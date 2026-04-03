@@ -189,7 +189,7 @@ export async function main(ns) {
     if (success) ns.tprint("ℹ️ Aktion erfolgreich ausgeführt.");
    // else ns.tprint("ℹ️ Aktion konnte nicht ausgeführt werden (vermutlich Race-Condition oder fehlende Mittel).");
 
-    // Warte vor dem nächsten Durchlaufkk
+    // Warte vor dem nächsten Durchlaufkkkk
     await ns.sleep(loopDelayMs);
   }
 }
