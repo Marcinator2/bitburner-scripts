@@ -1,0 +1,27 @@
+1. Die Befehle für dein Skript
+
+Du musst nicht auf dem Server "sein", um dort etwas zu tun. Du nutzt diese drei Befehle von deinem home-PC aus:
+
+    ns.scp(Dateiname, Zielserver): Kopiert die Datei von deinem aktuellen Server auf den Zielserver (egal wie viele Hops entfernt).
+    Terminal-Eingabe: Nutze scp Datei Ziel (ohne JavaScript-Syntax).
+    scp "FoodNStuff.js" FoodNStuff
+    scp "share-ram.js" iron-gym
+    scp "FoodNStuff.js" MeinErsterServer
+    ns.exec(Dateiname, Zielserver, Threads): Startet das Skript auf dem Zielserver.
+    exec "sigma-cosmetics.js" sigma-cosmetics 1
+
+    ns.killall(Zielserver): (Optional) Beendet alle laufenden Skripte auf dem Zielserver, um RAM freizumachen.
+
+    neo-net
+
+
+server von anfang finden:
+connect n00dles; connect CSEC
+connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I
+connect n00dles; connect nectar-net; connect phantasy; connect avmnite-02h
+connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect taiyang-digital; connect run4theh111z
+connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect infocomm; connect applied-energetics; connect fulcrumtech; connect .
+connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect infocomm; connect applied-energetics; connect fulcrumtech; connect .; connect blade; connect The-Cave
+connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect infocomm; connect applied-energetics; connect fulcrumtech; connect .; connect blade; connect The-Cave; connect w0r1d_d43m0n
+
+test24
