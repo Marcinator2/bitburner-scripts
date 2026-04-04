@@ -2,10 +2,15 @@
 export async function main(ns) {
   // Lese Argument (Servername) aus
   const server = ns.args[0] || "MeinServer_0";
-  const hackScript = (["money-hack.js", "share-ram.js", "profit-check.js", "stock_manager_worker.js",
-"v_grow.js",
-"v_hack.js",
-"v_weaken.js" ]);
+  const hackScript = ([
+    "money-hack.js", 
+    "share-ram.js", 
+    "profit-check.js", 
+    "manager_share-ram.js",
+    "v_grow.js",
+    "v_hack.js",
+    "v_weaken.js" 
+]);
 
   ns.tprint(`Setup läuft für: ${server}`);
 
@@ -21,8 +26,8 @@ export async function main(ns) {
   const scriptCost = ns.getScriptRam(hackScript[0], server);
   const threads = Math.floor(freeRam / scriptCost);
 
-  ns.exec("profit-check.js", server)
-
+  await ns.exec("profit-check.js", server)
+  await ns.exec("manager_share-ram.js", server)
 /*
   if (threads > 0) {
     ns.exec("profit-check.js", server)
