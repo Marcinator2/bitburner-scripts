@@ -5,7 +5,7 @@ export async function main(ns) {
   const verbesserungsFaktor = 1.5; // Ascension-Multiplikator-Schwelle (hack-Mult muss sich verdreifachen)
   const minHackFuerCrime = 200;    // Hack-Stat-Schwelle: darunter → trainieren statt Crime
   const geldPuffer = 10_000_000;   // Mindestgeld auf dem Konto nach Equipment-Kauf
-  const maxAmortisationStunden = 12; // Equipment wird nur gekauft wenn es sich in X Spielstunden amortisiert
+  const maxAmortisationStunden = 4; //1 Equipment wird nur gekauft wenn es sich in X Spielstunden amortisiert
   const loopDelayMs = 2000;         // Schleifenzeit in ms (muss mit ns.sleep übereinstimmen)
 
   // Equipment nach aufsteigendem Preis vorberechnen (günstigstes zuerst)

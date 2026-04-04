@@ -1,8 +1,8 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  const hackScript = ["money-hack.js", "share-ram.js"];
+  const scripts = ["money-hack.js", "profit-check.js", "manager_share-ram.js", "share-ram.js"];
   const blacklist = ["home"];
-  const killWaitMs = 250; // kurze Wartezeit nach Kill, damit RAM-Statistik aktualisiert
+  const killWaitMs = 250; // kurze Wartezeit nach Kill, damit RAM-Statistik aktualisiert.1
 
   // build server list (BFS-artig)
   const visited = new Set(["home"]);
@@ -42,86 +42,109 @@ export async function main(ns) {
       continue;
     }
 
-    // 1) Alle Instanzen von hackScript[0] auf dem Zielserver wirklich beenden
+    // 1) Alte money-hack/profit-check/share-ram Instanzen auf dem Zielserver beenden
     let procs = ns.ps(server);
     let killed = 0;
     for (const p of procs) {
-      if (p.filename === hackScript[0]) {
+      if (p.filename === scripts[0] || p.filename === scripts[1] || p.filename === scripts[2]|| p.filename === scripts[3]) {
         // ns.kill(pid) beendet genau diesen Prozess (sicherer als ns.kill(filename, server) wenn mehrere instanzen existieren)
         ns.kill(p.pid);
         killed++;
-        ns.tprint("🧨 Gekillt: " + hackScript[0] + " auf " + server + " (pid " + p.pid + ")");
+        ns.tprint("🧨 Gekillt: " + p.filename + " auf " + server + " (pid " + p.pid + ")");
       }
     }
     if (killed === 0) {
-      ns.tprint("ℹ️ Keine laufenden Instanzen von " + hackScript[0] + " auf " + server);
+      ns.tprint("ℹ️ Keine laufenden Instanzen von " + scripts[0] + ", " + scripts[1] + ", " + scripts[2] + " oder " + scripts[3] + " auf " + server);
     }
 
     // 2) kurz warten, damit RAM/Process-Listen aktualisiert werden
     await ns.sleep(killWaitMs);
 
     // 3) Datei-Existenz prüfen (auf home) und hochladen
-    if (!ns.fileExists(hackScript[0], "home")) {
-      ns.tprint("❌ " + hackScript[0] + " existiert nicht auf home. Überspringe " + server);
-      continue;
-    }
-    if (!ns.fileExists(hackScript[1], "home")) {
-      ns.tprint("❌ " + hackScript[1] + " existiert nicht auf home. Überspringe " + server);
+    if (!ns.fileExists(scripts[1], "home")) {
+      ns.tprint("❌ " + scripts[1] + " existiert nicht auf home. Überspringe " + server);
       continue;
     }
 
-    // scp lädt beide Dateien hoch
-    await ns.scp(hackScript, server);
+    if (!ns.fileExists(scripts[0], "home")) {
+      ns.tprint("❌ " + scripts[0] + " existiert nicht auf home. Überspringe " + server);
+      continue;
+    }
+    if (!ns.fileExists(scripts[2], "home")) {
+      ns.tprint("❌ " + scripts[2] + " existiert nicht auf home. Überspringe " + server);
+      continue;
+    }
+        if (!ns.fileExists(scripts[3], "home")) {
+      ns.tprint("❌ " + scripts[3] + " existiert nicht auf home. Überspringe " + server);
+      continue;
+    }
 
-    // 4) freien RAM berechnen und hackScript starten, danach Rest mit share-ram füllen
+    // scp lädt money-hack + profit-check + share-ram hoch
+    await ns.scp(scripts, server);
+
+    // 4) Nach Server-Typ starten:
+    //    - ohne Geld: profit-check einmal
+    //    - mit Geld: money-hack mit maximalen Threads auf sich selbst
     let freeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
+    let maxMoney = ns.getServerMaxMoney(server);
+    let reservedRam = 0;
 
-    // RAM für das Hack-Script (money-hack.js)
-    let hackRam = ns.getScriptRam(hackScript[0], server);
-    if (hackRam <= 0) {
-      ns.tprint("⚠️ Ungültige Script-RAM-Kosten für " + hackScript[0] + " auf " + server);
-      continue;
-    }
+    if (maxMoney <= 0) {
+      let profitRam = ns.getScriptRam(scripts[1], server);
+      if (profitRam <= 0) {
+        ns.tprint("⚠️ Ungültige Script-RAM-Kosten für " + scripts[1] + " auf " + server);
+        continue;
+      }
 
-    // Berechne Threads für money-hack.js
-    let hackThreads = Math.floor(freeRam / hackRam);
-
-    // Wenn Threads > 0, starte money-hack
-    let hackStarted = false;
-    if (hackThreads > 0) {
-      let pid = ns.exec(hackScript[0], server, hackThreads, server);
-      if (pid > 0) {
-        ns.tprint("🚀 " + hackScript[0] + " auf " + server + " gestartet (Threads: " + hackThreads + ", pid: " + pid + ").");
-        hackStarted = true;
+      if (freeRam >= profitRam) {
+        let pid = ns.exec(scripts[1], server, 1, server);
+        if (pid > 0) {
+          ns.tprint("🚀 " + scripts[1] + " auf " + server + " gestartet (Threads: 1, pid: " + pid + ").");
+          reservedRam = profitRam;
+        } else {
+          ns.tprint("⚠️ Exec fehlgeschlagen für " + scripts[1] + " auf " + server + " (Threads: 1).");
+        }
       } else {
-        ns.tprint("⚠️ Exec fehlgeschlagen für " + hackScript[0] + " auf " + server + " (Threads berechnet: " + hackThreads + ").");
+        ns.tprint("⚠️ Nicht genug freier RAM auf " + server + " für " + scripts[1] + " (benötigt " + profitRam + " RAM).");
       }
     } else {
-      ns.tprint("⚠️ Nicht genug freier RAM auf " + server + " für " + hackScript[0] + " (0 Threads).");
+      let moneyRam = ns.getScriptRam(scripts[0], server);
+      if (moneyRam <= 0) {
+        ns.tprint("⚠️ Ungültige Script-RAM-Kosten für " + scripts[0] + " auf " + server);
+        continue;
+      }
+
+      let moneyThreads = Math.floor(freeRam / moneyRam);
+      if (moneyThreads > 0) {
+        let pidMoney = ns.exec(scripts[0], server, moneyThreads, server);
+        if (pidMoney > 0) {
+          ns.tprint("💰 " + scripts[0] + " auf " + server + " gestartet (Threads: " + moneyThreads + ", pid: " + pidMoney + ").");
+          reservedRam = moneyThreads * moneyRam;
+        } else {
+          ns.tprint("⚠️ Exec fehlgeschlagen für " + scripts[0] + " auf " + server + " (Threads berechnet: " + moneyThreads + ").");
+        }
+      } else {
+        ns.tprint("⚠️ Nicht genug freier RAM auf " + server + " für " + scripts[0] + " (0 Threads).");
+      }
     }
 
-    // Berechne verbleibenden RAM (theoretisch nach dem Start)
-    // Wir rechnen mit der vorigen freeRam minus dem reservierten RAM für money-hack (auch wenn exec evtl. fehlgeschlagen ist).
-    let reservedForHack = hackThreads * hackRam;
-    let remainingRam = freeRam - reservedForHack;
-
-    // Versuche verbleibenden RAM mit share-ram.js zu füllen
-    let shareRam = ns.getScriptRam(hackScript[1], server);
+    // 5) Wenn nach dem Hauptskript noch RAM übrig ist, share-ram genau einmal starten
+    let remainingRam = freeRam - reservedRam;
+    let shareRam = ns.getScriptRam(scripts[2], server);
     if (shareRam <= 0) {
-      ns.tprint("⚠️ Ungültige Script-RAM-Kosten für " + hackScript[1] + " auf " + server);
+      ns.tprint("⚠️ Ungültige Script-RAM-Kosten für " + scripts[2] + " auf " + server);
       continue;
     }
 
-    let shareThreads = Math.floor(remainingRam / shareRam);
-    if (shareThreads > 0) {
-      let pidShare = ns.exec(hackScript[1], server, shareThreads);
+    if (remainingRam >= shareRam) {
+      let pidShare = ns.exec(scripts[2], server, 1);
       if (pidShare > 0) {
-        ns.tprint("🧩 " + hackScript[1] + " auf " + server + " gestartet (Threads: " + shareThreads + ", pid: " + pidShare + ").");
+        ns.tprint("🧩 " + scripts[2] + " auf " + server + " gestartet (Threads: 1, pid: " + pidShare + ").");
       } else {
-        ns.tprint("⚠️ Exec fehlgeschlagen für " + hackScript[1] + " auf " + server + " (Threads berechnet: " + shareThreads + ").");
+        ns.tprint("⚠️ Exec fehlgeschlagen für " + scripts[2] + " auf " + server + " (Threads: 1).");
       }
     } else {
-      ns.tprint("ℹ️ Kein verbleibender RAM für " + hackScript[1] + " auf " + server + " (benötigt " + shareRam + " RAM pro Thread).");
+      ns.tprint("ℹ️ Kein verbleibender RAM für " + scripts[2] + " auf " + server + " (benötigt " + shareRam + " RAM).");
     }
 
     // Backdoor-Check (optional)
