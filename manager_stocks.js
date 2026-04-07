@@ -3,7 +3,7 @@ export async function main(ns) {
   ns.disableLog("sleep");
 
   if (!ns.stock || typeof ns.stock.buyStock !== "function") {
-    ns.tprint("Stock API nicht verfügbar. Benötigt WSE/TIX API.");//tests
+    ns.tprint("Stock API nicht verfügbar. Benötigt WSE/TIX API.");//test
     return;
   }
 
@@ -28,7 +28,7 @@ export async function main(ns) {
   const pct_MinMoney = 0.2;
   const pct_MaxMoney = 0.8;
   const ramPuffer = 32;
-  const maxKaufMenge = 10_000_000;
+  const maxKaufMenge = 10_000_000_000;
   const minCashReserve = 10_000_000;
   const txFee = 100_000;
   const buyForecast = 0.56;
@@ -86,11 +86,22 @@ export async function main(ns) {
     if (avgVol <= 0.03 || avgEdge <= 0.035) {
       return {
         name: "QUIET",
+
+        /*//für test Daten von hot genommen
         buyF: buyForecast,
         sellF: sellForecast + 0.01,
         minVol: minVolatility,
         maxPos: Math.max(2, maxOpenPositions - 4),
         allocPerSymbol: Math.max(0.12, maxAllocationPerSymbol - 0.08),
+        */
+        buyF: buyForecast,
+        sellF: sellForecast,
+        minVol: minVolatility,
+        maxPos: maxOpenPositions,
+        allocPerSymbol: maxAllocationPerSymbol,
+
+
+
       };
     }
 

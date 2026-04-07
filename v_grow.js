@@ -1,6 +1,7 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  const ziel = ns.args[0];
-  // Das zweite Argument 'true' aktiviert den Einfluss auf den Aktienmarkt
+  const ziel  = ns.args[0];
+  const delay = ns.args[1] || 0;
+  if (delay > 0) await ns.sleep(delay);
   await ns.grow(ziel, { stock: true });
 }
