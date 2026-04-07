@@ -195,17 +195,23 @@ export async function main(ns) {
 
     // ── Einmalige Initialisierung ────────────────────────────────────────────
 
-    /** Alle Scripte auf MeinServer_-Servern beenden und Worker kopieren */
+    /** Fremde Scripte auf MeinServer_-Servern beenden, Worker-Scripte bleiben erhalten */
     async function initRunners(runners) {
-        const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT];
+        const workerScripts = new Set([H_SCRIPT, G_SCRIPT, W_SCRIPT]);
+        let killed = false;
         for (const r of runners) {
-            if (r.startsWith("MeinServer_")) {
-                ns.killall(r);
-                ns.print(`[Init] Alle Scripte auf ${r} beendet.`);
+            if (!r.startsWith("MeinServer_")) continue;
+            for (const proc of ns.ps(r)) {
+                if (!workerScripts.has(proc.filename)) {
+                    ns.kill(proc.pid);
+                    ns.print(`[Init] Beendet: ${proc.filename} auf ${r}`);
+                    killed = true;
+                }
             }
         }
-        // Kurz warten damit killall durchläuft, dann Worker kopieren
-        await ns.sleep(500);
+        if (killed) await ns.sleep(200);
+        // Worker-Scripte auf alle Runner kopieren
+        const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT];
         for (const r of runners) {
             if (r !== "home") await ns.scp(scripts, r);
         }
