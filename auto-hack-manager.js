@@ -11,6 +11,8 @@ export async function main(ns) {
     const H_SCRIPT      = "v_hack.js";
     const G_SCRIPT      = "v_grow.js";
     const W_SCRIPT      = "v_weaken.js";
+    const SHARE_SCRIPT  = "share-ram.js";
+    const SHARE_QUOTA   = 0.1;   // 10% RAM pro MeinServer_ für share-ram.js reservieren
     const HACK_FRACTION = 0.5;   // Anteil des Max-Geldes der pro Batch gestohlen wird
     const SPACING       = 200;   // ms Abstand zwischen den Finish-Zeitpunkten im Batch
     const HOME_RESERVE  = 32;    // GB die auf home reserviert bleiben
@@ -31,6 +33,27 @@ export async function main(ns) {
         return [...found];
     }
 
+    /** Versucht Root-Zugang auf einem Server zu erlangen */
+    function tryNuke(s) {
+        if (ns.hasRootAccess(s)) return true;
+        if (ns.getServerRequiredHackingLevel(s) > ns.getHackingLevel()) return false;
+
+        // Ports öffnen mit verfügbaren Tools
+        let openPorts = 0;
+        if (ns.fileExists("BruteSSH.exe",  "home")) { ns.brutessh(s);   openPorts++; }
+        if (ns.fileExists("FTPCrack.exe",  "home")) { ns.ftpcrack(s);   openPorts++; }
+        if (ns.fileExists("relaySMTP.exe", "home")) { ns.relaysmtp(s);  openPorts++; }
+        if (ns.fileExists("HTTPWorm.exe",  "home")) { ns.httpworm(s);   openPorts++; }
+        if (ns.fileExists("SQLInject.exe", "home")) { ns.sqlinject(s);  openPorts++; }
+
+        if (openPorts >= ns.getServerNumPortsRequired(s)) {
+            ns.nuke(s);
+            ns.tprint(`[Nuke] Root-Zugang erlangt: ${s}`);
+            return true;
+        }
+        return false;
+    }
+
     /** Ist der Server ein hackbares Ziel? */
     function isTarget(s) {
         if (s === "home" || s.startsWith("MeinServer_")) return false;
@@ -42,18 +65,29 @@ export async function main(ns) {
     /** Ist der Server ein Runner (führt Scripte aus)? */
     function isRunner(s) {
         if (s === "home") return ns.getServerMaxRam(s) > HOME_RESERVE;
-        return s.startsWith("MeinServer_") && ns.getServerMaxRam(s) > 0;
+        // Alle Server mit Root-Zugang und RAM nutzen
+        return ns.hasRootAccess(s) && ns.getServerMaxRam(s) > 0;
     }
 
-    /** Freier RAM aller Runner als Array [{host, free}] */
+    /** Freier RAM aller Runner als Array [{host, free}] – MeinServer_ zuerst, dann externe */
     function runnerRamList(runners) {
         return runners.map(r => {
-            const reserve = r === "home" ? HOME_RESERVE : 0;
+            let reserve = r === "home" ? HOME_RESERVE : 0;
+            // Für MeinServer_: 10% RAM immer für share-ram.js freihalten
+            if (r.startsWith("MeinServer_")) {
+                reserve += ns.getServerMaxRam(r) * SHARE_QUOTA;
+            }
             return {
                 host: r,
                 free: Math.max(0, ns.getServerMaxRam(r) - ns.getServerUsedRam(r) - reserve)
             };
-        }).filter(r => r.free > 0);
+        })
+        .filter(r => r.free > 0)
+        .sort((a, b) => {
+            // Reihenfolge: MeinServer_ > externe Server > home
+            const rank = h => h.startsWith("MeinServer_") ? 0 : h === "home" ? 2 : 1;
+            return rank(a.host) - rank(b.host);
+        });
     }
 
     /**
@@ -195,12 +229,12 @@ export async function main(ns) {
 
     // ── Einmalige Initialisierung ────────────────────────────────────────────
 
-    /** Fremde Scripte auf MeinServer_-Servern beenden, Worker-Scripte bleiben erhalten */
+    /** Fremde Scripte auf Runnern beenden, Worker-Scripte bleiben erhalten */
     async function initRunners(runners) {
-        const workerScripts = new Set([H_SCRIPT, G_SCRIPT, W_SCRIPT]);
+        const workerScripts = new Set([H_SCRIPT, G_SCRIPT, W_SCRIPT, SHARE_SCRIPT]);
         let killed = false;
         for (const r of runners) {
-            if (!r.startsWith("MeinServer_")) continue;
+            if (r === "home") continue;
             for (const proc of ns.ps(r)) {
                 if (!workerScripts.has(proc.filename)) {
                     ns.kill(proc.pid);
@@ -211,9 +245,24 @@ export async function main(ns) {
         }
         if (killed) await ns.sleep(200);
         // Worker-Scripte auf alle Runner kopieren
-        const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT];
+        const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT, SHARE_SCRIPT];
         for (const r of runners) {
             if (r !== "home") await ns.scp(scripts, r);
+        }
+        // share-ram.js nur auf MeinServer_ starten (max 10% RAM)
+        const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
+        for (const r of runners) {
+            if (!r.startsWith("MeinServer_")) continue;
+            if (ns.scriptRunning(SHARE_SCRIPT, r)) continue;
+            const maxRam     = ns.getServerMaxRam(r);
+            const shareQuota = maxRam * SHARE_QUOTA;
+            const threads = Math.floor(shareQuota / shareRam);
+            if (threads < 1) {
+                ns.print(`[Init] share-ram.js auf ${r} übersprungen (zu wenig RAM: ${shareQuota.toFixed(1)} GB < ${shareRam} GB)`);
+                continue;
+            }
+            ns.exec(SHARE_SCRIPT, r, threads);
+            ns.print(`[Init] share-ram.js auf ${r} mit ${threads} Thread(s) gestartet.`);
         }
     }
 
@@ -229,6 +278,12 @@ export async function main(ns) {
 
     while (true) {
         const allServers = scanAll();
+
+        // Versuche Root-Zugang auf allen noch nicht gehackten Servern
+        for (const s of allServers) {
+            if (!ns.hasRootAccess(s)) tryNuke(s);
+        }
+
         const runners    = allServers.filter(isRunner);
         const targets    = sortByProfit(allServers.filter(isTarget));
 
@@ -268,6 +323,12 @@ export async function main(ns) {
         ns.print(`║  Kein RAM:     ${String(noRam).padStart(4)}           ║`);
         ns.print(`║  Runner:       ${String(runners.length).padStart(4)}           ║`);
         ns.print(`║  Freier RAM:   ${String(totalFree).padStart(7)} GB       ║`);
+        ns.print("╠══════════════════════════════╣");
+        // RAM pro Runner anzeigen
+        for (const r of ramList) {
+            const label = r.host.length > 14 ? r.host.slice(0, 14) : r.host.padEnd(14);
+            ns.print(`║  ${label}  ${String(r.free.toFixed(0)).padStart(5)} GB       ║`);
+        }
         ns.print("╚══════════════════════════════╝");
 
         await ns.sleep(LOOP_DELAY);
