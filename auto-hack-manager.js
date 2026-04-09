@@ -1,6 +1,6 @@
 // auto-hack-manager.js
-// Bitburner Script: Optimierter HWGW-Batch-Manager
-// Alle erreichbaren Server werden gehackt. Nutzt home + MeinServer_ als Runner.
+// Bitburner Script: Optimierter HWGW-Batch-Manager22
+// Alle erreichbaren Server werden gehackt. Nutzt home + MeinServer_ als Runner.12
 // Worker-Scripte (v_hack.js, v_grow.js, v_weaken.js) müssen delay als 2. Argument unterstützen.
 
 /** @param {NS} ns **/
@@ -33,7 +33,9 @@ export async function main(ns) {
         return [...found];
     }
 
-    /** Versucht Root-Zugang auf einem Server zu erlangen */
+    /** Versucht Root-Zugang auf einem Server zu erlangen .ls
+     * 
+    */
     function tryNuke(s) {
         if (ns.hasRootAccess(s)) return true;
         if (ns.getServerRequiredHackingLevel(s) > ns.getHackingLevel()) return false;
@@ -83,11 +85,7 @@ export async function main(ns) {
             };
         })
         .filter(r => r.free > 0)
-        .sort((a, b) => {
-            // Reihenfolge: MeinServer_ > externe Server > home
-            const rank = h => h.startsWith("MeinServer_") ? 0 : h === "home" ? 2 : 1;
-            return rank(a.host) - rank(b.host);
-        });
+        .sort((a, b) => b.free - a.free); // meisten freien RAM zuerst → home (4PB) wird bevorzugt
     }
 
     /**
@@ -117,6 +115,15 @@ export async function main(ns) {
         }
     }
 
+    function safeGrowthThreads(target, multiplier) {
+        const growMult = Number.isFinite(multiplier) ? multiplier : Number(multiplier);
+        if (!Number.isFinite(growMult) || growMult < 1) {
+            ns.print(`[Warn] safeGrowthThreads: ungültiger growMult=${multiplier} für ${target}, setze 1`);
+            return 1;
+        }
+        return Math.max(1, Math.ceil(ns.growthAnalyze(target, growMult)));
+    }
+
     // ── HWGW-Berechnungen ────────────────────────────────────────────────────
 
     /**
@@ -124,17 +131,23 @@ export async function main(ns) {
      * Annahme: Ziel ist auf minSec + maxMoney (vorbereitet).
      */
     function calcBatch(target) {
-        const hackPer     = ns.hackAnalyze(target);
-        const hackThreads = Math.max(1, Math.floor(HACK_FRACTION / hackPer));
-        const stoleFrac   = Math.min(hackPer * hackThreads, 0.99);
+        const hackPer = ns.hackAnalyze(target);
+        const desiredSteal = Math.min(HACK_FRACTION, 0.99);
+        const hackThreads = Number.isFinite(hackPer) && hackPer > 0
+            ? Math.max(1, Math.floor(desiredSteal / hackPer))
+            : 1;
+        const stoleFrac = Number.isFinite(hackPer) && hackPer > 0
+            ? Math.min(hackPer * hackThreads, 0.99)
+            : 0.01;
 
-        const growThreads = Math.max(1, Math.ceil(
-            ns.growthAnalyze(target, 1 / (1 - stoleFrac))
-        ));
+        // growthAnalyze liefert die minimale Threadzahl, um mindestens den Faktor zu erreichen.
+        // Die Maschine selbst kann das Ergebnis dann auf maxMoney begrenzen.
+        const growMult = 1 / (1 - stoleFrac);
+        const growThreads = safeGrowthThreads(target, growMult);
 
-        const wPer        = ns.weakenAnalyze(1);
-        const w1Threads   = Math.max(1, Math.ceil(ns.hackAnalyzeSecurity(hackThreads)   / wPer));
-        const w2Threads   = Math.max(1, Math.ceil(ns.growthAnalyzeSecurity(growThreads) / wPer));
+        const wPer = ns.weakenAnalyze(1);
+        const w1Threads = Math.max(1, Math.ceil(ns.hackAnalyzeSecurity(hackThreads) / wPer));
+        const w2Threads = Math.max(1, Math.ceil(ns.growthAnalyzeSecurity(growThreads) / wPer));
 
         return { hackThreads, growThreads, w1Threads, w2Threads };
     }
@@ -163,7 +176,7 @@ export async function main(ns) {
         const minSec   = ns.getServerMinSecurityLevel(target);
         const maxMoney = ns.getServerMaxMoney(target);
         const curSec   = ns.getServerSecurityLevel(target);
-        const curMoney = ns.getServerMoneyAvailable(target) || 1;
+        const curMoney = Math.max(1, ns.getServerMoneyAvailable(target));
         let launched   = false;
 
         if (curSec > minSec + 0.5) {
@@ -171,7 +184,8 @@ export async function main(ns) {
             if (distribute(ramList, W_SCRIPT, threads, target, 0)) launched = true;
         }
         if (curMoney < maxMoney * 0.95) {
-            const threads = Math.ceil(ns.growthAnalyze(target, maxMoney / curMoney));
+            const growMult = maxMoney / curMoney;
+            const threads = safeGrowthThreads(target, growMult);
             if (distribute(ramList, G_SCRIPT, threads, target, 0)) launched = true;
         }
         return launched;
@@ -284,34 +298,52 @@ export async function main(ns) {
             if (!ns.hasRootAccess(s)) tryNuke(s);
         }
 
-        const runners    = allServers.filter(isRunner);
-        const targets    = sortByProfit(allServers.filter(isTarget));
+        const runners = allServers.filter(isRunner);
+        const targets = allServers.filter(isTarget);
 
         // Worker-Scripte auf neue Runner kopieren (bereits laufende bleiben)
         await scpToRunners(runners);
 
-        const ramList  = runnerRamList(runners);
-        let batched    = 0;
-        let prepping   = 0;
-        let noRam      = 0;
+        const ramList = runnerRamList(runners);
+        let batched = 0;
+        let prepping = 0;
+        let noRam = 0;
 
-        for (const target of targets) {
-            if (isReady(target)) {
-                // Server ist optimal vorbereitet → HWGW-Batch starten
+        const sortedTargets = sortByProfit(targets);
+        const readyTargets  = sortedTargets.filter(isReady);
+        const notReady      = sortedTargets.filter(t => !isReady(t));
+
+        // Vorbereitung für nicht-bereite Server
+        for (const target of notReady) {
+            const alreadyPreparing = runners.some(r =>
+                ns.ps(r).some(p => p.args[0] === target
+                    && (p.filename === W_SCRIPT || p.filename === G_SCRIPT))
+            );
+            if (!alreadyPreparing) {
+                if (prepareTarget(target, ramList)) prepping++;
+            } else {
+                prepping++;
+            }
+        }
+
+        // Round-Robin: jedes bereite Ziel bekommt reihum einen Batch,
+        // bis kein RAM mehr für irgendeinen Batch reicht.
+        let anyLaunched = true;
+        while (anyLaunched) {
+            anyLaunched = false;
+            for (const target of readyTargets) {
                 if (launchBatch(target, ramList, String(uid++))) {
                     batched++;
+                    anyLaunched = true;
                 } else {
                     noRam++;
                 }
-            } else {
-                // Server muss zuerst vorbereitet werden
-                if (prepareTarget(target, ramList)) prepping++;
             }
         }
 
         // Status-Anzeige im Log
         const totalFree = ramList.reduce((s, r) => s + r.free, 0).toFixed(1);
-        const ready     = targets.filter(isReady).length;
+        const ready = targets.filter(isReady).length;
         ns.clearLog();
         ns.print("╔══════════════════════════════╗");
         ns.print(`║  Auto-Hack Manager           ║`);
@@ -334,3 +366,5 @@ export async function main(ns) {
         await ns.sleep(LOOP_DELAY);
     }
 }
+
+
