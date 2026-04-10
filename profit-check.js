@@ -1,73 +1,53 @@
 /** @param {NS} ns */
+//1. Alle Server per BFS sammeln
+//2. Filtern: maxMoney > 0, nicht in blacklist
+//3. Sortieren nach maxMoney
+//4. Ausgabe in Tabelle mit Root-Zugriff, Name, Max-Money, Required Level
 export async function main(ns) {
-  const blacklist = ["home", "MeinServer_0"];
-  const scriptName = "money-hack.js";
-  
-  // 1. Server sammeln und sortieren
-  const serverData = collectServers(ns, blacklist);
-  
-  // 2. Verfügbaren RAM auf dem aktuellen Server berechnen
-  const host = ns.getHostname();
-  const maxRam = ns.getServerMaxRam(host);
-  const usedRam = ns.getServerUsedRam(host);
-  const scriptRam = ns.getScriptRam(scriptName);
-  
-  // Wir lassen ein bisschen Puffer (z.B. 10 GB oder 10%), damit das Hauptskript weiterlaufen kann
-  const freeRam = maxRam - usedRam;
-  
-  if (freeRam < scriptRam) {
-    ns.tprint("❌ Nicht genug RAM vorhanden, um Scripte zu starten!");
-    return;
-  }
+  const blacklist = new Set(["home"]);
 
-  // 3. Berechnung der Threads pro Server
-  const anzahlZiele = Math.min(20, serverData.length); // Wir nehmen z.B. die Top 20 Ziele
-  const totalPossibleThreads = Math.floor(freeRam / scriptRam);
-  const threadsPerServer = Math.floor(totalPossibleThreads / anzahlZiele);
-
-  ns.tprint(`💻 RAM: ${ns.formatRam(freeRam)} frei | Threads pro Ziel: ${threadsPerServer}`);
-
-  if (threadsPerServer < 1) {
-    ns.tprint("⚠️ Warnung: Zu viele Ziele für den verfügbaren RAM. Reduziere 'anzahlZiele'!");
-    return;
-  }
-
-  // 4. Scripte starten
-  for (let i = 0; i < anzahlZiele; i++) {
-    const s = serverData[i];
-    
-    if (ns.hasRootAccess(s.name)) {
-      ns.tprint(`🚀 Starte Hack auf ${s.name} mit ${threadsPerServer} Threads`);
-      ns.run(scriptName, threadsPerServer, s.name);
-    } else {
-      ns.tprint(`🔒 Kein Root-Zugriff auf ${s.name} - überspringe.`);
-    }
-  }
-}
-
-// Deine Hilfsfunktion (unverändert, nur logisch eingebunden)
-function collectServers(ns, blacklist = []) {
+  // Alle Server per BFS sammeln
   const visited = new Set(["home"]);
-  const allServers = ["home"];
-  for (let i = 0; i < allServers.length; i++) {
-    for (const neighbor of ns.scan(allServers[i])) {
+  const queue = ["home"];
+  while (queue.length) {
+    for (const neighbor of ns.scan(queue.shift())) {
       if (!visited.has(neighbor)) {
         visited.add(neighbor);
-        allServers.push(neighbor);
+        queue.push(neighbor);
       }
     }
   }
-  let serverData = [];
-  for (let server of allServers) {
-    if (blacklist.includes(server)) continue;
-    if (ns.getHackingLevel() >= ns.getServerRequiredHackingLevel(server)) {
-      serverData.push({
-        name: server,
-        money: ns.getServerMaxMoney(server),
-        hackLevel: ns.getServerRequiredHackingLevel(server)
-      });
-    }
+
+  const HACK_FRACTION = 0.5;
+
+  // Filtern, Profit-Rate berechnen und sortieren
+  const servers = [...visited]
+    .filter(s => !blacklist.has(s) && ns.getServerMaxMoney(s) > 0)
+    .map(s => ({
+      name: s,
+      maxMoney: ns.getServerMaxMoney(s),
+      reqLevel: ns.getServerRequiredHackingLevel(s),
+      hasRoot: ns.hasRootAccess(s),
+      rate: ns.getServerMaxMoney(s) * ns.hackAnalyze(s) * HACK_FRACTION / ns.getWeakenTime(s),
+    }))
+    .sort((a, b) => b.rate - a.rate);
+
+  // Ausgabe sortiert nach Profit-Rate
+  ns.tprint("╔════════════════════════════════════════════════════════════╗");
+  ns.tprint("║  Server sortiert nach Profit-Rate ($/s)                    ║");
+  ns.tprint("╠════════════════════════════════════════════════════════════╣");
+  ns.tprint(`║  ${"#".padEnd(3)} ${"Server".padEnd(18)} ${"Max-Money".padStart(11)} ${"$/s".padStart(10)} ${"Req".padStart(4)}  ║`);
+  ns.tprint("╠════════════════════════════════════════════════════════════╣");
+  for (let i = 0; i < servers.length; i++) {
+    const s = servers[i];
+    const root = s.hasRoot ? " " : "🔒";
+    const num  = String(i + 1).padEnd(3);
+    const name = s.name.length > 18 ? s.name.slice(0, 18) : s.name.padEnd(18);
+    const money = ns.nFormat(s.maxMoney, "$0.00a").padStart(11);
+    const rate  = ns.nFormat(s.rate,     "$0.00a").padStart(10);
+    const lvl   = String(s.reqLevel).padStart(4);
+    ns.tprint(`║ ${root} ${num} ${name} ${money} ${rate} ${lvl}  ║`);
   }
-  serverData.sort((a, b) => b.money - a.money);
-  return serverData;
+  ns.tprint("╚════════════════════════════════════════════════════════════╝");
+  ns.tprint(`  ${servers.length} Server gefunden.`);
 }

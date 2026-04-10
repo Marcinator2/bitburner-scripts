@@ -239,6 +239,51 @@ export async function main(ns) {
         });
     }
 
+    // ── Programme kaufen / programmieren (benötigt Singularity SF4) ─────────
+
+    /**
+     * Kauft fehlende Port-Cracker über den Darkweb-Shop oder programmiert sie.
+     * Wird per try/catch geschützt – ohne SF4 läuft das Script einfach weiter.
+     */
+    function manageProgramAcquisition() {
+        try {
+            const programs = [
+                "BruteSSH.exe",
+                "FTPCrack.exe",
+                "relaySMTP.exe",
+                "HTTPWorm.exe",
+                "SQLInject.exe",
+            ];
+
+            const missing = programs.filter(p => !ns.fileExists(p, "home"));
+            if (missing.length === 0) return;
+
+            // TOR-Router kaufen (nötig für Darkweb-Käufe)
+            ns.singularity.purchaseTor();
+
+            // Programme kaufen falls genug Geld vorhanden
+            for (const prog of missing) {
+                if (ns.singularity.purchaseProgram(prog)) {
+                    ns.tprint(`[Prog] Gekauft: ${prog}`);
+                }
+            }
+
+            // Noch fehlende Programme selbst programmieren
+            const stillMissing = programs.filter(p => !ns.fileExists(p, "home"));
+            if (stillMissing.length === 0) return;
+
+            const currentWork = ns.singularity.getCurrentWork();
+            const alreadyCoding = currentWork !== null && currentWork.type === "CREATE_PROGRAM";
+            if (!alreadyCoding) {
+                if (ns.singularity.createProgram(stillMissing[0], false)) {
+                    ns.print(`[Prog] Programmiere: ${stillMissing[0]}`);
+                }
+            }
+        } catch (_) {
+            // Singularity API nicht verfügbar (kein SF4) – wird ignoriert
+        }
+    }
+
     // ── Hauptschleife ────────────────────────────────────────────────────────
 
     // ── Einmalige Initialisierung ────────────────────────────────────────────
@@ -291,6 +336,8 @@ export async function main(ns) {
     let uid = 0;
 
     while (true) {
+        manageProgramAcquisition();
+
         const allServers = scanAll();
 
         // Versuche Root-Zugang auf allen noch nicht gehackten Servern
