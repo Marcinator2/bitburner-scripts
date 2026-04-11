@@ -1,3 +1,93 @@
+Skriptuebersicht
+================
+
+Hacking
+- 1st-hackworm.js: Steuert Hack/Grow/Weaken-Aktionen ueber die Worker v_hack.js, v_grow.js und v_weaken.js.
+- auto-hack-manager.js: Zentraler HWGW-Manager fuer mehrere Ziele und Server, nutzt auch share-ram.js.
+- hack-worker.js: Einfacher Endlos-Worker fuer einen Zielserver mit Hack/Grow/Weaken-Logik.
+- money-hack.js: Einzelserver-Hackskript mit Schwellwerten fuer Geld und Sicherheit.
+- v_hack.js: Kleiner Hack-Worker mit optionalem Delay.
+- v_grow.js: Kleiner Grow-Worker mit optionalem Delay.
+- v_weaken.js: Kleiner Weaken-Worker mit optionalem Delay.
+
+Player / Stats
+- player_stats_worker.js: Schreibt regelmaessig Player-Snapshots als JSON-Text in player_stats_data.txt.
+- player_stats.js: Liest die Historie aus, berechnet Trends ueber mehrere Zeitfenster und zeigt Charts an.
+- manager_stats.js: Trainiert automatisch den jeweils niedrigsten Combat-Stat im Gym.
+
+Stocks
+- manager_stocks.js: Aktien-/Server-Strategie rund um joesguns mit v_*.js-Unterstuetzung.
+- stock_manager_worker.js: Worker fuer die gleiche Grundidee auf einem festen Host/Ziel.
+
+Server / Infrastruktur
+- manager_hacknet.js: Kauft und upgraded Hacknet-Knoten.
+- manager_share-ram.js: Startet share-ram.js mit allen verfuegbaren Threads.
+- share-ram.js: Verwendet freie RAM fuer share().
+- new_server_buy.js: Kauft neue Purchased-Server.
+- new_server_setup.js: Kopiert Standardskripte auf neue Server.
+- umbenennen_server.js: Vereinheitlicht Purchased-Server-Namen.
+- upgrade_Server.js: Upgraded vorhandene Purchased-Server auf ein gemeinsames RAM-Ziel.
+
+Utility / Uebersicht
+- main_manager.js: Zentraler Supervisor, der passende Dauer-Skripte startet, ueberwacht und Mehrfachstarts vermeidet.
+- main_manager_config.txt: JSON-Konfiguration fuer main_manager.js, um Dienste, Threads, Intervalle und Argumente zentral zu steuern.
+- overview.js: Zeigt eine kompakte Uebersicht zu Einkommen, laufenden Skripten und Servern.
+- profit-check.js: Listet lohnende hackbare Server.
+- find-server.js: Sucht Verbindungswege und gibt connect-Befehle aus.
+- auto-leveler.js: Kauft Programme automatisch, wenn genug Geld vorhanden ist.
+
+Test / Unklar
+- befehltest.js: Testskript, wirkt experimentell.
+- scp_kopieren.js: Testskript, Name passt aktuell nicht ganz zum Inhalt.
+- test.js: Zweite Variante von Serversuche/Testcode.
+
+Moegliche spaetere Verknuepfung
+-------------------------------
+- zentrale Konfigurationsdatei fuer Ziele, Kaufgrenzen, Hostnamen und Intervalle
+- ein Hauptmanager, der Hacken, Stocks, Hacknet, Serverkauf und Player-Training koordiniert
+- gemeinsame Utility-Funktionen fuer Datei-I/O, Serverlisten und Logging
+
+Abhaengigkeiten / Startketten
+=============================
+
+Purchased-Server-Kette
+- new_server_buy.js -> startet new_server_setup.js nach dem Kauf eines neuen Servers.
+- new_server_setup.js -> kopiert money-hack.js, share-ram.js, profit-check.js, manager_share-ram.js und v_*.js auf den neuen Server.
+- new_server_setup.js -> startet aktuell profit-check.js und manager_share-ram.js auf dem neuen Server.
+- manager_share-ram.js -> startet share-ram.js mit den verfuegbaren Threads.
+
+Hacking-Kern
+- auto-hack-manager.js -> verteilt v_hack.js, v_grow.js und v_weaken.js auf Runner und startet optional share-ram.js auf MeinServer_-Hosts.
+- 1st-hackworm.js -> nutzt ebenfalls v_hack.js, v_grow.js und v_weaken.js.
+- stock_manager_worker.js -> nutzt v_hack.js, v_grow.js und v_weaken.js fuer die Kurs-/Server-Strategie.
+- manager_stocks.js -> nutzt v_hack.js, v_grow.js und v_weaken.js direkt auf home.
+
+Share-/Fallback-Kette
+- money-hack.js -> startet share-ram.js auf dem Ziel, falls der Zielserver kein Geld, aber RAM hat.
+- manager_share-ram.js -> dient als einfacher Starter fuer share-ram.js.
+
+Player-Stats-Kette
+- player_stats_worker.js -> schreibt die Zeitreihe in player_stats_data.txt.
+- player_stats.js -> liest player_stats_data.txt, berechnet Fenster und zeigt Trends/Charts an.
+
+Beobachtung / Anzeige
+- overview.js -> beobachtet laufende Instanzen von money-hack.js, startet selbst aber nichts.
+- find-server.js und profit-check.js -> Utilities ohne direkte Startkette, aber gute Kandidaten fuer einen spaeteren Hauptmanager.
+
+Wichtige gemeinsame Bausteine
+-----------------------------
+- v_hack.js, v_grow.js, v_weaken.js: gemeinsame Worker fuer mehrere Manager.
+- share-ram.js: gemeinsamer Worker fuer ungenutzten RAM.
+- player_stats_data.txt: gemeinsame Datendatei fuer Player-Stat-Historie.
+
+Sinnvolle Integrationspunkte spaeter
+------------------------------------
+- main_manager.js ist der erste Einstiegspunkt fuer eine spaetere Gesamtkoordination.
+- main_manager_config.txt ist die zentrale Stelle fuer Dienst-Aktivierung und Standardargumente.
+- Ein zentraler Manager kann new_server_buy.js, new_server_setup.js und upgrade_Server.js als Infrastruktur-Block steuern.
+- Die Ziele und Limits fuer auto-hack-manager.js, manager_stocks.js und money-hack.js sollten aus einer gemeinsamen Konfiguration kommen.
+- overview.js koennte zur zentralen Statusanzeige fuer Hacking, Stocks, Player-Stats und Serverkauf erweitert werden.
+
 1. Die Befehle für dein Skript
 
 Du musst nicht auf dem Server "sein", um dort etwas zu tun. Du nutzt diese drei Befehle von deinem home-PC aus:

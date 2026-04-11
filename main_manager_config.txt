@@ -1,0 +1,47 @@
+{
+
+  "loopMs": 5000,
+  "tail": true,
+  "services": {
+    "hack": {
+      "enabled": true,
+      "threads": 1,
+      "args": []
+    },
+    "hacknet": {
+      "enabled": false,
+      "threads": 1,
+      "args": []
+    },
+    "stocks": {
+      "enabled": false,
+      "threads": 1,
+      "args": []
+    },
+    "gang": {
+      "enabled": false,
+      "threads": 1,
+      "args": []
+    },
+    "programs": {
+      "enabled": false,
+      "threads": 1,
+      "args": []
+    },
+    "playerStatsWorker": {
+      "enabled": true,
+      "threads": 1,
+      "args": ["player_stats_data.txt", 10000, 360]
+    },
+    "playerStatsView": {
+      "enabled": true,
+      "threads": 1,
+      "args": ["player_stats_data.txt"]
+    },
+    "overview": {
+      "enabled": true,
+      "threads": 1,
+      "args": []
+    }
+  }
+}

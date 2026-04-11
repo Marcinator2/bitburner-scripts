@@ -26,6 +26,7 @@ export async function main(ns) {
     .map(s => ({
       name: s,
       maxMoney: ns.getServerMaxMoney(s),
+      curMoney: ns.getServerMoneyAvailable(s),
       reqLevel: ns.getServerRequiredHackingLevel(s),
       hasRoot: ns.hasRootAccess(s),
       rate: ns.getServerMaxMoney(s) * ns.hackAnalyze(s) * HACK_FRACTION / ns.getWeakenTime(s),
@@ -33,21 +34,22 @@ export async function main(ns) {
     .sort((a, b) => b.rate - a.rate);
 
   // Ausgabe sortiert nach Profit-Rate
-  ns.tprint("╔════════════════════════════════════════════════════════════╗");
-  ns.tprint("║  Server sortiert nach Profit-Rate ($/s)                    ║");
-  ns.tprint("╠════════════════════════════════════════════════════════════╣");
-  ns.tprint(`║  ${"#".padEnd(3)} ${"Server".padEnd(18)} ${"Max-Money".padStart(11)} ${"$/s".padStart(10)} ${"Req".padStart(4)}  ║`);
-  ns.tprint("╠════════════════════════════════════════════════════════════╣");
+  ns.tprint("╔══════════════════════════════════════════════════════════════════════╗");
+  ns.tprint("║  Server sortiert nach Profit-Rate ($/s)                              ║");
+  ns.tprint("╠══════════════════════════════════════════════════════════════════════╣");
+  ns.tprint(`║  ${"#".padEnd(3)} ${"Server".padEnd(18)} ${"Max-Money".padStart(11)} ${"Cur-Money".padStart(11)} ${"$/s".padStart(10)} ${"Req".padStart(4)}  ║`);
+  ns.tprint("╠══════════════════════════════════════════════════════════════════════╣");
   for (let i = 0; i < servers.length; i++) {
     const s = servers[i];
     const root = s.hasRoot ? " " : "🔒";
     const num  = String(i + 1).padEnd(3);
     const name = s.name.length > 18 ? s.name.slice(0, 18) : s.name.padEnd(18);
     const money = ns.nFormat(s.maxMoney, "$0.00a").padStart(11);
+    const cur   = ns.nFormat(s.curMoney, "$0.00a").padStart(11);
     const rate  = ns.nFormat(s.rate,     "$0.00a").padStart(10);
     const lvl   = String(s.reqLevel).padStart(4);
-    ns.tprint(`║ ${root} ${num} ${name} ${money} ${rate} ${lvl}  ║`);
+    ns.tprint(`║ ${root} ${num} ${name} ${money} ${cur} ${rate} ${lvl}  ║`);
   }
-  ns.tprint("╚════════════════════════════════════════════════════════════╝");
+  ns.tprint("╚══════════════════════════════════════════════════════════════════════╝");
   ns.tprint(`  ${servers.length} Server gefunden.`);
 }

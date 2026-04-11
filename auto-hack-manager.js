@@ -13,10 +13,11 @@ export async function main(ns) {
     const W_SCRIPT      = "v_weaken.js";
     const SHARE_SCRIPT  = "share-ram.js";
     const SHARE_QUOTA   = 0.1;   // 10% RAM pro MeinServer_ für share-ram.js reservieren
-    const HACK_FRACTION = 0.5;   // Anteil des Max-Geldes der pro Batch gestohlen wird
+    const HACK_FRACTION = 0.99;  // Maximaler Anteil des Max-Geldes pro Batch (so viel wie RAM erlaubt)
     const SPACING       = 200;   // ms Abstand zwischen den Finish-Zeitpunkten im Batch
-    const HOME_RESERVE  = 32;    // GB die auf home reserviert bleiben
-    const LOOP_DELAY    = 2000;  // Intervall der Manager-Schleife in ms
+    const HOME_RESERVE  = 10;    // GB die auf home reserviert bleiben
+    const LOOP_DELAY    = 1000;  // Intervall der Manager-Schleife in ms
+    const MIN_MONEY_FRAC = 0.85; // Ziel gilt als bereit wenn es mindestens 85% seines Max-Geldes hat
     // ─────────────────────────────────────────────────────────────────────────
 
     // ── Hilfsfunktionen ──────────────────────────────────────────────────────
@@ -130,9 +131,9 @@ export async function main(ns) {
      * Berechne Thread-Anzahlen für einen HWGW-Batch.
      * Annahme: Ziel ist auf minSec + maxMoney (vorbereitet).
      */
-    function calcBatch(target) {
+    function calcBatch(target, fraction = HACK_FRACTION) {
         const hackPer = ns.hackAnalyze(target);
-        const desiredSteal = Math.min(HACK_FRACTION, 0.99);
+        const desiredSteal = Math.min(fraction, 0.99);
         const hackThreads = Number.isFinite(hackPer) && hackPer > 0
             ? Math.max(1, Math.floor(desiredSteal / hackPer))
             : 1;
@@ -163,7 +164,7 @@ export async function main(ns) {
 
     function isReady(target) {
         return ns.getServerSecurityLevel(target) <= ns.getServerMinSecurityLevel(target) + 0.5
-            && ns.getServerMoneyAvailable(target) >= ns.getServerMaxMoney(target) * 0.95;
+            && ns.getServerMoneyAvailable(target) >= ns.getServerMaxMoney(target) * MIN_MONEY_FRAC;
     }
 
     // ── Vorbereitung ─────────────────────────────────────────────────────────
@@ -183,7 +184,7 @@ export async function main(ns) {
             const threads = Math.ceil((curSec - minSec) / ns.weakenAnalyze(1));
             if (distribute(ramList, W_SCRIPT, threads, target, 0)) launched = true;
         }
-        if (curMoney < maxMoney * 0.95) {
+        if (curMoney < maxMoney * MIN_MONEY_FRAC) {
             const growMult = maxMoney / curMoney;
             const threads = safeGrowthThreads(target, growMult);
             if (distribute(ramList, G_SCRIPT, threads, target, 0)) launched = true;
@@ -214,9 +215,18 @@ export async function main(ns) {
         const delay_G  = Math.max(0, weakenTime - growTime  + SPACING);
         const delay_W2 = 2 * SPACING;
 
-        const batch = calcBatch(target);
+        const totalFree = ramList.reduce((s, r) => s + r.free, 0);
+
+        // Binärsuche: maximale Fraction die noch in den RAM passt
+        let lo = 0.001, hi = HACK_FRACTION;
+        for (let i = 0; i < 20; i++) {
+            const mid = (lo + hi) / 2;
+            if (batchRam(calcBatch(target, mid)) <= totalFree) lo = mid;
+            else hi = mid;
+        }
+        const fraction = lo;
+        const batch = calcBatch(target, fraction);
         const totalNeeded = batchRam(batch);
-        const totalFree   = ramList.reduce((s, r) => s + r.free, 0);
         if (totalFree < totalNeeded) return false;
 
         // Starte alle 4 Operationen – uid als letztes Arg damit PIDs eindeutig sind
