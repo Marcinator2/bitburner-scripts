@@ -1,14 +1,11 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  const ram = 2 **16;// max 20
-  //const ram = 1024 * 4;
+  const ram = sanitizeRam(ns.args[0], 2 ** 16);
   const prefix = "MeinServer_";
-  // Kaufe genau 1 Server (du kannst das in eine Schleife packen)
   const limit = ns.getPurchasedServerLimit();
   const purchased = ns.getPurchasedServers();
-  const server_kaufen = 1;
 
-    ns.tprint("Maximale Serverzahl: " + limit);
+  ns.tprint("Maximale Serverzahl: " + limit);
 
   if (purchased.length >= limit) {
     ns.tprint("Kauf-Limit erreicht.");
@@ -27,21 +24,29 @@ export async function main(ns) {
   const cost = ns.getPurchasedServerCost(ram);
   const money = (typeof ns.getPlayer === "function") ? ns.getPlayer().money : ns.getServerMoneyAvailable("home");
 
-  ns.tprint("Serverkosten: "+ cost);
+  ns.tprint(`Server-RAM: ${ns.formatRam(ram)} | Serverkosten: ${cost}`);
   
   if (money < cost) {
     ns.tprint(`Nicht genug Geld für ${name}: benötigt ${Math.floor(cost).toLocaleString()}, verfügbar ${Math.floor(money).toLocaleString()}`);
     return;
   }
-  if (server_kaufen == 1){
-    const purchasedName = ns.purchaseServer(name, ram);
-    if (purchasedName) {
-      ns.tprint(`✅ Gekauft: ${purchasedName}`);
-      // Setup-Skript auf home starten und Name als Argument übergeben
-      const pid = ns.exec("new_server_setup.js", "home", 1, purchasedName);
-      ns.tprint(pid > 0 ? `Setup gestartet (pid ${pid})` : `Setup konnte nicht gestartet werden.`);
-    } else {
-      ns.tprint("❌ Kauf fehlgeschlagen.");
-    }
+
+  const purchasedName = ns.purchaseServer(name, ram);
+  if (purchasedName) {
+    ns.tprint(`✅ Gekauft: ${purchasedName}`);
+    const pid = ns.exec("new_server_setup.js", "home", 1, purchasedName);
+    ns.tprint(pid > 0 ? `Setup gestartet (pid ${pid})` : `Setup konnte nicht gestartet werden.`);
+  } else {
+    ns.tprint("❌ Kauf fehlgeschlagen.");
   }
+}
+
+function sanitizeRam(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 2 || numeric > 2 ** 20) {
+    return fallback;
+  }
+
+  const floored = Math.floor(numeric);
+  return Number.isInteger(Math.log2(floored)) ? floored : fallback;
 }

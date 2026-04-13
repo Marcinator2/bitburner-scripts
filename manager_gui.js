@@ -6,6 +6,11 @@ const CONFIG_FILE = "main_manager_config.txt";
 const PANEL_ID = "bitburner-main-manager-gui";
 const REFRESH_MS = 1000;
 const MAIN_MANAGER_SCRIPT = "main_manager.js";
+const NEW_SERVER_BUY_SCRIPT = "new_server_buy.js";
+const UPGRADE_SERVER_SCRIPT = "upgrade_Server.js";
+const BUY_RAM_DEFAULT = 2 ** 16;
+const UPGRADE_RAM_DEFAULT = 2 ** 12;
+const RAM_OPTIONS = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576];
 
 const SERVICES = [
   { key: "hack", script: "auto-hack-manager.js", host: "home", label: "Hack" },
@@ -46,7 +51,7 @@ export async function main(ns) {
   wireActions(panel, actionQueue);
 
   while (true) {
-    processQueuedActions(ns, actionQueue);
+    processQueuedActions(ns, panel, actionQueue);
     renderPanel(ns, panel);
     await ns.sleep(REFRESH_MS);
   }
@@ -159,8 +164,10 @@ function buildPanel(doc) {
   list.style.display = "grid";
   list.style.gap = "10px";
 
+  const admin = buildServerAdminSection(doc);
+
   const content = doc.createElement("div");
-  content.append(topBar, meta, list);
+  content.append(topBar, meta, admin.wrap, list);
 
   const rows = new Map();
   for (const service of SERVICES) {
@@ -235,6 +242,7 @@ function buildPanel(doc) {
     stopButton,
     refreshButton,
     minimizeButton,
+    admin,
     rows,
   };
 }
@@ -286,6 +294,130 @@ function buildCombatStatControls(doc) {
   return { wrap, checkboxes };
 }
 
+function buildServerAdminSection(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.padding = "0 12px 12px";
+
+  const card = doc.createElement("div");
+  card.style.padding = "10px 12px";
+  card.style.border = "1px solid rgba(255,255,255,0.08)";
+  card.style.borderRadius = "10px";
+  card.style.background = "rgba(255,255,255,0.03)";
+
+  const title = doc.createElement("div");
+  title.textContent = "Server Admin";
+  title.style.fontSize = "14px";
+  title.style.fontWeight = "700";
+
+  const subtitle = doc.createElement("div");
+  subtitle.textContent = `${NEW_SERVER_BUY_SCRIPT} | ${UPGRADE_SERVER_SCRIPT}`;
+  subtitle.style.fontSize = "11px";
+  subtitle.style.color = "#7fa6c8";
+  subtitle.style.marginTop = "3px";
+
+  const buyRow = doc.createElement("div");
+  buyRow.style.display = "grid";
+  buyRow.style.gridTemplateColumns = "1fr auto";
+  buyRow.style.gap = "8px";
+  buyRow.style.marginTop = "10px";
+
+  const buyRamSelect = makeRamSelect(doc, BUY_RAM_DEFAULT, "buy-server-ram");
+  const buyButton = makeButton(doc, "Buy Server", "buy-server");
+  styleActionButton(buyButton, "start");
+  buyRow.append(buyRamSelect, buyButton);
+
+  const upgradeRow = doc.createElement("div");
+  upgradeRow.style.display = "grid";
+  upgradeRow.style.gridTemplateColumns = "1fr auto";
+  upgradeRow.style.gap = "8px";
+  upgradeRow.style.marginTop = "8px";
+
+  const upgradeRamSelect = makeRamSelect(doc, UPGRADE_RAM_DEFAULT, "upgrade-server-ram");
+  const upgradeButton = makeButton(doc, "Prepare Upgrade", "request-upgrade-server");
+  styleActionButton(upgradeButton, "neutral");
+  upgradeRow.append(upgradeRamSelect, upgradeButton);
+
+  const confirmWrap = doc.createElement("div");
+  confirmWrap.style.display = "none";
+  confirmWrap.style.marginTop = "8px";
+  confirmWrap.style.padding = "8px";
+  confirmWrap.style.border = "1px solid rgba(255,126,153,0.28)";
+  confirmWrap.style.borderRadius = "8px";
+  confirmWrap.style.background = "rgba(120,30,46,0.18)";
+
+  const confirmText = doc.createElement("div");
+  confirmText.style.fontSize = "11px";
+  confirmText.style.color = "#ffd2db";
+
+  const confirmButtons = doc.createElement("div");
+  confirmButtons.style.display = "flex";
+  confirmButtons.style.gap = "8px";
+  confirmButtons.style.marginTop = "8px";
+
+  const confirmUpgradeButton = makeButton(doc, "Confirm Upgrade", "confirm-upgrade-server");
+  const cancelUpgradeButton = makeButton(doc, "Cancel", "cancel-upgrade-server");
+  confirmUpgradeButton.style.flex = "1";
+  cancelUpgradeButton.style.flex = "1";
+  styleActionButton(confirmUpgradeButton, "stop");
+  styleActionButton(cancelUpgradeButton, "neutral");
+  confirmButtons.append(confirmUpgradeButton, cancelUpgradeButton);
+  confirmWrap.append(confirmText, confirmButtons);
+
+  const details = doc.createElement("div");
+  details.style.marginTop = "8px";
+  details.style.fontSize = "11px";
+  details.style.color = "#b9d1e7";
+  details.style.whiteSpace = "pre-line";
+
+  card.append(title, subtitle, buyRow, upgradeRow, confirmWrap, details);
+  wrap.appendChild(card);
+
+  return {
+    wrap,
+    buyRamSelect,
+    upgradeRamSelect,
+    buyButton,
+    upgradeButton,
+    confirmWrap,
+    confirmText,
+    confirmUpgradeButton,
+    cancelUpgradeButton,
+    details,
+    upgradePending: false,
+  };
+}
+
+function makeRamSelect(doc, defaultValue, name) {
+  const select = doc.createElement("select");
+  select.dataset.name = name;
+  select.style.border = "1px solid rgba(120,190,255,0.28)";
+  select.style.background = "rgba(19,31,49,0.72)";
+  select.style.color = "#eef6ff";
+  select.style.borderRadius = "8px";
+  select.style.padding = "8px 10px";
+  select.style.font = "inherit";
+  select.style.cursor = "pointer";
+
+  for (const ram of RAM_OPTIONS) {
+    const option = doc.createElement("option");
+    option.value = String(ram);
+    option.textContent = formatRamOption(ram);
+    if (ram === defaultValue) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  }
+
+  return select;
+}
+
+function formatRamOption(ram) {
+  if (ram >= 1024) {
+    return `${ram} GB (${(ram / 1024).toFixed(ram % 1024 === 0 ? 0 : 1)} TB)`;
+  }
+  return `${ram} GB`;
+}
+
 function formatCombatStatLabel(stat) {
   if (stat === "strength") return "STR";
   if (stat === "defense") return "DEF";
@@ -322,7 +454,7 @@ function wireActions(panel, actionQueue) {
   });
 }
 
-function processQueuedActions(ns, actionQueue) {
+function processQueuedActions(ns, panel, actionQueue) {
   while (actionQueue.length > 0) {
     const action = actionQueue.shift();
 
@@ -341,6 +473,27 @@ function processQueuedActions(ns, actionQueue) {
     }
 
     if (action === "toggle-visibility") {
+      continue;
+    }
+
+    if (action === "buy-server") {
+      startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, getSelectedRam(panel.admin.buyRamSelect, BUY_RAM_DEFAULT));
+      continue;
+    }
+
+    if (action === "request-upgrade-server") {
+      panel.admin.upgradePending = true;
+      continue;
+    }
+
+    if (action === "cancel-upgrade-server") {
+      panel.admin.upgradePending = false;
+      continue;
+    }
+
+    if (action === "confirm-upgrade-server") {
+      startScriptIfIdle(ns, UPGRADE_SERVER_SCRIPT, getSelectedRam(panel.admin.upgradeRamSelect, UPGRADE_RAM_DEFAULT), true);
+      panel.admin.upgradePending = false;
       continue;
     }
 
@@ -452,6 +605,17 @@ function clamp(value, min, max) {
 function renderPanel(ns, panel) {
   const config = loadConfig(ns, CONFIG_FILE);
   const managerRunning = ns.scriptRunning(MAIN_MANAGER_SCRIPT, "home");
+  const purchasedServers = ns.getPurchasedServers().filter(server => server.startsWith("MeinServer_"));
+  const purchasedLimit = ns.getPurchasedServerLimit();
+  const buyScriptExists = ns.fileExists(NEW_SERVER_BUY_SCRIPT, "home");
+  const upgradeScriptExists = ns.fileExists(UPGRADE_SERVER_SCRIPT, "home");
+  const buyRunning = ns.scriptRunning(NEW_SERVER_BUY_SCRIPT, "home");
+  const upgradeRunning = ns.scriptRunning(UPGRADE_SERVER_SCRIPT, "home");
+  const buyRam = getSelectedRam(panel.admin.buyRamSelect, BUY_RAM_DEFAULT);
+  const upgradeRam = getSelectedRam(panel.admin.upgradeRamSelect, UPGRADE_RAM_DEFAULT);
+  const playerMoney = ns.getPlayer().money;
+  const buyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, buyRam);
+  const upgradePlan = getUpgradePlan(ns, purchasedServers, upgradeRam);
 
   panel.status.textContent = `Main Manager: ${managerRunning ? "RUNNING" : "STOPPED"}`;
   panel.loop.textContent = `Loop: ${Math.floor(config.loopMs / 1000)}s`;
@@ -460,6 +624,23 @@ function renderPanel(ns, panel) {
   styleActionButton(panel.startButton, managerRunning ? "disabled" : "start");
   styleActionButton(panel.stopButton, managerRunning ? "stop" : "disabled");
   styleActionButton(panel.refreshButton, "neutral");
+
+  panel.admin.buyButton.disabled = !buyScriptExists || buyRunning || buyPlan.blocked;
+  panel.admin.upgradeButton.disabled = !upgradeScriptExists || upgradeRunning || upgradePlan.upgradableCount === 0;
+  panel.admin.confirmUpgradeButton.disabled = !upgradeScriptExists || upgradeRunning || upgradePlan.upgradableCount === 0;
+  panel.admin.cancelUpgradeButton.disabled = upgradeRunning;
+  styleActionButton(panel.admin.buyButton, panel.admin.buyButton.disabled ? "disabled" : "start");
+  styleActionButton(panel.admin.upgradeButton, panel.admin.upgradeButton.disabled ? "disabled" : "neutral");
+  styleActionButton(panel.admin.confirmUpgradeButton, panel.admin.confirmUpgradeButton.disabled ? "disabled" : "stop");
+  styleActionButton(panel.admin.cancelUpgradeButton, panel.admin.cancelUpgradeButton.disabled ? "disabled" : "neutral");
+  panel.admin.confirmWrap.style.display = panel.admin.upgradePending ? "block" : "none";
+  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} Server auf ${ns.formatRam(upgradeRam)} fuer insgesamt ${ns.formatNumber(upgradePlan.totalCost)}$.`; 
+  panel.admin.details.textContent = [
+    `MeinServer: ${purchasedServers.length}/${purchasedLimit} | Geld: ${ns.formatNumber(playerMoney)}$`,
+    `Buy ${ns.formatRam(buyRam)} -> ${buyPlan.targetName} | Kosten: ${ns.formatNumber(buyPlan.cost)}$ | ${buyPlan.status}`,
+    `Upgrade ${ns.formatRam(upgradeRam)} -> ${upgradePlan.upgradableCount}/${purchasedServers.length} Server | Kosten: ${ns.formatNumber(upgradePlan.totalCost)}$ | ${upgradePlan.status}`,
+    `Buy Script: ${buyScriptExists ? (buyRunning ? "RUNNING" : "READY") : "MISSING"} | Upgrade Script: ${upgradeScriptExists ? (upgradeRunning ? "RUNNING" : "READY") : "MISSING"}`,
+  ].join("\n");
 
   for (const service of SERVICES) {
     const row = panel.rows.get(service.key);
@@ -560,6 +741,67 @@ function toggleCombatTrainerStat(ns, stat) {
   };
 
   saveConfig(ns, CONFIG_FILE, config);
+}
+
+function startScriptIfIdle(ns, script, ...args) {
+  if (!ns.fileExists(script, "home")) {
+    return;
+  }
+
+  if (ns.scriptRunning(script, "home")) {
+    return;
+  }
+
+  ns.exec(script, "home", 1, ...args);
+}
+
+function getSelectedRam(select, fallback) {
+  const numeric = Number(select?.value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function getBuyPlan(ns, purchasedServers, purchasedLimit, ram) {
+  const index = purchasedServers.length;
+  const targetName = `MeinServer_${index}`;
+  const cost = ns.getPurchasedServerCost(ram);
+  const atLimit = purchasedServers.length >= purchasedLimit;
+  const nameExists = ns.serverExists(targetName);
+
+  if (atLimit) {
+    return { targetName, cost, blocked: true, status: "LIMIT" };
+  }
+
+  if (nameExists) {
+    return { targetName, cost, blocked: true, status: "NAME EXISTS" };
+  }
+
+  return { targetName, cost, blocked: false, status: "READY" };
+}
+
+function getUpgradePlan(ns, purchasedServers, targetRam) {
+  let totalCost = 0;
+  let upgradableCount = 0;
+
+  for (const server of purchasedServers) {
+    const currentRam = ns.getServerMaxRam(server);
+    if (currentRam >= targetRam) {
+      continue;
+    }
+
+    const cost = ns.getPurchasedServerUpgradeCost(server, targetRam);
+    if (!Number.isFinite(cost) || cost <= 0) {
+      continue;
+    }
+
+    totalCost += cost;
+    upgradableCount++;
+  }
+
+  return {
+    totalCost,
+    upgradableCount,
+    status: upgradableCount > 0 ? "READY" : "NOTHING TO UPGRADE",
+  };
 }
 
 function sanitizeCombatStatSelection(selection) {

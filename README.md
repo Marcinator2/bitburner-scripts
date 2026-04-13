@@ -403,6 +403,10 @@ Funktionen:
 - Anzeige von Config-Status, Runtime-Status und Script-Verfuegbarkeit
 - Fenster ist per Header ziehbar
 - Fenster kann ueber `Hide` ausgeblendet und ueber einen schwebenden Button wieder eingeblendet werden
+- Server-Admin-Bereich mit Buttons fuer `new_server_buy.js` und `upgrade_Server.js`
+- getrennte RAM-Auswahl fuer Kauf und Upgrade direkt im GUI
+- Live-Kostenanzeige fuer Kauf und Upgrade direkt im GUI
+- Upgrade-Bestaetigung direkt im GUI statt ueber `ns.prompt`, wenn ueber das Panel gestartet
 
 Hinweis zum Combat-Trainer:
 Hinweis zum Stat-Trainer:
