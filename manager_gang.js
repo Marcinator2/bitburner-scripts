@@ -5,11 +5,11 @@ export async function main(ns) {
   const verbesserungsFaktor = 1.8; // Ascension-Multiplikator-Schwelle (hack-Mult muss sich verdreifachen)
   const combatAscendFaktor = 1.35; // Combat-Ascension-Schwelle für War-Team
   const minHackFuerCrime = 200;    // Hack-Stat-Schwelle: darunter → trainieren statt Crime
-  const minHackShare = 0.2;       // Mindestens 50% der Gang bleiben auf Hacking-Tasks
+  const minHackShare = 0.5;       // Mindestens 50% der Gang bleiben auf Hacking-Tasks
   const prepCombatMode = false;    // true = nur Vorbereitung (Combat trainieren), false = normaler Gang-Betrieb
-  const powerFarmMode = true;      // true = Power über Territory Warfare farmen, aber ohne Clashes
+  const powerFarmMode = false;      // true = Power über Territory Warfare farmen, aber ohne Clashes
   const powerFarmShare = 0.8;     // Anteil der Gang für Power-Farming, zusätzlich begrenzt durch minHackShare
-  const prepDexFocus = true;       // true = Swap anhand DEX-Fortschritt, false = anhand Combat-Summe
+  const prepDexFocus = false;       // true = Swap anhand DEX-Fortschritt, false = anhand Combat-Summe
   const dexFloorRatio = 0.6;       // Bei DEX-Fokus: dex muss mind. X% vom höchsten anderen Combat-Stat sein
   const swapMinAbs = 120;          // Absoluter Mindestfortschritt für Swap
   const swapPct = 0.2;             // Relativer Fortschritt für Swap (0.2=20% vom Startwert)

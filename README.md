@@ -81,6 +81,8 @@ Aktuell bekannte Services:
 - teilt freie RAM-Kapazitaet ueber `share()`
 - wird von mehreren Stellen eingesetzt und ist damit ein wiederverwendbarer Infrastruktur-Worker
 - auf `MeinServer_*` soll es nur einmal real laufen; der Hack-Manager reserviert dafuer nicht mehr doppelt zusaetzlichen RAM
+- der Auto-Hack-Manager startet es jetzt auch auf fremden Runnern mit Root-Zugang; Zielgroesse ist ca. 10% RAM, aber mindestens 1 Thread
+- wenn selbst 1 Share-Thread dazu fuehren wuerde, dass auf dem Host kein Platz mehr fuer H/G/W bleibt, wird Share dort nicht gestartet
 
 `player_stats_worker.js`
 - sammelt periodisch Spielerzustand

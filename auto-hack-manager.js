@@ -12,7 +12,7 @@ export async function main(ns) {
     const G_SCRIPT      = "v_grow.js";
     const W_SCRIPT      = "v_weaken.js";
     const SHARE_SCRIPT  = "share-ram.js";
-    const SHARE_QUOTA   = 0.1;   // 10% RAM pro MeinServer_ für share-ram.js reservieren
+    const SHARE_QUOTA   = 0.1;   // 10% RAM pro Runner für share-ram.js, mindestens 1 Thread wenn genug Platz bleibt
     const HACK_FRACTION = 0.99;  // Maximaler Anteil des Max-Geldes pro Batch (so viel wie RAM erlaubt)
     const SPACING       = 200;   // ms Abstand zwischen den Finish-Zeitpunkten im Batch
     const HOME_RESERVE  = 40;    // GB die auf home reserviert bleiben
@@ -106,9 +106,55 @@ export async function main(ns) {
 
     /** Scripte auf alle Runner kopieren */
     async function scpToRunners(runners) {
-        const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT];
+        const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT, SHARE_SCRIPT];
         for (const r of runners) {
             if (r !== "home") await ns.scp(scripts, r);
+        }
+    }
+
+    function shareThreadsForRunner(host) {
+        if (host === "home") return 0;
+
+        const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
+        if (shareRam <= 0) return 0;
+
+        const maxRam = ns.getServerMaxRam(host);
+        if (maxRam < shareRam) return 0;
+
+        return Math.max(1, Math.floor((maxRam * SHARE_QUOTA) / shareRam));
+    }
+
+    function canSpareRamForShare(host, shareThreads) {
+        if (shareThreads < 1) return false;
+
+        const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
+        const minWorkerRam = Math.min(
+            ns.getScriptRam(H_SCRIPT, "home"),
+            ns.getScriptRam(G_SCRIPT, "home"),
+            ns.getScriptRam(W_SCRIPT, "home")
+        );
+        const freeRam = ns.getServerMaxRam(host) - ns.getServerUsedRam(host);
+        const remainingAfterShare = freeRam - (shareThreads * shareRam);
+
+        return remainingAfterShare >= minWorkerRam;
+    }
+
+    function ensureShareOnRunners(runners) {
+        for (const host of runners) {
+            if (host === "home") continue;
+            if (ns.scriptRunning(SHARE_SCRIPT, host)) continue;
+
+            const threads = shareThreadsForRunner(host);
+            if (threads < 1) continue;
+            if (!canSpareRamForShare(host, threads)) {
+                ns.print(`[Share] ${host} übersprungen: share-ram.js würde keinen Platz mehr für H/G/W lassen.`);
+                continue;
+            }
+
+            const pid = ns.exec(SHARE_SCRIPT, host, threads);
+            if (pid > 0) {
+                ns.print(`[Share] ${SHARE_SCRIPT} auf ${host} mit ${threads} Thread(s) gestartet.`);
+            }
         }
     }
 
@@ -314,21 +360,7 @@ export async function main(ns) {
         for (const r of runners) {
             if (r !== "home") await ns.scp(scripts, r);
         }
-        // share-ram.js nur auf MeinServer_ starten (ca. 10% RAM, mindestens 1 Thread)
-        const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
-        for (const r of runners) {
-            if (!r.startsWith("MeinServer_")) continue;
-            if (ns.scriptRunning(SHARE_SCRIPT, r)) continue;
-            const maxRam     = ns.getServerMaxRam(r);
-            const shareQuota = maxRam * SHARE_QUOTA;
-            const threads = Math.max(1, Math.floor(shareQuota / shareRam));
-            if (threads < 1) {
-                ns.print(`[Init] share-ram.js auf ${r} übersprungen (zu wenig RAM: ${shareQuota.toFixed(1)} GB < ${shareRam} GB)`);
-                continue;
-            }
-            ns.exec(SHARE_SCRIPT, r, threads);
-            ns.print(`[Init] share-ram.js auf ${r} mit ${threads} Thread(s) gestartet.`);
-        }
+        ensureShareOnRunners(runners);
     }
 
     ns.tprint("Auto-Hack Manager gestartet.");
@@ -356,6 +388,7 @@ export async function main(ns) {
 
         // Worker-Scripte auf neue Runner kopieren (bereits laufende bleiben)
         await scpToRunners(runners);
+        ensureShareOnRunners(runners);
 
         const ramList = runnerRamList(runners);
         let batched = 0;
