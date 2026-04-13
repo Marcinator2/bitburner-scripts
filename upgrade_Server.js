@@ -11,8 +11,15 @@ export async function main(ns) {
 
   const plan = buildUpgradePlan(ns, servers, ram);
   if (plan.upgradable.length === 0) {
+    if (plan.blockedDowngrades > 0) {
+      ns.tprint(`Ziel-RAM ${ns.formatRam(ram)} ist kleiner als bei ${plan.blockedDowngrades} vorhandenen Servern. Downgrade wird nicht ausgefuehrt.`);
+    }
     ns.tprint(`Keine MeinServer_ koennen auf ${ns.formatRam(ram)} upgegradet werden.`);
     return;
+  }
+
+  if (plan.blockedDowngrades > 0) {
+    ns.tprint(`Hinweis: ${plan.blockedDowngrades} Server liegen bereits ueber ${ns.formatRam(ram)} und werden nicht verkleinert.`);
   }
 
   const gesamtKosten = plan.totalCost;
@@ -50,10 +57,14 @@ export async function main(ns) {
 function buildUpgradePlan(ns, servers, ram) {
   const upgradable = [];
   let totalCost = 0;
+  let blockedDowngrades = 0;
 
   for (const serverName of servers) {
     const currentRam = ns.getServerMaxRam(serverName);
     if (currentRam >= ram) {
+      if (currentRam > ram) {
+        blockedDowngrades++;
+      }
       continue;
     }
 
@@ -66,7 +77,7 @@ function buildUpgradePlan(ns, servers, ram) {
     totalCost += cost;
   }
 
-  return { upgradable, totalCost };
+  return { upgradable, totalCost, blockedDowngrades };
 }
 
 function sanitizeRam(value, fallback) {

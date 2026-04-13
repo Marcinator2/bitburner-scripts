@@ -634,7 +634,7 @@ function renderPanel(ns, panel) {
   styleActionButton(panel.admin.confirmUpgradeButton, panel.admin.confirmUpgradeButton.disabled ? "disabled" : "stop");
   styleActionButton(panel.admin.cancelUpgradeButton, panel.admin.cancelUpgradeButton.disabled ? "disabled" : "neutral");
   panel.admin.confirmWrap.style.display = panel.admin.upgradePending ? "block" : "none";
-  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} Server auf ${ns.formatRam(upgradeRam)} fuer insgesamt ${ns.formatNumber(upgradePlan.totalCost)}$.`; 
+  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} Server auf ${ns.formatRam(upgradeRam)} fuer insgesamt ${ns.formatNumber(upgradePlan.totalCost)}$. ${upgradePlan.blockedDowngrades > 0 ? `${upgradePlan.blockedDowngrades} groessere Server bleiben unveraendert.` : ""}`.trim(); 
   panel.admin.details.textContent = [
     `MeinServer: ${purchasedServers.length}/${purchasedLimit} | Geld: ${ns.formatNumber(playerMoney)}$`,
     `Buy ${ns.formatRam(buyRam)} -> ${buyPlan.targetName} | Kosten: ${ns.formatNumber(buyPlan.cost)}$ | ${buyPlan.status}`,
@@ -781,10 +781,14 @@ function getBuyPlan(ns, purchasedServers, purchasedLimit, ram) {
 function getUpgradePlan(ns, purchasedServers, targetRam) {
   let totalCost = 0;
   let upgradableCount = 0;
+  let blockedDowngrades = 0;
 
   for (const server of purchasedServers) {
     const currentRam = ns.getServerMaxRam(server);
     if (currentRam >= targetRam) {
+      if (currentRam > targetRam) {
+        blockedDowngrades++;
+      }
       continue;
     }
 
@@ -800,7 +804,10 @@ function getUpgradePlan(ns, purchasedServers, targetRam) {
   return {
     totalCost,
     upgradableCount,
-    status: upgradableCount > 0 ? "READY" : "NOTHING TO UPGRADE",
+    blockedDowngrades,
+    status: upgradableCount > 0
+      ? (blockedDowngrades > 0 ? `READY | ${blockedDowngrades} DOWNGRADE BLOCKED` : "READY")
+      : (blockedDowngrades > 0 ? `NOTHING TO UPGRADE | ${blockedDowngrades} DOWNGRADE BLOCKED` : "NOTHING TO UPGRADE"),
   };
 }
 
