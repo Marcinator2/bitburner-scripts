@@ -407,6 +407,10 @@ Funktionen:
 - getrennte RAM-Auswahl fuer Kauf und Upgrade direkt im GUI
 - Live-Kostenanzeige fuer Kauf und Upgrade direkt im GUI
 - Upgrade-Bestaetigung direkt im GUI statt ueber `ns.prompt`, wenn ueber das Panel gestartet
+- RAM-Auswahl geht bis `2^20` = `1048576 GB`
+- zuletzt gewaehlte GUI-Einstellungen fuer Kauf/Upgrade und Fensterposition werden gespeichert
+- offener Upgrade-Bestaetigungszustand wird bei relevanten GUI-Aenderungen sauber zurueckgesetzt
+- Stat-Trainer zeigt aktive Stats sowie Combat-/Charisma-Trainingsorte direkt im GUI an
 
 Hinweis zum Combat-Trainer:
 Hinweis zum Stat-Trainer:

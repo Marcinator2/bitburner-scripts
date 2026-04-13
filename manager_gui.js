@@ -11,6 +11,16 @@ const UPGRADE_SERVER_SCRIPT = "upgrade_Server.js";
 const BUY_RAM_DEFAULT = 2 ** 16;
 const UPGRADE_RAM_DEFAULT = 2 ** 12;
 const RAM_OPTIONS = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576];
+const GUI_STATE_DEFAULT = {
+  buyRam: BUY_RAM_DEFAULT,
+  upgradeRam: UPGRADE_RAM_DEFAULT,
+  panel: {
+    top: "96px",
+    left: "",
+    right: "24px",
+    hidden: false,
+  },
+};
 
 const SERVICES = [
   { key: "hack", script: "auto-hack-manager.js", host: "home", label: "Hack" },
@@ -35,11 +45,13 @@ export async function main(ns) {
 
   removeExistingPanel(doc);
 
+  const initialConfig = loadConfig(ns, CONFIG_FILE);
   const panel = buildPanel(doc);
   doc.body.appendChild(panel.root);
   doc.body.appendChild(panel.launcher);
   const actionQueue = [];
-  const cleanup = enableWindowBehavior(doc, panel);
+  applySavedGuiState(panel, initialConfig);
+  const cleanup = enableWindowBehavior(doc, panel, actionQueue, initialConfig);
 
   if (typeof ns.atExit === "function") {
     ns.atExit(() => {
@@ -438,6 +450,15 @@ function wireActions(panel, actionQueue) {
   panel.root.addEventListener("change", event => {
     const input = event.target.closest("input[data-action]");
     if (!input) {
+      const select = event.target.closest("select[data-name]");
+      if (!select) {
+        return;
+      }
+
+      if (select.dataset.name === "upgrade-server-ram") {
+        actionQueue.push("reset-upgrade-confirmation");
+      }
+      actionQueue.push("save-gui-state");
       return;
     }
 
@@ -476,7 +497,18 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "save-gui-state") {
+      saveGuiState(ns, panel);
+      continue;
+    }
+
+    if (action === "reset-upgrade-confirmation") {
+      panel.admin.upgradePending = false;
+      continue;
+    }
+
     if (action === "buy-server") {
+      panel.admin.upgradePending = false;
       startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, getSelectedRam(panel.admin.buyRamSelect, BUY_RAM_DEFAULT));
       continue;
     }
@@ -510,13 +542,14 @@ function processQueuedActions(ns, panel, actionQueue) {
   }
 }
 
-function enableWindowBehavior(doc, panel) {
+function enableWindowBehavior(doc, panel, actionQueue, config) {
   const state = {
     dragging: false,
     offsetX: 0,
     offsetY: 0,
-    hidden: false,
+    hidden: getGuiState(config).panel.hidden,
   };
+  panel.windowState = state;
 
   const syncLauncherPosition = () => {
     panel.launcher.style.left = "";
@@ -532,6 +565,8 @@ function enableWindowBehavior(doc, panel) {
       syncLauncherPosition();
     }
   };
+
+  panel.setHidden = setHidden;
 
   const onMouseDown = event => {
     if (event.button !== 0) {
@@ -569,8 +604,12 @@ function enableWindowBehavior(doc, panel) {
   };
 
   const onMouseUp = () => {
+    const wasDragging = state.dragging;
     state.dragging = false;
     doc.body.style.userSelect = "";
+    if (wasDragging) {
+      actionQueue.push("save-gui-state");
+    }
   };
 
   const onToggleVisibility = event => {
@@ -580,6 +619,7 @@ function enableWindowBehavior(doc, panel) {
     }
 
     setHidden(!state.hidden);
+    actionQueue.push("save-gui-state");
   };
 
   panel.header.addEventListener("mousedown", onMouseDown);
@@ -588,6 +628,7 @@ function enableWindowBehavior(doc, panel) {
   panel.root.addEventListener("click", onToggleVisibility);
   panel.launcher.addEventListener("click", onToggleVisibility);
   syncLauncherPosition();
+  setHidden(state.hidden);
 
   return () => {
     panel.header.removeEventListener("mousedown", onMouseDown);
@@ -616,6 +657,7 @@ function renderPanel(ns, panel) {
   const playerMoney = ns.getPlayer().money;
   const buyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, buyRam);
   const upgradePlan = getUpgradePlan(ns, purchasedServers, upgradeRam);
+  const combatTrainerConfig = getCombatTrainerConfig(config.services.combatTrainer || {});
 
   panel.status.textContent = `Main Manager: ${managerRunning ? "RUNNING" : "STOPPED"}`;
   panel.loop.textContent = `Loop: ${Math.floor(config.loopMs / 1000)}s`;
@@ -629,6 +671,9 @@ function renderPanel(ns, panel) {
   panel.admin.upgradeButton.disabled = !upgradeScriptExists || upgradeRunning || upgradePlan.upgradableCount === 0;
   panel.admin.confirmUpgradeButton.disabled = !upgradeScriptExists || upgradeRunning || upgradePlan.upgradableCount === 0;
   panel.admin.cancelUpgradeButton.disabled = upgradeRunning;
+  if (upgradeRunning) {
+    panel.admin.upgradePending = false;
+  }
   styleActionButton(panel.admin.buyButton, panel.admin.buyButton.disabled ? "disabled" : "start");
   styleActionButton(panel.admin.upgradeButton, panel.admin.upgradeButton.disabled ? "disabled" : "neutral");
   styleActionButton(panel.admin.confirmUpgradeButton, panel.admin.confirmUpgradeButton.disabled ? "disabled" : "stop");
@@ -655,12 +700,15 @@ function renderPanel(ns, panel) {
 
     row.toggle.textContent = enabled ? "Disable" : "Enable";
     styleActionButton(row.toggle, enabled ? "stop" : "start");
-    row.details.textContent = [
-      `Config: ${enabled ? "ON" : "OFF"}`,
-      `Runtime: ${running ? "RUNNING" : "STOPPED"}`,
-      `Threads: ${override.threads ?? 1}`,
-      scriptExists ? "Script: OK" : "Script: MISSING",
-    ].join(" | ");
+    row.details.style.whiteSpace = service.key === "combatTrainer" ? "pre-line" : "normal";
+    row.details.textContent = service.key === "combatTrainer"
+      ? buildCombatTrainerDetails(enabled, running, override, scriptExists, combatTrainerConfig)
+      : [
+          `Config: ${enabled ? "ON" : "OFF"}`,
+          `Runtime: ${running ? "RUNNING" : "STOPPED"}`,
+          `Threads: ${override.threads ?? 1}`,
+          scriptExists ? "Script: OK" : "Script: MISSING",
+        ].join(" | ");
     row.row.style.borderColor = enabled ? "rgba(86,201,120,0.35)" : "rgba(255,255,255,0.08)";
 
     if (service.key === "combatTrainer" && row.statControls) {
@@ -670,6 +718,20 @@ function renderPanel(ns, panel) {
       }
     }
   }
+}
+
+function buildCombatTrainerDetails(enabled, running, override, scriptExists, trainerConfig) {
+  const activeStats = Object.entries(trainerConfig.stats)
+    .filter(([, selected]) => selected)
+    .map(([stat]) => formatCombatStatLabel(stat))
+    .join(", ");
+
+  return [
+    `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+    `Stats: ${activeStats || "keine"} | Focus: ${trainerConfig.focus ? "ON" : "OFF"}`,
+    `Combat: ${trainerConfig.combatCity} @ ${trainerConfig.gym}`,
+    `Charisma: ${trainerConfig.charismaCity} @ ${trainerConfig.university} / ${trainerConfig.charismaCourse}`,
+  ].join("\n");
 }
 
 function styleActionButton(button, mode) {
@@ -760,6 +822,84 @@ function getSelectedRam(select, fallback) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
 }
 
+function getCombatTrainerConfig(service) {
+  const args = Array.isArray(service.args) ? service.args : [];
+  return {
+    combatCity: String(args[1] || "Sector-12"),
+    gym: String(args[2] || "Powerhouse Gym"),
+    focus: Boolean(args[3]),
+    charismaCity: String(args[4] || args[1] || "Sector-12"),
+    university: String(args[5] || "Rothman University"),
+    charismaCourse: String(args[6] || "Leadership"),
+    stats: sanitizeCombatStatSelection(service.stats),
+  };
+}
+
+function applySavedGuiState(panel, config) {
+  const guiState = getGuiState(config);
+
+  panel.admin.buyRamSelect.value = String(guiState.buyRam);
+  panel.admin.upgradeRamSelect.value = String(guiState.upgradeRam);
+
+  panel.root.style.top = guiState.panel.top || GUI_STATE_DEFAULT.panel.top;
+  if (guiState.panel.left) {
+    panel.root.style.left = guiState.panel.left;
+    panel.root.style.right = "auto";
+  } else {
+    panel.root.style.left = "";
+    panel.root.style.right = guiState.panel.right || GUI_STATE_DEFAULT.panel.right;
+  }
+}
+
+function saveGuiState(ns, panel) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  config.gui = config.gui && typeof config.gui === "object" ? config.gui : {};
+  config.gui.managerGui = collectGuiState(panel);
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function collectGuiState(panel) {
+  return {
+    buyRam: getSelectedRam(panel.admin.buyRamSelect, BUY_RAM_DEFAULT),
+    upgradeRam: getSelectedRam(panel.admin.upgradeRamSelect, UPGRADE_RAM_DEFAULT),
+    panel: {
+      top: panel.root.style.top || GUI_STATE_DEFAULT.panel.top,
+      left: panel.root.style.left || "",
+      right: panel.root.style.right || GUI_STATE_DEFAULT.panel.right,
+      hidden: Boolean(panel.windowState?.hidden),
+    },
+  };
+}
+
+function getGuiState(config) {
+  const raw = config?.gui?.managerGui;
+  return sanitizeGuiState(raw);
+}
+
+function sanitizeGuiState(state) {
+  const panel = state?.panel && typeof state.panel === "object" ? state.panel : {};
+
+  return {
+    buyRam: sanitizeGuiRam(state?.buyRam, BUY_RAM_DEFAULT),
+    upgradeRam: sanitizeGuiRam(state?.upgradeRam, UPGRADE_RAM_DEFAULT),
+    panel: {
+      top: typeof panel.top === "string" && panel.top ? panel.top : GUI_STATE_DEFAULT.panel.top,
+      left: typeof panel.left === "string" ? panel.left : GUI_STATE_DEFAULT.panel.left,
+      right: typeof panel.right === "string" && panel.right ? panel.right : GUI_STATE_DEFAULT.panel.right,
+      hidden: Boolean(panel.hidden),
+    },
+  };
+}
+
+function sanitizeGuiRam(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || !RAM_OPTIONS.includes(numeric)) {
+    return fallback;
+  }
+
+  return numeric;
+}
+
 function getBuyPlan(ns, purchasedServers, purchasedLimit, ram) {
   const index = purchasedServers.length;
   const targetName = `MeinServer_${index}`;
@@ -844,6 +984,7 @@ function loadConfig(ns, configFile) {
     loopMs: 5000,
     tail: true,
     services: {},
+    gui: {},
   };
 
   const fileState = ensureJsonFile(ns, configFile, fallback);
@@ -854,6 +995,7 @@ function loadConfig(ns, configFile) {
       loopMs: Number(parsed.loopMs) || fallback.loopMs,
       tail: parsed.tail !== false,
       services: parsed.services && typeof parsed.services === "object" ? parsed.services : {},
+      gui: parsed.gui && typeof parsed.gui === "object" ? parsed.gui : {},
     };
   } catch {
     return fallback;
