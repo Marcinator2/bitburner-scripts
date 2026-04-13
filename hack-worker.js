@@ -1,3 +1,5 @@
+// STATUS: Einfacher Legacy-Worker fuer ein einzelnes Target.
+// Wird derzeit von keinem Manager gestartet; produktive Batch-Worker sind v_hack.js, v_grow.js und v_weaken.js.
 /** @param {NS} ns */
 export async function main(ns) {
   const target = String(ns.args[0] ?? "");

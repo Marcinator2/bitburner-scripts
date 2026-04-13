@@ -1,3 +1,5 @@
+// STATUS: Test-/Duplikat-Skript von find-server.js.
+// Fuer produktive Nutzung find-server.js verwenden; Aenderungen nur dort pflegen.
 /** @param {NS} ns */
 export async function main(ns) {
   // ns.args[0] ist das erste Wort nach dem Skriptnamen

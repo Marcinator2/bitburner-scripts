@@ -1,3 +1,5 @@
+// STATUS: Legacy-Hacking-Manager. Aktuell nicht vom main_manager referenziert.
+// Nur behalten fuer Vergleich oder Rueckgriff, neue Hacking-Logik in auto-hack-manager.js pflegen.
 /** @param {NS} ns */
 
 //dd1

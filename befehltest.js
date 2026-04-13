@@ -1,3 +1,5 @@
+// STATUS: Experimentelles Scratch-Skript fuer manuelle Kauf-/Anzeige-Checks.
+// Nicht in produktive Ablaufe einbinden, ausser die Logik wird vorher bewusst uebernommen.
 /** @param {NS} ns */
 export async function main(ns) {
   const ram = 2**16;

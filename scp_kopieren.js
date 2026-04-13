@@ -1,3 +1,5 @@
+// STATUS: Experimentelles Testskript fuer Upgrade-/SCP-Ideen.
+// Der aktuelle Inhalt ist kein produktiver Ablauf und dient nur als Notiz-/Teststand.
 /** @param {NS} ns */
 export async function main(ns) {
   const ram = 2**14;
