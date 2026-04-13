@@ -27,6 +27,7 @@ Aktuell bekannte Services:
 - `stocks` -> `manager_stocks.js`
 - `gang` -> `manager_gang.js`
 - `programs` -> `auto-leveler.js`
+- `combatTrainer` -> `combat_stat_trainer.js`
 - `playerStatsWorker` -> `player_stats_worker.js`
 - `playerStatsView` -> `player_stats.js`
 - `overview` -> `overview.js`
@@ -60,6 +61,12 @@ Aktuell bekannte Services:
 - trainiert Combat-Stats automatisch ueber die Singularity-API
 - ist aktuell nicht in `main_manager.js` eingebunden, aber logisch ein separater Manager/Trainer
 
+`combat_stat_trainer.js`
+- trainiert die im Config-/GUI-Modus ausgewaehlten Stats dauerhaft
+- ist jetzt direkt als Service `combatTrainer` in `main_manager.js` integrierbar
+- liest seine Auswahl live aus `main_manager_config.txt`, statt auf feste Zielwerte zu laufen
+- trainiert STR/DEF/DEX/AGI im Gym und CHARISMA ueber Uni/Kurs
+
 `auto-leveler.js`
 - ist fuer automatische Programmbeschaffung gedacht
 - wird ueber den Service `programs` angesteuert
@@ -73,6 +80,7 @@ Aktuell bekannte Services:
 `share-ram.js`
 - teilt freie RAM-Kapazitaet ueber `share()`
 - wird von mehreren Stellen eingesetzt und ist damit ein wiederverwendbarer Infrastruktur-Worker
+- auf `MeinServer_*` soll es nur einmal real laufen; der Hack-Manager reserviert dafuer nicht mehr doppelt zusaetzlichen RAM
 
 `player_stats_worker.js`
 - sammelt periodisch Spielerzustand
@@ -184,6 +192,11 @@ Die Stats-Anzeige ist damit absichtlich von der Datensammlung getrennt.
 
 ## Konfiguration und Daten
 
+Wichtig fuer die VSCode-Bitburner-Erweiterung:
+- Runtime-Dateien wie `main_manager_config.txt` und `player_stats_data.txt` muessen nicht aus dem Workspace nach Bitburner gepusht werden.
+- Die Skripte legen diese Dateien bei Bedarf selbst im Spiel an oder reparieren sie, wenn sie ungueltig sind.
+- Dadurch sollten diese Dateien eher als Ingame-Runtime-Dateien behandelt werden, nicht als regulaere Sync-Dateien.
+
 ### `main_manager_config.txt`
 
 Die Datei ist die zentrale Schaltstelle fuer den Supervisor.
@@ -197,6 +210,8 @@ Beispielhafte Services:
 - `hack.enabled`
 - `stocks.enabled`
 - `gang.enabled`
+- `combatTrainer.args = ["main_manager_config.txt", "Sector-12", "Powerhouse Gym", false, "Sector-12", "Rothman University", "Leadership"]`
+- `combatTrainer.stats = { strength, defense, dexterity, agility, charisma }`
 - `playerStatsWorker.args = ["player_stats_data.txt", 10000, 360]`
 
 ### `player_stats_data.txt`
@@ -368,6 +383,7 @@ Empfohlene Bedeutung:
 
 Fuer den normalen Betrieb:
 - `run main_manager.js`
+- `run manager_gui.js` fuer ein GUI-Panel mit Buttons zum Aktivieren/Deaktivieren der Services
 
 Fuer Status ohne Dauerloop:
 - `run main_manager.js status`
@@ -376,6 +392,31 @@ Fuer Status ohne Dauerloop:
 Fuer Einzelwerkzeuge:
 - `run find-server.js n00dles`
 - `run player_stats.js player_stats_data.txt once`
+
+## GUI fuer den Manager
+
+Es gibt jetzt einen ersten GUI-Pfad ueber `manager_gui.js`.
+
+Funktionen:
+- Start/Stop fuer `main_manager.js`
+- Button pro Service zum Aktivieren oder Deaktivieren
+- Anzeige von Config-Status, Runtime-Status und Script-Verfuegbarkeit
+- Fenster ist per Header ziehbar
+- Fenster kann ueber `Hide` ausgeblendet und ueber einen schwebenden Button wieder eingeblendet werden
+
+Hinweis zum Combat-Trainer:
+Hinweis zum Stat-Trainer:
+- Im GUI gibt es Checkboxen fuer STR, DEF, DEX, AGI und CHA.
+- Der Trainer laeuft mit den aktuell aktivierten Stats weiter, bis du die Auswahl aenderst.
+- Combat-Stats nutzen `combatCity` plus Gym, Charisma nutzt `charismaCity` plus University/Kurs aus `services.combatTrainer.args`.
+
+Wichtig:
+- Die GUI schreibt direkt in `main_manager_config.txt`.
+- Beim Deaktivieren wird der jeweilige Scriptprozess sofort gestoppt.
+- Beim Aktivieren wird der Main-Manager gestartet, falls er noch nicht laeuft.
+
+Einschraenkung:
+- Die GUI nutzt den DOM-Zugriff der Bitburner-Oberflaeche. Wenn diese Umgebung einmal nicht verfuegbar ist, waere als Fallback ein Prompt-Menue der robustere Weg.
 
 ## Offene Punkte fuer spaeter
 

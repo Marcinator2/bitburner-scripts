@@ -1,5 +1,7 @@
 /** @param {NS} ns */
 
+import { ensureJsonFile } from "./runtime_file_utils.js";
+
 const DEFAULT_CONFIG_FILE = "main_manager_config.txt";
 const DEFAULT_LOOP_MS = 5000;
 
@@ -53,6 +55,16 @@ const SERVICE_DEFINITIONS = [
     args: [],
     description: "Kauft Programme automatisch",
     shouldRun: ns => typeof ns.purchaseProgram === "function",
+  },
+  {
+    key: "combatTrainer",
+    script: "combat_stat_trainer.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [DEFAULT_CONFIG_FILE, "Sector-12", "Powerhouse Gym", false, "Sector-12", "Rothman University", "Leadership"],
+    description: "Trainiert ausgewaehlte Stats dauerhaft, inklusive Charisma",
+    shouldRun: ns => Boolean(ns.singularity),
   },
   {
     key: "playerStatsWorker",
@@ -126,6 +138,10 @@ function supervise(ns, configFile, runOnce) {
 
   for (const state of serviceStates) {
     if (!state.enabled) {
+      if (state.running) {
+        state.stopped = ns.scriptKill(state.script, state.host);
+        state.running = scriptStillRunning(ns, state);
+      }
       continue;
     }
 
@@ -164,9 +180,14 @@ function inspectServices(ns, config) {
       canRun,
       running,
       startedPid: 0,
+      stopped: false,
       error: scriptExists ? "" : "Script fehlt",
     };
   });
+}
+
+function scriptStillRunning(ns, state) {
+  return ns.fileExists(state.script, state.host) && ns.isRunning(state.script, state.host, ...state.args);
 }
 
 function safeShouldRun(ns, service) {
@@ -192,6 +213,10 @@ function printStatus(ns, serviceStates, config, configFile) {
 
 function formatServiceLine(state) {
   const name = padRight(state.key, 17);
+
+  if (!state.enabled && state.stopped) {
+    return `${name} STOPPED   ${state.script}`;
+  }
 
   if (!state.enabled) {
     return `${name} DISABLED  ${state.script}`;
@@ -232,18 +257,15 @@ function loadConfig(ns, configFile) {
     parseError: false,
   };
 
-  const raw = ns.read(configFile);
-  if (!raw) {
-    return fallback;
-  }
+  const fileState = ensureJsonFile(ns, configFile, fallback);
 
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = fileState.value;
     return {
       loopMs: sanitizeLoopMs(parsed.loopMs),
       tail: parsed.tail !== false,
       services: parsed.services && typeof parsed.services === "object" ? parsed.services : {},
-      parseError: false,
+      parseError: fileState.repaired,
     };
   } catch {
     return {

@@ -28,6 +28,18 @@
       "threads": 1,
       "args": []
     },
+    "combatTrainer": {
+      "enabled": false,
+      "threads": 1,
+      "args": ["main_manager_config.txt", "Sector-12", "Powerhouse Gym", false, "Sector-12", "Rothman University", "Leadership"],
+      "stats": {
+        "strength": true,
+        "defense": true,
+        "dexterity": true,
+        "agility": true,
+        "charisma": false
+      }
+    },
     "playerStatsWorker": {
       "enabled": true,
       "threads": 1,

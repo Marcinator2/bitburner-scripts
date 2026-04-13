@@ -1,5 +1,7 @@
 /** @param {NS} ns */
 
+import { ensureJsonFile } from "./runtime_file_utils.js";
+
 const DEFAULT_FILE = "player_stats_data.txt";
 const DEFAULT_SAMPLE_MS = 10000;
 const DEFAULT_MAX_SAMPLES = 360;
@@ -23,6 +25,8 @@ export async function main(ns) {
     return;
   }
 
+  ensureHistoryFile(ns, file, sampleMs, maxSamples);
+
   while (true) {
     const history = loadHistory(ns, file);
     history.sampleMs = sampleMs;
@@ -38,6 +42,15 @@ export async function main(ns) {
 
     await ns.sleep(sampleMs);
   }
+}
+
+function ensureHistoryFile(ns, file, sampleMs, maxSamples) {
+  ensureJsonFile(ns, file, {
+    version: 1,
+    sampleMs,
+    maxSamples,
+    samples: [],
+  });
 }
 
 function loadHistory(ns, file) {

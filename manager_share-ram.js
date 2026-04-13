@@ -3,9 +3,15 @@
 export async function main(ns) {
     const hostname = ns.getHostname();
     const worker = "share-ram.js";
-    let ram_available = ns.getServerMaxRam("home") - ns.getServerUsedRam("home")
+    const shareQuota = 0.1;
+    let ram_available = ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname);
     const ram_needed = ns.getScriptRam(worker, hostname);
-    let threads = Math.floor(ram_available / ram_needed);
+    const reservedForShare = ns.getServerMaxRam(hostname) * shareQuota;
+    let threads = Math.max(1, Math.floor(Math.min(ram_available, reservedForShare) / ram_needed));
+
+    if (ns.scriptRunning(worker, hostname)) {
+        return;
+    }
 
     if (threads > 0) {
 

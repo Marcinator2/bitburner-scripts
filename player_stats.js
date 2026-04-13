@@ -1,5 +1,7 @@
 /** @param {NS} ns */
 
+import { ensureJsonFile } from "./runtime_file_utils.js";
+
 const DEFAULT_FILE = "player_stats_data.txt";
 const REFRESH_MS = 1000;
 const CHART_POINTS = 24;
@@ -17,6 +19,13 @@ export async function main(ns) {
   ns.disableLog("sleep");
   ns.disableLog("read");
   ns.tail();
+
+  ensureJsonFile(ns, file, {
+    version: 1,
+    sampleMs: 10000,
+    maxSamples: 360,
+    samples: [],
+  });
 
   while (true) {
     ns.clearLog();

@@ -76,10 +76,6 @@ export async function main(ns) {
     function runnerRamList(runners) {
         return runners.map(r => {
             let reserve = r === "home" ? HOME_RESERVE : 0;
-            // Für MeinServer_: 10% RAM immer für share-ram.js freihalten
-            if (r.startsWith("MeinServer_")) {
-                reserve += ns.getServerMaxRam(r) * SHARE_QUOTA;
-            }
             return {
                 host: r,
                 free: Math.max(0, ns.getServerMaxRam(r) - ns.getServerUsedRam(r) - reserve)
@@ -318,14 +314,14 @@ export async function main(ns) {
         for (const r of runners) {
             if (r !== "home") await ns.scp(scripts, r);
         }
-        // share-ram.js nur auf MeinServer_ starten (max 10% RAM)
+        // share-ram.js nur auf MeinServer_ starten (ca. 10% RAM, mindestens 1 Thread)
         const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
         for (const r of runners) {
             if (!r.startsWith("MeinServer_")) continue;
             if (ns.scriptRunning(SHARE_SCRIPT, r)) continue;
             const maxRam     = ns.getServerMaxRam(r);
             const shareQuota = maxRam * SHARE_QUOTA;
-            const threads = Math.floor(shareQuota / shareRam);
+            const threads = Math.max(1, Math.floor(shareQuota / shareRam));
             if (threads < 1) {
                 ns.print(`[Init] share-ram.js auf ${r} übersprungen (zu wenig RAM: ${shareQuota.toFixed(1)} GB < ${shareRam} GB)`);
                 continue;
