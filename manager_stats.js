@@ -1,6 +1,11 @@
 /** @param {NS} ns */
 //needs Source-File 4 to run
 export async function main(ns) {
+    if (!ns.singularity || typeof ns.singularity.gymWorkout !== "function") {
+        ns.tprint("Fehler: Singularity API nicht verfuegbar. Benoetigt Source-File 4.");
+        return;
+    }
+
     const stats = ["strength", "defense", "dexterity", "agility"];
 
     while (true) {

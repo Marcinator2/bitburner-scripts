@@ -11,6 +11,7 @@ Hacking
 - v_weaken.js: Kleiner Weaken-Worker mit optionalem Delay.
 
 Player / Stats
+- combat_stat_trainer.js: Trainiert STR/DEF/DEX/AGI bis zu vorgegebenen Zielwerten per Argument.
 - player_stats_worker.js: Schreibt regelmaessig Player-Snapshots als JSON-Text in player_stats_data.txt.
 - player_stats.js: Liest die Historie aus, berechnet Trends ueber mehrere Zeitfenster und zeigt Charts an.
 - manager_stats.js: Trainiert automatisch den jeweils niedrigsten Combat-Stat im Gym.
