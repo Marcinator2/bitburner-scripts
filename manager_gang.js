@@ -5,7 +5,7 @@ export async function main(ns) {
   const verbesserungsFaktor = 1.8; // Ascension-Multiplikator-Schwelle (hack-Mult muss sich verdreifachen)
   const combatAscendFaktor = 1.35; // Combat-Ascension-Schwelle für War-Team
   const minHackFuerCrime = 200;    // Hack-Stat-Schwelle: darunter → trainieren statt Crime
-  const minHackShare = 0.5;       // Mindestens 50% der Gang bleiben auf Hacking-Tasks
+  const minHackShare = 0.2;       // Mindestens 50% der Gang bleiben auf Hacking-Tasks
   const prepCombatMode = false;    // true = nur Vorbereitung (Combat trainieren), false = normaler Gang-Betrieb
   const powerFarmMode = false;      // true = Power über Territory Warfare farmen, aber ohne Clashes
   const powerFarmShare = 0.8;     // Anteil der Gang für Power-Farming, zusätzlich begrenzt durch minHackShare
@@ -20,8 +20,8 @@ export async function main(ns) {
   const maxAmortisationStunden = 4; //1 Equipment wird nur gekauft wenn es sich in X Spielstunden amortisiert
   const loopDelayMs = 2000;         // Schleifenzeit in ms (muss mit ns.sleep übereinstimmen)
   const prepStatusEveryLoops = 5;   // Status-Ausgabe nur jede X Schleifen
-  const minRespectForCyberterrorismMin = 10_500_000; // Untergrenze für dynamische Cyberterrorism-Schwelle
-  const minRespectForCyberterrorismMax = 25_000_000; // Obergrenze für dynamische Cyberterrorism-Schwelle
+  const minRespectForCyberterrorismMin = 12_500_000; // Untergrenze für dynamische Cyberterrorism-Schwelle
+  const minRespectForCyberterrorismMax = 20_000_000; // Obergrenze für dynamische Cyberterrorism-Schwelle
   const respectRaiseFactor = 1.2;   // Schwelle steigt bei stabiler Wanted-Lage
   const respectLowerFactor = 0.9;   // Schwelle sinkt bei instabiler Wanted-Lage
   const respectAdjustEveryLoops = 30; // Anpassung alle X Schleifen (bei 2s Loop = 60s)
