@@ -2,10 +2,38 @@
 export async function main(ns) {
   ns.disableLog("sleep");
 
-  if (!ns.stock || typeof ns.stock.buyStock !== "function") {
+  if (!ns.stock || (
+    typeof ns.stock.buyStock !== "function" &&
+    typeof ns.stock.purchaseTixApi !== "function" &&
+    typeof ns.stock.hasTixApiAccess !== "function"
+  )) {
     ns.tprint("Stock API nicht verfügbar. Benötigt WSE/TIX API.");//test
     return;
   }
+
+  const getStockMethod = (...names) => {
+    for (const name of names) {
+      if (typeof ns.stock?.[name] === "function") {
+        return ns.stock[name].bind(ns.stock);
+      }
+    }
+    return null;
+  };
+
+  const stockApi = {
+    getConstants: getStockMethod("getConstants"),
+    hasTixApiAccess: getStockMethod("hasTixApiAccess"),
+    purchaseTixApi: getStockMethod("purchaseTixApi"),
+    has4SDataTixApi: getStockMethod("has4SDataTixApi", "has4SDataTIXAPI"),
+    purchase4SMarketDataTixApi: getStockMethod("purchase4SMarketDataTixApi", "purchase4SMarketDataTIXAPI"),
+  };
+  const stockConstants = (() => {
+    try {
+      return stockApi.getConstants ? stockApi.getConstants() : {};
+    } catch {
+      return {};
+    }
+  })();
 
   const firma = ns.args[0] || "joesguns";
   const symbol_Firma = ns.args[1] || "JGN";
@@ -37,10 +65,14 @@ export async function main(ns) {
   const maxOpenPositions = 10;
   const maxAllocationPerSymbol = 0.2;
   const rebuyCooldownMs = 90_000;
+  const accessCheckIntervalMs = 30_000;
   const trailingStopPct = 0.10;  // Trailing Stop: Verkauf wenn Preis X% unter Höchststand fällt
   const rebuyBlockedUntil = {};
   const positionPeak = {};       // Höchster Bid-Preis seit Kauf je Symbol
   let noTradeCycles = 0;
+  let lastAccessSummary = "";
+  let lastAccessCheckTs = 0;
+  let singularityStatusLogged = false;
 
   function calcThreads() {
     const freeRam = ns.getServerMaxRam(host) - ns.getServerUsedRam(host) - ramPuffer;
@@ -54,7 +86,68 @@ export async function main(ns) {
   }
 
   function has4S() {
-    return typeof ns.stock.has4SDataTIXAPI === "function" && ns.stock.has4SDataTIXAPI();
+    return Boolean(stockApi.has4SDataTixApi && stockApi.has4SDataTixApi());
+  }
+
+  function getStockAccessSummary() {
+    const hasTix = stockApi.hasTixApiAccess
+      ? stockApi.hasTixApiAccess()
+      : typeof ns.stock.buyStock === "function";
+    const has4SDataTixApi = has4S();
+    const missing = [];
+
+    if (!hasTix) missing.push("TIX API");
+    if (!has4SDataTixApi) missing.push("4S Market Data TIX API");
+
+    return {
+      hasTix,
+      has4SDataTixApi,
+      missing,
+      ready: missing.length === 0,
+    };
+  }
+
+  function canAfford(cost) {
+    return !Number.isFinite(cost) || ns.getPlayer().money >= cost;
+  }
+
+  function ensureStockPrerequisites() {
+    const purchases = [];
+    const initialSummary = getStockAccessSummary();
+
+    if (!initialSummary.hasTix && stockApi.purchaseTixApi && canAfford(Number(stockConstants.TixApiCost))) {
+      if (stockApi.purchaseTixApi()) {
+        purchases.push(`TIX API (${ns.formatNumber(Number(stockConstants.TixApiCost))}$)`);
+      }
+    }
+
+    const afterTixSummary = getStockAccessSummary();
+    if (
+      afterTixSummary.hasTix &&
+      !afterTixSummary.has4SDataTixApi &&
+      stockApi.purchase4SMarketDataTixApi &&
+      canAfford(Number(stockConstants.MarketDataTixApi4SCost))
+    ) {
+      if (stockApi.purchase4SMarketDataTixApi()) {
+        purchases.push(`4S Market Data TIX API (${ns.formatNumber(Number(stockConstants.MarketDataTixApi4SCost))}$)`);
+      }
+    }
+
+    const summary = getStockAccessSummary();
+    const statusText = summary.ready
+      ? "Aktien-Voraussetzungen erfüllt"
+      : `Aktien-Voraussetzungen offen: ${summary.missing.join(", ")}`;
+
+    if (purchases.length > 0) {
+      ns.tprint(`Aktien-Voraussetzungen gekauft: ${purchases.join(", ")}`);
+    }
+
+    if (statusText !== lastAccessSummary) {
+      ns.tprint(statusText);
+      lastAccessSummary = statusText;
+    }
+
+    return summary;
   }
 
   function getMarketRegime(symbols) {
@@ -245,8 +338,31 @@ export async function main(ns) {
   let modeLogged = "";
   let lastRegime = "";
   let lastStatusTs = 0;
+
+  if (!singularityStatusLogged) {
+    ns.tprint(
+      `Singularity API ${ns.singularity ? "verfügbar" : "nicht verfügbar"}. ` +
+      "Börsen-Freischaltungen werden über ns.stock geprüft."
+    );
+    singularityStatusLogged = true;
+  }
+
+  ensureStockPrerequisites();
+  lastAccessCheckTs = Date.now();
   
   while (true) {
+    const accessNowTs = Date.now();
+    if (accessNowTs - lastAccessCheckTs >= accessCheckIntervalMs) {
+      ensureStockPrerequisites();
+      lastAccessCheckTs = accessNowTs;
+    }
+
+    const accessSummary = getStockAccessSummary();
+    if (!accessSummary.hasTix) {
+      await ns.sleep(2000);
+      continue;
+    }
+
     if (has4S()) {
       if (modeLogged !== "4S") {
         ns.tprint("Stock-Manager Modus: 4S Forecast Trading (Multi-Symbol)");

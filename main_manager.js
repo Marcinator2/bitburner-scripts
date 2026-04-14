@@ -34,7 +34,13 @@ const SERVICE_DEFINITIONS = [
     enabled: false,
     args: [],
     description: "Aktien-Manager",
-    shouldRun: ns => Boolean(ns.stock && typeof ns.stock.buyStock === "function"),
+    shouldRun: ns => Boolean(
+      ns.stock && (
+        typeof ns.stock.buyStock === "function" ||
+        typeof ns.stock.hasTixApiAccess === "function" ||
+        typeof ns.stock.purchaseTixApi === "function"
+      )
+    ),
   },
   {
     key: "gang",
