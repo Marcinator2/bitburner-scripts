@@ -66,9 +66,17 @@ export async function main(ns) {
   const maxAllocationPerSymbol = 0.2;
   const rebuyCooldownMs = 90_000;
   const accessCheckIntervalMs = 30_000;
+  const hardStopLossPct = 0.04;
+  const forecastDropExit = 0.05;
+  const rotationScoreRatio = 1.25;
+  const rotationScoreMargin = 0.0015;
+  const stockTickMs = Number(stockConstants.msPerStockUpdate) || 6_000;
+  const minHoldMs = stockTickMs * 2;
   const trailingStopPct = 0.10;  // Trailing Stop: Verkauf wenn Preis X% unter Höchststand fällt
   const rebuyBlockedUntil = {};
   const positionPeak = {};       // Höchster Bid-Preis seit Kauf je Symbol
+  const positionEntryForecast = {};
+  const positionEntryTime = {};
   let noTradeCycles = 0;
   let lastAccessSummary = "";
   let lastAccessCheckTs = 0;
@@ -87,6 +95,10 @@ export async function main(ns) {
 
   function has4S() {
     return Boolean(stockApi.has4SDataTixApi && stockApi.has4SDataTixApi());
+  }
+
+  function getSignalScore(forecast, volatility) {
+    return Math.max(0, forecast - 0.5) * volatility;
   }
 
   function getStockAccessSummary() {
@@ -224,40 +236,77 @@ export async function main(ns) {
     let blockedVolatility = 0;
     let blockedBudget = 0;
     let buys = 0;
+    let rotations = 0;
+    let stoppedLoss = 0;
+    let droppedForecast = 0;
+    const heldPositions = [];
 
     // Erst Exit-Regeln ausführen, damit Kapital frei wird.
     for (const sym of symbols) {
       const [shares, , avgBuyPrice] = ns.stock.getPosition(sym);
       if (shares <= 0) {
         delete positionPeak[sym]; // Position ist weg, Peak zurücksetzen
+        delete positionEntryForecast[sym];
+        delete positionEntryTime[sym];
         continue;
       }
 
       const bid = ns.stock.getBidPrice(sym);
+      const forecast = ns.stock.getForecast(sym);
+      const volatility = ns.stock.getVolatility(sym);
+
+      if (positionEntryForecast[sym] === undefined) {
+        positionEntryForecast[sym] = forecast;
+      }
+      if (positionEntryTime[sym] === undefined) {
+        positionEntryTime[sym] = now;
+      }
 
       // Peak aktualisieren
       if (!positionPeak[sym] || bid > positionPeak[sym]) {
         positionPeak[sym] = bid;
       }
 
-      const forecast = ns.stock.getForecast(sym);
+      const heldMs = now - positionEntryTime[sym];
       const trailingStopPrice = positionPeak[sym] * (1 - trailingStopPct);
+      const stopLossPrice = avgBuyPrice * (1 - hardStopLossPct);
       const trailingHit = bid <= trailingStopPrice;
       const forecastHit = forecast <= regime.sellF;
+      const stopLossHit = bid <= stopLossPrice;
+      const forecastDropHit = heldMs >= minHoldMs && (positionEntryForecast[sym] - forecast) >= forecastDropExit;
 
-      if (forecastHit || trailingHit) {
-        const grund = trailingHit
-          ? `TrailingStop (peak=${ns.formatNumber(positionPeak[sym])} → now=${ns.formatNumber(bid)}, -${(((positionPeak[sym] - bid) / positionPeak[sym]) * 100).toFixed(1)}%)`
-          : `Forecast (${forecast.toFixed(3)} ≤ ${regime.sellF})`;
+      if (stopLossHit || forecastDropHit || forecastHit || trailingHit) {
+        const grund = stopLossHit
+          ? `StopLoss (${ns.formatNumber(bid)} ≤ ${ns.formatNumber(stopLossPrice)})`
+          : forecastDropHit
+            ? `ForecastDrop (${positionEntryForecast[sym].toFixed(3)} → ${forecast.toFixed(3)})`
+            : trailingHit
+              ? `TrailingStop (peak=${ns.formatNumber(positionPeak[sym])} → now=${ns.formatNumber(bid)}, -${(((positionPeak[sym] - bid) / positionPeak[sym]) * 100).toFixed(1)}%)`
+              : `Forecast (${forecast.toFixed(3)} ≤ ${regime.sellF})`;
         const sellPrice = ns.stock.sellStock(sym, shares);
         if (sellPrice > 0) {
           delete positionPeak[sym];
+          delete positionEntryForecast[sym];
+          delete positionEntryTime[sym];
           rebuyBlockedUntil[sym] = now + rebuyCooldownMs;
           sells++;
+          if (stopLossHit) stoppedLoss++;
+          if (forecastDropHit) droppedForecast++;
           const pnlPct = ((sellPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(1);
           ns.print(`4S SELL ${sym}: ${shares} @ ${ns.formatNumber(sellPrice)} (${pnlPct}%) | ${grund}`);
         }
+        continue;
       }
+
+      heldPositions.push({
+        sym,
+        shares,
+        forecast,
+        volatility,
+        score: getSignalScore(forecast, volatility),
+        avgBuyPrice,
+        heldMs,
+      });
     }
 
     // Kandidaten aufbauen und nach erwarteter Kante sortieren.
@@ -281,13 +330,64 @@ export async function main(ns) {
         continue;
       }
 
-      const score = (forecast - 0.5) * vol;
+      const score = getSignalScore(forecast, vol);
       candidates.push({ sym, score, forecast, vol });
     }
     candidates.sort((a, b) => b.score - a.score);
 
-    const slots = Math.max(0, regime.maxPos - symbols.filter(s => ns.stock.getPosition(s)[0] > 0).length);
-    if (slots <= 0) return;
+    const currentOpenPositions = heldPositions.length;
+    let slots = Math.max(0, regime.maxPos - currentOpenPositions);
+
+    if (slots <= 0 && candidates.length > 0 && heldPositions.length > 0) {
+      heldPositions.sort((a, b) => a.score - b.score);
+      const weakestHeld = heldPositions[0];
+      const bestCandidate = candidates[0];
+      const rotationAllowed = weakestHeld.heldMs >= minHoldMs;
+      const rotationBetter = bestCandidate.score > weakestHeld.score * rotationScoreRatio;
+      const rotationFarEnough = (bestCandidate.score - weakestHeld.score) >= rotationScoreMargin;
+
+      if (rotationAllowed && rotationBetter && rotationFarEnough) {
+        const sellPrice = ns.stock.sellStock(weakestHeld.sym, weakestHeld.shares);
+        if (sellPrice > 0) {
+          delete positionPeak[weakestHeld.sym];
+          delete positionEntryForecast[weakestHeld.sym];
+          delete positionEntryTime[weakestHeld.sym];
+          rebuyBlockedUntil[weakestHeld.sym] = now + rebuyCooldownMs;
+          sells++;
+          rotations++;
+          slots = 1;
+          ns.print(
+            `4S ROTATE ${weakestHeld.sym} -> ${bestCandidate.sym}: ` +
+            `score ${weakestHeld.score.toFixed(4)} -> ${bestCandidate.score.toFixed(4)}`
+          );
+        }
+      }
+    }
+
+    if (slots <= 0) {
+      if (buys === 0 && sells === 0) {
+        noTradeCycles++;
+      } else {
+        noTradeCycles = 0;
+      }
+
+      return {
+        regime: regime.name,
+        buys,
+        sells,
+        rotations,
+        stoppedLoss,
+        droppedForecast,
+        blockedCooldown,
+        blockedForecast,
+        blockedVolatility,
+        blockedBudget,
+        adaptiveBuyF,
+        adaptiveMinVol,
+        openPositions: Math.max(0, currentOpenPositions - rotations),
+        tradableCash,
+      };
+    }
 
     let opened = 0;
     for (const c of candidates) {
@@ -310,6 +410,9 @@ export async function main(ns) {
       if (buyPrice > 0) {
         opened++;
         buys++;
+        positionEntryForecast[c.sym] = c.forecast;
+        positionEntryTime[c.sym] = now;
+        positionPeak[c.sym] = ns.stock.getBidPrice(c.sym);
         ns.print(`4S BUY ${c.sym}: ${qty} @ ${ns.formatNumber(buyPrice)} f=${c.forecast.toFixed(3)} v=${c.vol.toFixed(3)}`);
       }
     }
@@ -324,6 +427,9 @@ export async function main(ns) {
       regime: regime.name,
       buys,
       sells,
+      rotations,
+      stoppedLoss,
+      droppedForecast,
       blockedCooldown,
       blockedForecast,
       blockedVolatility,
@@ -378,7 +484,8 @@ export async function main(ns) {
         ns.tprint(
           `4S Status | regime=${status.regime} open=${status.openPositions} cash=${ns.formatNumber(status.tradableCash)} ` +
           `buyF=${status.adaptiveBuyF.toFixed(3)} minVol=${status.adaptiveMinVol.toFixed(3)} ` +
-          `buys=${status.buys} sells=${status.sells} block(forecast=${status.blockedForecast},vol=${status.blockedVolatility},cd=${status.blockedCooldown},budget=${status.blockedBudget})`
+          `buys=${status.buys} sells=${status.sells} rot=${status.rotations} stop=${status.stoppedLoss} drop=${status.droppedForecast} ` +
+          `block(forecast=${status.blockedForecast},vol=${status.blockedVolatility},cd=${status.blockedCooldown},budget=${status.blockedBudget})`
         );
         lastStatusTs = now;
       }
