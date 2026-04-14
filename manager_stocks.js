@@ -192,21 +192,11 @@ export async function main(ns) {
       return {
         name: "QUIET",
 
-        /*//für test Daten von hot genommen
-        buyF: buyForecast,
+        buyF: buyForecast + 0.01,
         sellF: sellForecast + 0.01,
-        minVol: minVolatility,
-        maxPos: Math.max(2, maxOpenPositions - 4),
-        allocPerSymbol: Math.max(0.12, maxAllocationPerSymbol - 0.08),
-        */
-        buyF: buyForecast,
-        sellF: sellForecast,
-        minVol: minVolatility,
-        maxPos: maxOpenPositions,
-        allocPerSymbol: maxAllocationPerSymbol,
-
-
-
+        minVol: minVolatility + 0.002,
+        maxPos: Math.max(7, maxOpenPositions - 2),
+        allocPerSymbol: Math.max(0.16, maxAllocationPerSymbol - 0.03),
       };
     }
 
