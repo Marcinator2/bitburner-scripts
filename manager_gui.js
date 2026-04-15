@@ -218,15 +218,19 @@ function buildPanel(doc) {
     details.style.color = "#b9d1e7";
 
     let statControls = null;
+    let gangControls = null;
     if (service.key === "combatTrainer") {
       statControls = buildCombatStatControls(doc);
       row.append(top, details, statControls.wrap);
+    } else if (service.key === "gang") {
+      gangControls = buildGangControls(doc);
+      row.append(top, details, gangControls.wrap);
     } else {
       row.append(top, details);
     }
 
     list.appendChild(row);
-    rows.set(service.key, { toggle, details, row, statControls });
+    rows.set(service.key, { toggle, details, row, statControls, gangControls });
   }
 
   const launcher = makeButton(doc, "Manager GUI", "toggle-visibility");
@@ -301,6 +305,45 @@ function buildCombatStatControls(doc) {
     label.append(checkbox, text);
     wrap.appendChild(label);
     checkboxes.set(stat, checkbox);
+  }
+
+  return { wrap, checkboxes };
+}
+
+function buildGangControls(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.display = "grid";
+  wrap.style.gridTemplateColumns = "minmax(0, 1fr)";
+  wrap.style.gap = "6px";
+  wrap.style.marginTop = "10px";
+  wrap.style.fontSize = "11px";
+  wrap.style.color = "#c6d8eb";
+
+  const checkboxes = new Map();
+  const options = [
+    { key: "autoAscend", action: "toggle-gang-auto-ascend", label: "Mitglieder automatisch aufleveln" },
+    { key: "autoEquipment", action: "toggle-gang-auto-equipment", label: "Equipment automatisch kaufen" },
+    { key: "autoTerritoryWarfare", action: "toggle-gang-auto-territory", label: "Territory Warfare automatisch steuern" },
+  ];
+
+  for (const option of options) {
+    const label = doc.createElement("label");
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "6px";
+    label.style.cursor = "pointer";
+
+    const checkbox = doc.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.action = option.action;
+    checkbox.style.cursor = "pointer";
+
+    const text = doc.createElement("span");
+    text.textContent = option.label;
+
+    label.append(checkbox, text);
+    wrap.appendChild(label);
+    checkboxes.set(option.key, checkbox);
   }
 
   return { wrap, checkboxes };
@@ -535,6 +578,21 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-gang-auto-ascend") {
+      toggleGangAutoAscend(ns);
+      continue;
+    }
+
+    if (action === "toggle-gang-auto-equipment") {
+      toggleGangAutoEquipment(ns);
+      continue;
+    }
+
+    if (action === "toggle-gang-auto-territory") {
+      toggleGangAutoTerritoryWarfare(ns);
+      continue;
+    }
+
     if (action.startsWith("toggle:")) {
       const key = action.split(":")[1];
       toggleService(ns, key);
@@ -658,6 +716,7 @@ function renderPanel(ns, panel) {
   const buyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, buyRam);
   const upgradePlan = getUpgradePlan(ns, purchasedServers, upgradeRam);
   const combatTrainerConfig = getCombatTrainerConfig(config.services.combatTrainer || {});
+  const gangConfig = getGangConfig(config.services.gang || {});
 
   panel.status.textContent = `Main Manager: ${managerRunning ? "RUNNING" : "STOPPED"}`;
   panel.loop.textContent = `Loop: ${Math.floor(config.loopMs / 1000)}s`;
@@ -700,15 +759,17 @@ function renderPanel(ns, panel) {
 
     row.toggle.textContent = enabled ? "Disable" : "Enable";
     styleActionButton(row.toggle, enabled ? "stop" : "start");
-    row.details.style.whiteSpace = service.key === "combatTrainer" ? "pre-line" : "normal";
+    row.details.style.whiteSpace = service.key === "combatTrainer" || service.key === "gang" ? "pre-line" : "normal";
     row.details.textContent = service.key === "combatTrainer"
       ? buildCombatTrainerDetails(enabled, running, override, scriptExists, combatTrainerConfig)
-      : [
-          `Config: ${enabled ? "ON" : "OFF"}`,
-          `Runtime: ${running ? "RUNNING" : "STOPPED"}`,
-          `Threads: ${override.threads ?? 1}`,
-          scriptExists ? "Script: OK" : "Script: MISSING",
-        ].join(" | ");
+      : service.key === "gang"
+        ? buildGangDetails(enabled, running, override, scriptExists, gangConfig)
+        : [
+            `Config: ${enabled ? "ON" : "OFF"}`,
+            `Runtime: ${running ? "RUNNING" : "STOPPED"}`,
+            `Threads: ${override.threads ?? 1}`,
+            scriptExists ? "Script: OK" : "Script: MISSING",
+          ].join(" | ");
     row.row.style.borderColor = enabled ? "rgba(86,201,120,0.35)" : "rgba(255,255,255,0.08)";
 
     if (service.key === "combatTrainer" && row.statControls) {
@@ -716,6 +777,12 @@ function renderPanel(ns, panel) {
       for (const [stat, checkbox] of row.statControls.checkboxes.entries()) {
         checkbox.checked = Boolean(stats[stat]);
       }
+    }
+
+    if (service.key === "gang" && row.gangControls) {
+      row.gangControls.checkboxes.get("autoAscend").checked = gangConfig.autoAscend;
+      row.gangControls.checkboxes.get("autoEquipment").checked = gangConfig.autoEquipment;
+      row.gangControls.checkboxes.get("autoTerritoryWarfare").checked = gangConfig.autoTerritoryWarfare;
     }
   }
 }
@@ -729,8 +796,17 @@ function buildCombatTrainerDetails(enabled, running, override, scriptExists, tra
   return [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
     `Stats: ${activeStats || "keine"} | Focus: ${trainerConfig.focus ? "ON" : "OFF"}`,
-    `Combat: ${trainerConfig.combatCity} @ ${trainerConfig.gym}`,
-    `Charisma: ${trainerConfig.charismaCity} @ ${trainerConfig.university} / ${trainerConfig.charismaCourse}`,
+    `Combat: Auto best gym (XP/s)`,
+    `Charisma: Auto best university (XP/s) / ${trainerConfig.charismaCourse}`,
+  ].join("\n");
+}
+
+function buildGangDetails(enabled, running, override, scriptExists, gangConfig) {
+  return [
+    `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+    `Auto-Ascend: ${gangConfig.autoAscend ? "ON" : "OFF"}`,
+    `Auto-Equipment: ${gangConfig.autoEquipment ? "ON" : "OFF"}`,
+    `Auto-Territory: ${gangConfig.autoTerritoryWarfare ? "ON" : "OFF"}`,
   ].join("\n");
 }
 
@@ -798,8 +874,56 @@ function toggleCombatTrainerStat(ns, stat) {
     ...current,
     enabled: current.enabled ?? false,
     threads: current.threads ?? 1,
-    args: Array.isArray(current.args) ? current.args : [CONFIG_FILE, "Sector-12", "Powerhouse Gym", false, "Sector-12", "Rothman University", "Leadership"],
+    args: Array.isArray(current.args) ? current.args : [CONFIG_FILE, false, "Leadership"],
     stats,
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleGangAutoAscend(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.gang || {};
+  const gangConfig = getGangConfig(current);
+
+  config.services.gang = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args: Array.isArray(current.args) ? current.args : [],
+    autoAscend: !gangConfig.autoAscend,
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleGangAutoEquipment(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.gang || {};
+  const gangConfig = getGangConfig(current);
+
+  config.services.gang = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args: Array.isArray(current.args) ? current.args : [],
+    autoEquipment: !gangConfig.autoEquipment,
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleGangAutoTerritoryWarfare(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.gang || {};
+  const gangConfig = getGangConfig(current);
+
+  config.services.gang = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args: Array.isArray(current.args) ? current.args : [],
+    autoTerritoryWarfare: !gangConfig.autoTerritoryWarfare,
   };
 
   saveConfig(ns, CONFIG_FILE, config);
@@ -824,14 +948,19 @@ function getSelectedRam(select, fallback) {
 
 function getCombatTrainerConfig(service) {
   const args = Array.isArray(service.args) ? service.args : [];
+  const usesLegacyArgs = args.length >= 7;
   return {
-    combatCity: String(args[1] || "Sector-12"),
-    gym: String(args[2] || "Powerhouse Gym"),
-    focus: Boolean(args[3]),
-    charismaCity: String(args[4] || args[1] || "Sector-12"),
-    university: String(args[5] || "Rothman University"),
-    charismaCourse: String(args[6] || "Leadership"),
+    focus: usesLegacyArgs ? Boolean(args[3]) : Boolean(args[1]),
+    charismaCourse: String((usesLegacyArgs ? args[6] : args[2]) || "Leadership"),
     stats: sanitizeCombatStatSelection(service.stats),
+  };
+}
+
+function getGangConfig(service) {
+  return {
+    autoAscend: service.autoAscend ?? true,
+    autoEquipment: service.autoEquipment ?? true,
+    autoTerritoryWarfare: service.autoTerritoryWarfare ?? true,
   };
 }
 

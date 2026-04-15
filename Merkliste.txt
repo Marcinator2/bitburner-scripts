@@ -107,12 +107,12 @@ Du musst nicht auf dem Server "sein", um dort etwas zu tun. Du nutzt diese drei 
 
 
 server von anfang finden:
-connect n00dles; connect CSEC
-connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I
-connect n00dles; connect nectar-net; connect phantasy; connect avmnite-02h
-connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect taiyang-digital; connect run4theh111z
-connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect infocomm; connect applied-energetics; connect fulcrumtech; connect .
-connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect infocomm; connect applied-energetics; connect fulcrumtech; connect .; connect blade; connect The-Cave
-connect n00dles; connect nectar-net; connect phantasy; connect netlink; connect I.I.I.I; connect lexo-corp; connect global-pharm; connect deltaone; connect zeus-med; connect infocomm; connect applied-energetics; connect fulcrumtech; connect .; connect blade; connect The-Cave; connect w0r1d_d43m0n
+CSEC
+I.I.I.I
+avmnite-02h
+run4theh111z
+.
+The-Cave
+w0r1d_d43m0n
 
 test24sa

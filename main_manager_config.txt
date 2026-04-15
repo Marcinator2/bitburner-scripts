@@ -31,7 +31,7 @@
     "combatTrainer": {
       "enabled": false,
       "threads": 1,
-      "args": ["main_manager_config.txt", "Sector-12", "Powerhouse Gym", false, "Sector-12", "Rothman University", "Leadership"],
+      "args": ["main_manager_config.txt", false, "Leadership"],
       "stats": {
         "strength": true,
         "defense": true,

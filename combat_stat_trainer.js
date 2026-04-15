@@ -1,11 +1,10 @@
 /** @param {NS} ns */
 
 import { ensureJsonFile } from "./runtime_file_utils.js";
+import { GYM_LOCATIONS, UNIVERSITY_LOCATIONS, getConfiguredLocation, selectBestGym, selectBestUniversity } from "./training_location_utils.js";
 
 const DEFAULT_CONFIG_FILE = "main_manager_config.txt";
-const DEFAULT_CITY = "Sector-12";
-const DEFAULT_GYM = "Powerhouse Gym";
-const DEFAULT_UNIVERSITY = "Rothman University";
+const DEFAULT_FOCUS = false;
 const DEFAULT_CHARISMA_COURSE = "Leadership";
 const CHECK_INTERVAL_MS = 15000;
 const TRAINABLE_STATS = ["strength", "defense", "dexterity", "agility", "charisma"];
@@ -28,11 +27,14 @@ export async function main(ns) {
     ns.clearLog();
 
     const trainerConfig = loadTrainerConfig(ns, configFile);
-    const playerSkills = ns.getPlayer().skills;
+    const player = ns.getPlayer();
+    const playerSkills = player.skills;
     const selectedStats = getSelectedStats(trainerConfig.stats);
     const nextStat = pickNextStat(playerSkills, selectedStats);
+    const gymChoice = resolveGymChoice(ns, trainerConfig, player, nextStat || "strength");
+    const universityChoice = resolveUniversityChoice(ns, trainerConfig, player);
 
-    printStatus(ns, playerSkills, trainerConfig, selectedStats, currentStat);
+    printStatus(ns, playerSkills, trainerConfig, selectedStats, currentStat, gymChoice, universityChoice);
 
     if (!nextStat) {
       if (currentStat) {
@@ -47,7 +49,7 @@ export async function main(ns) {
     }
 
     if (currentStat !== nextStat) {
-      const started = startTraining(ns, trainerConfig, nextStat);
+      const started = startTraining(ns, trainerConfig, nextStat, gymChoice, universityChoice);
       if (!started) {
         ns.print(`Fehler: Training fuer ${nextStat} konnte nicht gestartet werden.`);
         await ns.sleep(CHECK_INTERVAL_MS);
@@ -65,12 +67,8 @@ export async function main(ns) {
 
 function loadTrainerConfig(ns, configFile) {
   const fallback = {
-    combatCity: DEFAULT_CITY,
-    gym: DEFAULT_GYM,
-    charismaCity: DEFAULT_CITY,
-    university: DEFAULT_UNIVERSITY,
     charismaCourse: DEFAULT_CHARISMA_COURSE,
-    focus: false,
+    focus: DEFAULT_FOCUS,
     stats: createDefaultStatSelection(),
   };
 
@@ -82,7 +80,7 @@ function loadTrainerConfig(ns, configFile) {
         combatTrainer: {
           enabled: false,
           threads: 1,
-          args: [DEFAULT_CONFIG_FILE, DEFAULT_CITY, DEFAULT_GYM, false, DEFAULT_CITY, DEFAULT_UNIVERSITY, DEFAULT_CHARISMA_COURSE],
+          args: [DEFAULT_CONFIG_FILE, DEFAULT_FOCUS, DEFAULT_CHARISMA_COURSE],
           stats: createDefaultStatSelection(),
         },
       },
@@ -90,13 +88,10 @@ function loadTrainerConfig(ns, configFile) {
     const parsed = fileState.value;
     const service = parsed?.services?.[SERVICE_KEY] || {};
     const args = Array.isArray(service.args) ? service.args : [];
+    const usesLegacyArgs = args.length >= 7;
     return {
-      combatCity: String(args[1] || DEFAULT_CITY),
-      gym: String(args[2] || DEFAULT_GYM),
-      focus: Boolean(args[3]),
-      charismaCity: String(args[4] || args[1] || DEFAULT_CITY),
-      university: String(args[5] || DEFAULT_UNIVERSITY),
-      charismaCourse: String(args[6] || DEFAULT_CHARISMA_COURSE),
+      focus: usesLegacyArgs ? Boolean(args[3]) : Boolean(args[1]),
+      charismaCourse: String((usesLegacyArgs ? args[6] : args[2]) || DEFAULT_CHARISMA_COURSE),
       stats: sanitizeStatSelection(service.stats),
     };
   } catch {
@@ -117,18 +112,20 @@ function ensureCity(ns, city) {
   return ns.singularity.travelToCity(city);
 }
 
-function startTraining(ns, trainerConfig, stat) {
+function startTraining(ns, trainerConfig, stat, gymChoice, universityChoice) {
   if (stat === "charisma") {
     if (typeof ns.singularity.universityCourse !== "function") {
       return false;
     }
 
-    if (!ensureCity(ns, trainerConfig.charismaCity)) {
+    const chosenUniversity = universityChoice || resolveUniversityChoice(ns, trainerConfig);
+
+    if (!ensureCity(ns, chosenUniversity.city)) {
       return false;
     }
 
     return ns.singularity.universityCourse(
-      trainerConfig.university,
+      chosenUniversity.name,
       trainerConfig.charismaCourse,
       trainerConfig.focus,
     );
@@ -138,11 +135,13 @@ function startTraining(ns, trainerConfig, stat) {
     return false;
   }
 
-  if (!ensureCity(ns, trainerConfig.combatCity)) {
+  const chosenGym = gymChoice || resolveGymChoice(ns, trainerConfig, ns.getPlayer(), stat);
+
+  if (!ensureCity(ns, chosenGym.city)) {
     return false;
   }
 
-  return ns.singularity.gymWorkout(trainerConfig.gym, stat, trainerConfig.focus);
+  return ns.singularity.gymWorkout(chosenGym.name, stat, trainerConfig.focus);
 }
 
 function pickNextStat(skills, selectedStats) {
@@ -160,13 +159,15 @@ function pickNextStat(skills, selectedStats) {
   return nextStat;
 }
 
-function printStatus(ns, skills, trainerConfig, selectedStats, currentStat) {
+function printStatus(ns, skills, trainerConfig, selectedStats, currentStat, gymChoice, universityChoice) {
   ns.print("STAT TRAINER");
   ns.print("");
   ns.print(`Config: ${DEFAULT_CONFIG_FILE}`);
-  ns.print(`Combat: ${trainerConfig.combatCity} | Gym: ${trainerConfig.gym}`);
-  ns.print(`Charisma: ${trainerConfig.charismaCity} | Uni: ${trainerConfig.university}`);
+  ns.print(`Combat: ${gymChoice.city} | Gym: ${gymChoice.name}`);
+  ns.print(`Gym-Wahl: ${gymChoice.reason}`);
+  ns.print(`Charisma: ${universityChoice.city} | Uni: ${universityChoice.name}`);
   ns.print(`Kurs: ${trainerConfig.charismaCourse}`);
+  ns.print(`Uni-Wahl: ${universityChoice.reason}`);
   ns.print(`Focus: ${trainerConfig.focus ? "ON" : "OFF"}`);
   ns.print("");
   ns.print(`Aktive Stats: ${selectedStats.length > 0 ? selectedStats.map(formatStatName).join(", ") : "keine"}`);
@@ -211,6 +212,24 @@ function stopCurrentAction(ns) {
   if (ns.singularity && typeof ns.singularity.stopAction === "function") {
     ns.singularity.stopAction();
   }
+}
+
+function resolveUniversityChoice(ns, trainerConfig, player = ns.getPlayer()) {
+  return selectBestUniversity(
+    ns,
+    player,
+    trainerConfig.charismaCourse,
+    getConfiguredLocation(UNIVERSITY_LOCATIONS),
+  );
+}
+
+function resolveGymChoice(ns, trainerConfig, player = ns.getPlayer(), stat = "strength") {
+  return selectBestGym(
+    ns,
+    player,
+    stat,
+    getConfiguredLocation(GYM_LOCATIONS),
+  );
 }
 
 function formatStatName(stat) {

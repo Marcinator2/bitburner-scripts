@@ -68,7 +68,7 @@ const SERVICE_DEFINITIONS = [
     host: "home",
     threads: 1,
     enabled: false,
-    args: [DEFAULT_CONFIG_FILE, "Sector-12", "Powerhouse Gym", false, "Sector-12", "Rothman University", "Leadership"],
+    args: [DEFAULT_CONFIG_FILE, false, "Leadership"],
     description: "Trainiert ausgewaehlte Stats dauerhaft, inklusive Charisma",
     shouldRun: ns => Boolean(ns.singularity),
   },

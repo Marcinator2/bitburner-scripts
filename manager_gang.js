@@ -1,5 +1,6 @@
 /** @param {NS} ns */
 export async function main(ns) {
+  const configFile = String(ns.args[0] || "main_manager_config.txt");
   //ns.disableLog("ALL");
 
   const verbesserungsFaktor = 1.8; // Ascension-Multiplikator-Schwelle (hack-Mult muss sich verdreifachen)
@@ -25,6 +26,25 @@ export async function main(ns) {
   const respectRaiseFactor = 1.2;   // Schwelle steigt bei stabiler Wanted-Lage
   const respectLowerFactor = 0.9;   // Schwelle sinkt bei instabiler Wanted-Lage
   const respectAdjustEveryLoops = 30; // Anpassung alle X Schleifen (bei 2s Loop = 60s)
+
+  function loadGangConfig() {
+    try {
+      const raw = ns.read(configFile);
+      if (!raw || !raw.trim()) {
+          return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
+      }
+
+      const parsed = JSON.parse(raw);
+      const gang = parsed?.services?.gang;
+      return {
+        autoAscend: gang?.autoAscend ?? true,
+        autoEquipment: gang?.autoEquipment ?? true,
+          autoTerritoryWarfare: gang?.autoTerritoryWarfare ?? true,
+      };
+    } catch {
+        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
+    }
+  }
 
   const allServers = ns.scan("home").filter(s => s !== "home");
   const visited = new Set(["home"]);
@@ -119,6 +139,7 @@ export async function main(ns) {
 
   while (true) {
     loopCount++;
+    const gangConfig = loadGangConfig();
 
     // Neue Mitglieder rekrutieren (while: manchmal sind mehrere auf einmal verfügbar)
     while (ns.gang.canRecruitMember()) {
@@ -230,6 +251,9 @@ export async function main(ns) {
         territoryWarfareOn = false;
       }
     }
+      if (!gangConfig.autoTerritoryWarfare) {
+        territoryWarfareOn = false;
+      }
     ns.gang.setTerritoryWarfare(territoryWarfareOn);
 
     // Nur trainierte Members für Crime/Wanted-Logik heranziehen
@@ -322,7 +346,7 @@ export async function main(ns) {
 
       // Ascension: Hacker über Hack-Mult, War-Team über Combat-Mults
       const res = ns.gang.getAscensionResult(name);
-      if (res) {
+      if (gangConfig.autoAscend && res) {
         const shouldAscendHack = res.hack >= verbesserungsFaktor;
         const shouldAscendCombat = istWarrior && (
           res.str >= combatAscendFaktor ||
@@ -395,7 +419,9 @@ export async function main(ns) {
       );
     }
 
-    buyGangEquipment(memberStats, combatRoleSet);
+    if (gangConfig.autoEquipment) {
+      buyGangEquipment(memberStats, combatRoleSet);
+    }
     await ns.sleep(loopDelayMs);
   }
 }
