@@ -1,8 +1,6 @@
 /** @param {NS} ns */
 export async function main(ns) {
   ns.disableLog("sleep");
-  ns.disableLog("getPlayer");
-  ns.disableLog("getAugmentationPrice");
 
   const augName = "NeuroFlux Governor";
   const reserveMoney = Number(ns.args[1] ?? 0);
