@@ -453,7 +453,36 @@ function buildServerAdminSection(doc) {
   details.style.color = "#b9d1e7";
   details.style.whiteSpace = "pre-line";
 
-  card.append(title, subtitle, buyRow, upgradeRow, confirmWrap, details);
+  // Auto-Upgrade Checkbox
+  const autoUpgradeRow = doc.createElement("div");
+  autoUpgradeRow.style.marginTop = "8px";
+  autoUpgradeRow.style.display = "flex";
+  autoUpgradeRow.style.flexDirection = "column";
+  autoUpgradeRow.style.gap = "6px";
+
+  function makeAutoCheckbox(action, text) {
+    const label = doc.createElement("label");
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "6px";
+    label.style.cursor = "pointer";
+    label.style.fontSize = "11px";
+    label.style.color = "#c6d8eb";
+    const cb = doc.createElement("input");
+    cb.type = "checkbox";
+    cb.dataset.action = action;
+    cb.style.cursor = "pointer";
+    const span = doc.createElement("span");
+    span.textContent = text;
+    label.append(cb, span);
+    autoUpgradeRow.appendChild(label);
+    return cb;
+  }
+
+  const autoUpgradeCheckbox = makeAutoCheckbox("toggle-auto-upgrade-server", "Auto-Upgrade: Server upgraden wenn Geld reicht");
+  const autoBuyCheckbox     = makeAutoCheckbox("toggle-auto-buy-server",     "Auto-Buy: neue Server kaufen wenn Geld reicht");
+
+  card.append(title, subtitle, buyRow, upgradeRow, confirmWrap, autoUpgradeRow, details);
   wrap.appendChild(card);
 
   return {
@@ -466,6 +495,8 @@ function buildServerAdminSection(doc) {
     confirmText,
     confirmUpgradeButton,
     cancelUpgradeButton,
+    autoUpgradeCheckbox,
+    autoBuyCheckbox,
     details,
     upgradePending: false,
   };
@@ -582,6 +613,16 @@ function processQueuedActions(ns, panel, actionQueue) {
     if (action === "buy-server") {
       panel.admin.upgradePending = false;
       startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, getSelectedRam(panel.admin.buyRamSelect, BUY_RAM_DEFAULT));
+      continue;
+    }
+
+    if (action === "toggle-auto-upgrade-server") {
+      saveGuiState(ns, panel);
+      continue;
+    }
+
+    if (action === "toggle-auto-buy-server") {
+      saveGuiState(ns, panel);
       continue;
     }
 
@@ -760,6 +801,24 @@ function renderPanel(ns, panel) {
   styleActionButton(panel.startButton, managerRunning ? "disabled" : "start");
   styleActionButton(panel.stopButton, managerRunning ? "stop" : "disabled");
   styleActionButton(panel.refreshButton, "neutral");
+
+  // Auto-Upgrade: automatisch upgraden wenn aktiviert und genug Geld vorhanden
+  const autoUpgradeEnabled = panel.admin.autoUpgradeCheckbox.checked;
+  if (autoUpgradeEnabled && upgradeScriptExists && !upgradeRunning
+      && upgradePlan.upgradableCount > 0 && upgradePlan.totalCost > 0
+      && playerMoney >= upgradePlan.totalCost) {
+    startScriptIfIdle(ns, UPGRADE_SERVER_SCRIPT, upgradeRam, true);
+  }
+
+  // Auto-Buy: automatisch neuen Server kaufen (immer kleinstes RAM = 8 GB, um Slots zu fuellen)
+  const autoBuyEnabled = panel.admin.autoBuyCheckbox.checked;
+  const autoBuyRam = RAM_OPTIONS[0]; // immer 8 GB
+  const autoBuyCost = ns.getPurchasedServerCost(autoBuyRam);
+  const autoBuyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, autoBuyRam);
+  if (autoBuyEnabled && buyScriptExists && !buyRunning && !autoBuyPlan.blocked
+      && autoBuyCost > 0 && playerMoney >= autoBuyCost) {
+    startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, autoBuyRam);
+  }
 
   panel.admin.buyButton.disabled = !buyScriptExists || buyRunning || buyPlan.blocked;
   panel.admin.upgradeButton.disabled = !upgradeScriptExists || upgradeRunning || upgradePlan.upgradableCount === 0;
@@ -1101,6 +1160,8 @@ function applySavedGuiState(panel, config) {
 
   panel.admin.buyRamSelect.value = String(guiState.buyRam);
   panel.admin.upgradeRamSelect.value = String(guiState.upgradeRam);
+  panel.admin.autoUpgradeCheckbox.checked = guiState.autoUpgrade;
+  panel.admin.autoBuyCheckbox.checked = guiState.autoBuy;
 
   panel.root.style.top = guiState.panel.top || GUI_STATE_DEFAULT.panel.top;
   if (guiState.panel.left) {
@@ -1123,6 +1184,8 @@ function collectGuiState(panel) {
   return {
     buyRam: getSelectedRam(panel.admin.buyRamSelect, BUY_RAM_DEFAULT),
     upgradeRam: getSelectedRam(panel.admin.upgradeRamSelect, UPGRADE_RAM_DEFAULT),
+    autoUpgrade: panel.admin.autoUpgradeCheckbox?.checked ?? false,
+    autoBuy: panel.admin.autoBuyCheckbox?.checked ?? false,
     panel: {
       top: panel.root.style.top || GUI_STATE_DEFAULT.panel.top,
       left: panel.root.style.left || "",
@@ -1143,6 +1206,8 @@ function sanitizeGuiState(state) {
   return {
     buyRam: sanitizeGuiRam(state?.buyRam, BUY_RAM_DEFAULT),
     upgradeRam: sanitizeGuiRam(state?.upgradeRam, UPGRADE_RAM_DEFAULT),
+    autoUpgrade: Boolean(state?.autoUpgrade),
+    autoBuy: Boolean(state?.autoBuy),
     panel: {
       top: typeof panel.top === "string" && panel.top ? panel.top : GUI_STATE_DEFAULT.panel.top,
       left: typeof panel.left === "string" ? panel.left : GUI_STATE_DEFAULT.panel.left,
