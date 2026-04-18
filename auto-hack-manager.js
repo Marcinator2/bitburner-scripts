@@ -18,6 +18,8 @@ export async function main(ns) {
     const HOME_RESERVE  = 40;    // GB die auf home reserviert bleiben
     const LOOP_DELAY    = 1000;  // Intervall der Manager-Schleife in ms
     const MIN_MONEY_FRAC = 0.85; // Ziel gilt als bereit wenn es mindestens 85% seines Max-Geldes hat
+    const MAX_BATCHES_PER_CYCLE = 250; // Harte Obergrenze pro Manager-Runde gegen Prozess-Explosionen
+    const BATCH_YIELD_EVERY = 25; // Regelmaessig an die Engine zurueckgeben, damit keine Endlosschleife erkannt wird
     // ─────────────────────────────────────────────────────────────────────────
 
     // ── Hilfsfunktionen ──────────────────────────────────────────────────────
@@ -415,16 +417,29 @@ export async function main(ns) {
         // Round-Robin: jedes bereite Ziel bekommt reihum einen Batch,
         // bis kein RAM mehr für irgendeinen Batch reicht.
         let anyLaunched = true;
-        while (anyLaunched) {
+        let cycleCapped = false;
+        while (anyLaunched && batched < MAX_BATCHES_PER_CYCLE) {
             anyLaunched = false;
             for (const target of readyTargets) {
+                if (batched >= MAX_BATCHES_PER_CYCLE) {
+                    cycleCapped = true;
+                    break;
+                }
+
                 if (launchBatch(target, ramList, String(uid++))) {
                     batched++;
                     anyLaunched = true;
+                    if (batched % BATCH_YIELD_EVERY === 0) {
+                        await ns.sleep(0);
+                    }
                 } else {
                     noRam++;
                 }
             }
+        }
+
+        if (batched >= MAX_BATCHES_PER_CYCLE) {
+            cycleCapped = true;
         }
 
         // Status-Anzeige im Log
@@ -441,6 +456,7 @@ export async function main(ns) {
         ns.print(`║  Kein RAM:     ${String(noRam).padStart(4)}           ║`);
         ns.print(`║  Runner:       ${String(runners.length).padStart(4)}           ║`);
         ns.print(`║  Freier RAM:   ${String(totalFree).padStart(7)} GB       ║`);
+        ns.print(`║  Batch-Cap:    ${(cycleCapped ? "JA" : "nein").padStart(4)}           ║`);
         ns.print("╠══════════════════════════════╣");
         // RAM pro Runner anzeigen
         for (const r of ramList) {
