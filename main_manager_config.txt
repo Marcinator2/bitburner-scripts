@@ -23,6 +23,13 @@
       "threads": 1,
       "args": []
     },
+    "negativeKarma": {
+      "enabled": false,
+      "threads": 1,
+      "args": [
+        "main_manager_config.txt"
+      ]
+    },
     "programs": {
       "enabled": false,
       "threads": 1,

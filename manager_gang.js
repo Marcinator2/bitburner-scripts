@@ -31,7 +31,7 @@ export async function main(ns) {
     try {
       const raw = ns.read(configFile);
       if (!raw || !raw.trim()) {
-          return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
+        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
       }
 
       const parsed = JSON.parse(raw);
@@ -39,11 +39,21 @@ export async function main(ns) {
       return {
         autoAscend: gang?.autoAscend ?? true,
         autoEquipment: gang?.autoEquipment ?? true,
-          autoTerritoryWarfare: gang?.autoTerritoryWarfare ?? true,
+        autoTerritoryWarfare: gang?.autoTerritoryWarfare ?? true,
       };
     } catch {
-        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
+      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
     }
+  }
+
+  if (!ns.gang || typeof ns.gang.inGang !== "function") {
+    ns.tprint("Fehler: Gang API nicht verfuegbar.");
+    return;
+  }
+
+  if (!ns.gang.inGang()) {
+    ns.tprint("Noch in keiner Gang. manager_gang.js wird beendet.");
+    return;
   }
 
   const allServers = ns.scan("home").filter(s => s !== "home");

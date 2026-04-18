@@ -1,5 +1,5 @@
 // auto-hack-manager.js
-// Bitburner Script: Optimierter HWGW-Batch-Manager22
+// Bitburner Script: Optimierter HWGW-Batch-Manager2l
 // Alle erreichbaren Server werden gehackt. Nutzt home + MeinServer_ als Runner.12
 // Worker-Scripte (v_hack.js, v_grow.js, v_weaken.js) müssen delay als 2. Argument unterstützen.
 
@@ -12,13 +12,13 @@ export async function main(ns) {
     const G_SCRIPT      = "v_grow.js";
     const W_SCRIPT      = "v_weaken.js";
     const SHARE_SCRIPT  = "share-ram.js";
-    const SHARE_QUOTA   = 0.1;   // 10% RAM pro Runner für share-ram.js, mindestens 1 Thread wenn genug Platz bleibt
+    const SHARE_QUOTA   = 0.01;   // Zielanteil pro Runner fuer share-ram.js; laufende Instanzen werden auf diese Groesse nachgezogen
     const HACK_FRACTION = 0.99;  // Maximaler Anteil des Max-Geldes pro Batch (so viel wie RAM erlaubt)
     const SPACING       = 200;   // ms Abstand zwischen den Finish-Zeitpunkten im Batch
     const HOME_RESERVE  = 40;    // GB die auf home reserviert bleiben
     const LOOP_DELAY    = 1000;  // Intervall der Manager-Schleife in ms
     const MIN_MONEY_FRAC = 0.85; // Ziel gilt als bereit wenn es mindestens 85% seines Max-Geldes hat
-    const MAX_BATCHES_PER_CYCLE = 250; // Harte Obergrenze pro Manager-Runde gegen Prozess-Explosionen
+    const MAX_BATCHES_PER_CYCLE = 300//250; // Harte Obergrenze pro Manager-Runde gegen Prozess-Explosionen
     const BATCH_YIELD_EVERY = 25; // Regelmaessig an die Engine zurueckgeben, damit keine Endlosschleife erkannt wird
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -114,6 +114,12 @@ export async function main(ns) {
         }
     }
 
+    function getRunningShareThreads(host) {
+        return ns.ps(host)
+            .filter(proc => proc.filename === SHARE_SCRIPT)
+            .reduce((sum, proc) => sum + proc.threads, 0);
+    }
+
     function shareThreadsForRunner(host) {
         if (host === "home") return 0;
 
@@ -126,7 +132,7 @@ export async function main(ns) {
         return Math.max(1, Math.floor((maxRam * SHARE_QUOTA) / shareRam));
     }
 
-    function canSpareRamForShare(host, shareThreads) {
+    function canSpareRamForShare(host, shareThreads, currentShareThreads = 0) {
         if (shareThreads < 1) return false;
 
         const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
@@ -136,7 +142,8 @@ export async function main(ns) {
             ns.getScriptRam(W_SCRIPT, "home")
         );
         const freeRam = ns.getServerMaxRam(host) - ns.getServerUsedRam(host);
-        const remainingAfterShare = freeRam - (shareThreads * shareRam);
+        const reclaimableShareRam = currentShareThreads * shareRam;
+        const remainingAfterShare = freeRam + reclaimableShareRam - (shareThreads * shareRam);
 
         return remainingAfterShare >= minWorkerRam;
     }
@@ -144,18 +151,31 @@ export async function main(ns) {
     function ensureShareOnRunners(runners) {
         for (const host of runners) {
             if (host === "home") continue;
-            if (ns.scriptRunning(SHARE_SCRIPT, host)) continue;
 
+            const runningThreads = getRunningShareThreads(host);
             const threads = shareThreadsForRunner(host);
-            if (threads < 1) continue;
-            if (!canSpareRamForShare(host, threads)) {
+            if (threads < 1) {
+                if (runningThreads > 0) {
+                    ns.scriptKill(SHARE_SCRIPT, host);
+                }
+                continue;
+            }
+
+            if (runningThreads === threads) continue;
+
+            if (!canSpareRamForShare(host, threads, runningThreads)) {
                 ns.print(`[Share] ${host} übersprungen: share-ram.js würde keinen Platz mehr für H/G/W lassen.`);
                 continue;
             }
 
+            if (runningThreads > 0) {
+                ns.scriptKill(SHARE_SCRIPT, host);
+            }
+
             const pid = ns.exec(SHARE_SCRIPT, host, threads);
             if (pid > 0) {
-                ns.print(`[Share] ${SHARE_SCRIPT} auf ${host} mit ${threads} Thread(s) gestartet.`);
+                const action = runningThreads > 0 ? "skaliert" : "gestartet";
+                ns.print(`[Share] ${SHARE_SCRIPT} auf ${host} mit ${threads} Thread(s) ${action}.`);
             }
         }
     }
@@ -458,10 +478,14 @@ export async function main(ns) {
         ns.print(`║  Freier RAM:   ${String(totalFree).padStart(7)} GB       ║`);
         ns.print(`║  Batch-Cap:    ${(cycleCapped ? "JA" : "nein").padStart(4)}           ║`);
         ns.print("╠══════════════════════════════╣");
-        // RAM pro Runner anzeigen
-        for (const r of ramList) {
+        // RAM pro Runner anzeigen (Top 10)
+        const displayList = ramList.slice(0, 10);
+        for (const r of displayList) {
             const label = r.host.length > 14 ? r.host.slice(0, 14) : r.host.padEnd(14);
             ns.print(`║  ${label}  ${String(r.free.toFixed(0)).padStart(5)} GB       ║`);
+        }
+        if (ramList.length > 10) {
+            ns.print(`║  ... +${String(ramList.length - 10).padStart(2)} weitere Runner          ║`);
         }
         ns.print("╚══════════════════════════════╝");
 

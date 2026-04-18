@@ -1,6 +1,8 @@
 /** @param {NS} ns */
 
 import { ensureJsonFile } from "./runtime_file_utils.js";
+import { getBestKarmaCrime } from "./manager_karma.js";
+import { normalizeUniversityCourse } from "./training_location_utils.js";
 
 const CONFIG_FILE = "main_manager_config.txt";
 const PANEL_ID = "bitburner-main-manager-gui";
@@ -10,7 +12,7 @@ const NEW_SERVER_BUY_SCRIPT = "new_server_buy.js";
 const UPGRADE_SERVER_SCRIPT = "upgrade_Server.js";
 const BUY_RAM_DEFAULT = 2 ** 16;
 const UPGRADE_RAM_DEFAULT = 2 ** 12;
-const RAM_OPTIONS = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576];
+const RAM_OPTIONS = [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576];
 const GUI_STATE_DEFAULT = {
   buyRam: BUY_RAM_DEFAULT,
   upgradeRam: UPGRADE_RAM_DEFAULT,
@@ -27,6 +29,7 @@ const SERVICES = [
   { key: "hacknet", script: "manager_hacknet.js", host: "home", label: "Hacknet" },
   { key: "stocks", script: "manager_stocks.js", host: "home", label: "Stocks" },
   { key: "gang", script: "manager_gang.js", host: "home", label: "Gang" },
+  { key: "negativeKarma", script: "manager_karma.js", host: "home", label: "Negative Karma" },
   { key: "programs", script: "auto-leveler.js", host: "home", label: "Programs" },
   { key: "combatTrainer", script: "combat_stat_trainer.js", host: "home", label: "Stat Trainer" },
   { key: "playerStatsWorker", script: "player_stats_worker.js", host: "home", label: "Stats Writer" },
@@ -307,7 +310,33 @@ function buildCombatStatControls(doc) {
     checkboxes.set(stat, checkbox);
   }
 
-  return { wrap, checkboxes };
+  // Trennlinie
+  const divider = doc.createElement("div");
+  divider.style.gridColumn = "1 / -1";
+  divider.style.borderTop = "1px solid rgba(255,255,255,0.10)";
+  divider.style.marginTop = "4px";
+  wrap.appendChild(divider);
+
+  // Focus-Checkbox
+  const focusLabel = doc.createElement("label");
+  focusLabel.style.display = "flex";
+  focusLabel.style.alignItems = "center";
+  focusLabel.style.gap = "6px";
+  focusLabel.style.cursor = "pointer";
+  focusLabel.style.gridColumn = "1 / -1";
+
+  const focusCheckbox = doc.createElement("input");
+  focusCheckbox.type = "checkbox";
+  focusCheckbox.dataset.action = "toggle-combat-focus";
+  focusCheckbox.style.cursor = "pointer";
+
+  const focusText = doc.createElement("span");
+  focusText.textContent = "Training mit Focus";
+
+  focusLabel.append(focusCheckbox, focusText);
+  wrap.appendChild(focusLabel);
+
+  return { wrap, checkboxes, focusCheckbox };
 }
 
 function buildGangControls(doc) {
@@ -578,6 +607,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-combat-focus") {
+      toggleCombatTrainerFocus(ns);
+      continue;
+    }
+
     if (action === "toggle-gang-auto-ascend") {
       toggleGangAutoAscend(ns);
       continue;
@@ -717,6 +751,7 @@ function renderPanel(ns, panel) {
   const upgradePlan = getUpgradePlan(ns, purchasedServers, upgradeRam);
   const combatTrainerConfig = getCombatTrainerConfig(config.services.combatTrainer || {});
   const gangConfig = getGangConfig(config.services.gang || {});
+  const negativeKarmaConfig = getNegativeKarmaConfig(config.services.negativeKarma || {});
 
   panel.status.textContent = `Main Manager: ${managerRunning ? "RUNNING" : "STOPPED"}`;
   panel.loop.textContent = `Loop: ${Math.floor(config.loopMs / 1000)}s`;
@@ -759,11 +794,13 @@ function renderPanel(ns, panel) {
 
     row.toggle.textContent = enabled ? "Disable" : "Enable";
     styleActionButton(row.toggle, enabled ? "stop" : "start");
-    row.details.style.whiteSpace = service.key === "combatTrainer" || service.key === "gang" ? "pre-line" : "normal";
+    row.details.style.whiteSpace = service.key === "combatTrainer" || service.key === "gang" || service.key === "negativeKarma" ? "pre-line" : "normal";
     row.details.textContent = service.key === "combatTrainer"
       ? buildCombatTrainerDetails(enabled, running, override, scriptExists, combatTrainerConfig)
       : service.key === "gang"
         ? buildGangDetails(enabled, running, override, scriptExists, gangConfig)
+        : service.key === "negativeKarma"
+          ? buildNegativeKarmaDetails(ns, enabled, running, override, scriptExists, negativeKarmaConfig, combatTrainerConfig)
         : [
             `Config: ${enabled ? "ON" : "OFF"}`,
             `Runtime: ${running ? "RUNNING" : "STOPPED"}`,
@@ -776,6 +813,9 @@ function renderPanel(ns, panel) {
       const stats = sanitizeCombatStatSelection(override.stats);
       for (const [stat, checkbox] of row.statControls.checkboxes.entries()) {
         checkbox.checked = Boolean(stats[stat]);
+      }
+      if (row.statControls.focusCheckbox) {
+        row.statControls.focusCheckbox.checked = combatTrainerConfig.focus;
       }
     }
 
@@ -807,6 +847,38 @@ function buildGangDetails(enabled, running, override, scriptExists, gangConfig) 
     `Auto-Ascend: ${gangConfig.autoAscend ? "ON" : "OFF"}`,
     `Auto-Equipment: ${gangConfig.autoEquipment ? "ON" : "OFF"}`,
     `Auto-Territory: ${gangConfig.autoTerritoryWarfare ? "ON" : "OFF"}`,
+  ].join("\n");
+}
+
+function buildNegativeKarmaDetails(ns, enabled, running, override, scriptExists, negativeKarmaConfig, combatTrainerConfig) {
+  const bestCrime = getNegativeKarmaCrimeForDisplay(ns);
+  const currentWork = typeof ns.singularity?.getCurrentWork === "function"
+    ? ns.singularity.getCurrentWork()
+    : null;
+  const trainerStats = Object.entries(combatTrainerConfig.stats)
+    .filter(([, selected]) => selected)
+    .map(([stat]) => formatCombatStatLabel(stat))
+    .join(", ");
+
+  if (!bestCrime) {
+    return [
+      `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+      "Crime: nicht verfuegbar",
+      "Chance/Karma: n/a",
+    ].join("\n");
+  }
+
+  const mode = negativeKarmaConfig.trainerManaged && combatTrainerConfigEnabled(combatTrainerConfig, currentWork)
+    ? "Training fuer 90%"
+    : isCrimeWork(currentWork, bestCrime.type)
+      ? "Crime aktiv"
+      : "Bereit";
+
+  return [
+    `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+    `Crime: ${bestCrime.type} | Chance: ${(bestCrime.chance * 100).toFixed(1)}% | Karma/s: ${bestCrime.karmaPerSecond.toFixed(3)}`,
+    `Mode: ${mode} | Zielchance: 90.0%`,
+    `Trainer-Stats: ${trainerStats || "keine"}`,
   ].join("\n");
 }
 
@@ -881,6 +953,27 @@ function toggleCombatTrainerStat(ns, stat) {
   saveConfig(ns, CONFIG_FILE, config);
 }
 
+function toggleCombatTrainerFocus(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.combatTrainer || {};
+  const trainerConfig = getCombatTrainerConfig(current);
+
+  const args = Array.isArray(current.args) ? [...current.args] : [CONFIG_FILE, false, "Leadership"];
+  const usesLegacyArgs = args.length >= 7;
+  const focusIdx = usesLegacyArgs ? 3 : 1;
+  args[focusIdx] = !trainerConfig.focus;
+
+  config.services.combatTrainer = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args,
+    stats: sanitizeCombatStatSelection(current.stats),
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
 function toggleGangAutoAscend(ns) {
   const config = loadConfig(ns, CONFIG_FILE);
   const current = config.services.gang || {};
@@ -950,8 +1043,9 @@ function getCombatTrainerConfig(service) {
   const args = Array.isArray(service.args) ? service.args : [];
   const usesLegacyArgs = args.length >= 7;
   return {
+    enabled: service.enabled ?? false,
     focus: usesLegacyArgs ? Boolean(args[3]) : Boolean(args[1]),
-    charismaCourse: String((usesLegacyArgs ? args[6] : args[2]) || "Leadership"),
+    charismaCourse: normalizeUniversityCourse((usesLegacyArgs ? args[6] : args[2]) || "Leadership"),
     stats: sanitizeCombatStatSelection(service.stats),
   };
 }
@@ -962,6 +1056,44 @@ function getGangConfig(service) {
     autoEquipment: service.autoEquipment ?? true,
     autoTerritoryWarfare: service.autoTerritoryWarfare ?? true,
   };
+}
+
+function getNegativeKarmaConfig(service) {
+  return {
+    trainerManaged: service.trainerManaged === true,
+  };
+}
+
+function getNegativeKarmaCrimeForDisplay(ns) {
+  if (!ns.singularity || typeof ns.singularity.getCrimeStats !== "function" || typeof ns.singularity.getCrimeChance !== "function") {
+    return null;
+  }
+
+  try {
+    return getBestKarmaCrime(ns);
+  } catch {
+    return null;
+  }
+}
+
+function combatTrainerConfigEnabled(trainerConfig, currentWork) {
+  if (trainerConfig.enabled) {
+    return true;
+  }
+
+  return Boolean(currentWork && String(currentWork.type || "").toLowerCase() === "class");
+}
+
+function isCrimeWork(work, crimeType) {
+  if (!work || typeof work !== "object") {
+    return false;
+  }
+
+  if (String(work.type || "").toLowerCase() !== "crime") {
+    return false;
+  }
+
+  return !crimeType || String(work.crimeType || "") === crimeType;
 }
 
 function applySavedGuiState(panel, config) {

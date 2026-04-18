@@ -53,6 +53,16 @@ const SERVICE_DEFINITIONS = [
     shouldRun: ns => Boolean(ns.gang && typeof ns.gang.inGang === "function" && ns.gang.inGang()),
   },
   {
+    key: "negativeKarma",
+    script: "manager_karma.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [DEFAULT_CONFIG_FILE],
+    description: "Farmt negatives Karma und trainiert bis 90% Crime-Chance",
+    shouldRun: ns => Boolean(ns.singularity),
+  },
+  {
     key: "programs",
     script: "auto-leveler.js",
     host: "home",

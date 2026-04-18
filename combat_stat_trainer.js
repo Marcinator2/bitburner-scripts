@@ -1,7 +1,14 @@
 /** @param {NS} ns */
 
 import { ensureJsonFile } from "./runtime_file_utils.js";
-import { GYM_LOCATIONS, UNIVERSITY_LOCATIONS, getConfiguredLocation, selectBestGym, selectBestUniversity } from "./training_location_utils.js";
+import {
+  GYM_LOCATIONS,
+  UNIVERSITY_LOCATIONS,
+  getConfiguredLocation,
+  normalizeUniversityCourse,
+  selectBestGym,
+  selectBestUniversity,
+} from "./training_location_utils.js";
 
 const DEFAULT_CONFIG_FILE = "main_manager_config.txt";
 const DEFAULT_FOCUS = false;
@@ -89,9 +96,10 @@ function loadTrainerConfig(ns, configFile) {
     const service = parsed?.services?.[SERVICE_KEY] || {};
     const args = Array.isArray(service.args) ? service.args : [];
     const usesLegacyArgs = args.length >= 7;
+    const rawCharismaCourse = usesLegacyArgs ? args[6] : args[2];
     return {
       focus: usesLegacyArgs ? Boolean(args[3]) : Boolean(args[1]),
-      charismaCourse: String((usesLegacyArgs ? args[6] : args[2]) || DEFAULT_CHARISMA_COURSE),
+      charismaCourse: normalizeUniversityCourse(rawCharismaCourse || DEFAULT_CHARISMA_COURSE),
       stats: sanitizeStatSelection(service.stats),
     };
   } catch {
@@ -119,6 +127,7 @@ function startTraining(ns, trainerConfig, stat, gymChoice, universityChoice) {
     }
 
     const chosenUniversity = universityChoice || resolveUniversityChoice(ns, trainerConfig);
+    const courseName = normalizeUniversityCourse(trainerConfig.charismaCourse);
 
     if (!ensureCity(ns, chosenUniversity.city)) {
       return false;
@@ -126,7 +135,7 @@ function startTraining(ns, trainerConfig, stat, gymChoice, universityChoice) {
 
     return ns.singularity.universityCourse(
       chosenUniversity.name,
-      trainerConfig.charismaCourse,
+      courseName,
       trainerConfig.focus,
     );
   }
