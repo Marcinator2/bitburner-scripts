@@ -179,11 +179,9 @@ function buildPanel(doc) {
 
   const startButton = makeButton(doc, "Start Manager", "start-manager");
   const stopButton = makeButton(doc, "Stop Manager", "stop-manager");
-  const refreshButton = makeButton(doc, "Refresh", "refresh");
   startButton.style.flex = "1";
   stopButton.style.flex = "1";
-  refreshButton.style.flex = "0 0 auto";
-  topBar.append(startButton, stopButton, refreshButton);
+  topBar.append(startButton, stopButton);
 
   const meta = doc.createElement("div");
   meta.style.display = "flex";
@@ -385,7 +383,6 @@ function buildPanel(doc) {
     loop,
     startButton,
     stopButton,
-    refreshButton,
     minimizeButton,
     admin,
     rows,
@@ -476,9 +473,10 @@ function buildGangControls(doc) {
 
   const checkboxes = new Map();
   const options = [
-    { key: "autoAscend", action: "toggle-gang-auto-ascend", label: "Mitglieder automatisch aufleveln" },
-    { key: "autoEquipment", action: "toggle-gang-auto-equipment", label: "Equipment automatisch kaufen" },
-    { key: "autoTerritoryWarfare", action: "toggle-gang-auto-territory", label: "Territory Warfare automatisch steuern" },
+    { key: "autoAscend",            action: "toggle-gang-auto-ascend",      label: "Mitglieder automatisch aufleveln" },
+    { key: "autoEquipment",         action: "toggle-gang-auto-equipment",   label: "Equipment automatisch kaufen" },
+    { key: "autoTerritoryWarfare",  action: "toggle-gang-auto-territory",   label: "Territory Warfare automatisch steuern" },
+    { key: "prepCombatMode",        action: "toggle-gang-prep-combat",      label: "Kampfwerte trainieren (Prep-Modus)" },
   ];
 
   for (const option of options) {
@@ -784,10 +782,6 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
-    if (action === "refresh") {
-      continue;
-    }
-
     if (action === "toggle-visibility") {
       continue;
     }
@@ -857,6 +851,11 @@ function processQueuedActions(ns, panel, actionQueue) {
 
     if (action === "toggle-gang-auto-territory") {
       toggleGangAutoTerritoryWarfare(ns);
+      continue;
+    }
+
+    if (action === "toggle-gang-prep-combat") {
+      toggleGangPrepCombat(ns);
       continue;
     }
 
@@ -1004,7 +1003,6 @@ function renderPanel(ns, panel) {
   panel.stopButton.disabled = !managerRunning;
   styleActionButton(panel.startButton, managerRunning ? "disabled" : "start");
   styleActionButton(panel.stopButton, managerRunning ? "stop" : "disabled");
-  styleActionButton(panel.refreshButton, "neutral");
 
   // Auto-Upgrade: automatisch upgraden wenn aktiviert und genug Geld vorhanden
   const autoUpgradeEnabled = panel.admin.autoUpgradeCheckbox.checked;
@@ -1086,6 +1084,7 @@ function renderPanel(ns, panel) {
       row.gangControls.checkboxes.get("autoAscend").checked = gangConfig.autoAscend;
       row.gangControls.checkboxes.get("autoEquipment").checked = gangConfig.autoEquipment;
       row.gangControls.checkboxes.get("autoTerritoryWarfare").checked = gangConfig.autoTerritoryWarfare;
+      row.gangControls.checkboxes.get("prepCombatMode").checked = gangConfig.prepCombatMode;
     }
 
     if (service.key === "augments" && row.augmentControls) {
@@ -1356,6 +1355,22 @@ function toggleGangAutoTerritoryWarfare(ns) {
   saveConfig(ns, CONFIG_FILE, config);
 }
 
+function toggleGangPrepCombat(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.gang || {};
+  const gangConfig = getGangConfig(current);
+
+  config.services.gang = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args: Array.isArray(current.args) ? current.args : [],
+    prepCombatMode: !gangConfig.prepCombatMode,
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
 function startScriptIfIdle(ns, script, ...args) {
   if (!ns.fileExists(script, "home")) {
     return;
@@ -1389,6 +1404,7 @@ function getGangConfig(service) {
     autoAscend: service.autoAscend ?? true,
     autoEquipment: service.autoEquipment ?? true,
     autoTerritoryWarfare: service.autoTerritoryWarfare ?? true,
+    prepCombatMode: service.prepCombatMode ?? false,
   };
 }
 

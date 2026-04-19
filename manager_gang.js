@@ -7,7 +7,6 @@ export async function main(ns) {
   const combatAscendFaktor = 1.35; // Combat-Ascension-Schwelle für War-Team
   const minHackFuerCrime = 200;    // Hack-Stat-Schwelle: darunter → trainieren statt Crime
   const minHackShare = 0.2;       // Mindestens 50% der Gang bleiben auf Hacking-Tasks
-  const prepCombatMode = false;    // true = nur Vorbereitung (Combat trainieren), false = normaler Gang-Betrieb
   const powerFarmMode = false;      // true = Power über Territory Warfare farmen, aber ohne Clashes
   const powerFarmShare = 0.8;     // Anteil der Gang für Power-Farming, zusätzlich begrenzt durch minHackShare
   const prepDexFocus = false;       // true = Swap anhand DEX-Fortschritt, false = anhand Combat-Summe
@@ -31,7 +30,7 @@ export async function main(ns) {
     try {
       const raw = ns.read(configFile);
       if (!raw || !raw.trim()) {
-        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
+        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false };
       }
 
       const parsed = JSON.parse(raw);
@@ -40,9 +39,10 @@ export async function main(ns) {
         autoAscend: gang?.autoAscend ?? true,
         autoEquipment: gang?.autoEquipment ?? true,
         autoTerritoryWarfare: gang?.autoTerritoryWarfare ?? true,
+        prepCombatMode: gang?.prepCombatMode ?? false,
       };
     } catch {
-      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true };
+      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false };
     }
   }
 
@@ -150,6 +150,7 @@ export async function main(ns) {
   while (true) {
     loopCount++;
     const gangConfig = loadGangConfig();
+    const prepCombatMode = gangConfig.prepCombatMode;
 
     // Neue Mitglieder rekrutieren (while: manchmal sind mehrere auf einmal verfügbar)
     while (ns.gang.canRecruitMember()) {
