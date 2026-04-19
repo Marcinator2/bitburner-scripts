@@ -36,6 +36,7 @@ const SERVICES = [
   { key: "playerStatsView", script: "player_stats.js", host: "home", label: "Stats View" },
   { key: "overview", script: "overview.js", host: "home", label: "Overview" },
   { key: "augments", script: "manager_augments.js", host: "home", label: "Augments" },
+  { key: "backdoor", script: "manager_backdoor.js", host: "home", label: "Backdoor" },
 ];
 
 const TABS = [
@@ -52,7 +53,7 @@ const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", aug
 function getServiceTab(key) {
   if (key === "negativeKarma" || key === "combatTrainer") return "training";
   if (key === "gang") return "gang";
-  if (key === "augments") return "augments";
+  if (key === "augments" || key === "backdoor") return "augments";
   return "services";
 }
 

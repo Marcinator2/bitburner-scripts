@@ -122,6 +122,16 @@ const SERVICE_DEFINITIONS = [
     description: "Kauft Augmentationen automatisch (Hacking/Kampf/Hacknet/Bladeburner/Charisma)",
     shouldRun: ns => Boolean(ns.singularity),
   },
+  {
+    key: "backdoor",
+    script: "manager_backdoor.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [],
+    description: "Installiert Backdoors auf allen erreichbaren Servern",
+    shouldRun: ns => Boolean(ns.singularity),
+  },
 ];
 
 export async function main(ns) {
