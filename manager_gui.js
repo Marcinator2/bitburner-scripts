@@ -53,7 +53,7 @@ const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", aug
 function getServiceTab(key) {
   if (key === "negativeKarma" || key === "combatTrainer") return "training";
   if (key === "gang") return "gang";
-  if (key === "augments" || key === "backdoor") return "augments";
+  if (key === "augments") return "augments";
   return "services";
 }
 
