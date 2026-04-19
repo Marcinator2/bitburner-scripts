@@ -542,7 +542,32 @@ function buildAugmentControls(doc) {
     checkboxes.set(option.key, checkbox);
   }
 
-  return { wrap, checkboxes };
+  // Trennlinie + Rep-Farming-Checkbox
+  const divider = doc.createElement("div");
+  divider.style.gridColumn = "1 / -1";
+  divider.style.borderTop = "1px solid rgba(255,255,255,0.10)";
+  divider.style.marginTop = "4px";
+  wrap.appendChild(divider);
+
+  const repLabel = doc.createElement("label");
+  repLabel.style.display = "flex";
+  repLabel.style.alignItems = "center";
+  repLabel.style.gap = "6px";
+  repLabel.style.cursor = "pointer";
+  repLabel.style.gridColumn = "1 / -1";
+
+  const repCheckbox = doc.createElement("input");
+  repCheckbox.type = "checkbox";
+  repCheckbox.dataset.action = "toggle-augment-rep-farming";
+  repCheckbox.style.cursor = "pointer";
+
+  const repText = doc.createElement("span");
+  repText.textContent = "Rep-Farming wenn Rep fehlt";
+
+  repLabel.append(repCheckbox, repText);
+  wrap.appendChild(repLabel);
+
+  return { wrap, checkboxes, repCheckbox };
 }
 
 function buildServerAdminSection(doc) {
@@ -841,6 +866,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-augment-rep-farming") {
+      toggleAugmentRepFarming(ns);
+      continue;
+    }
+
     if (action.startsWith("toggle:")) {
       const key = action.split(":")[1];
       toggleService(ns, key);
@@ -1062,6 +1092,9 @@ function renderPanel(ns, panel) {
       for (const [cat, checkbox] of row.augmentControls.checkboxes) {
         checkbox.checked = augmentConfig.categories[cat] ?? false;
       }
+      if (row.augmentControls.repCheckbox) {
+        row.augmentControls.repCheckbox.checked = augmentConfig.repFarming;
+      }
     }
   }
 }
@@ -1138,7 +1171,7 @@ function buildAugmentDetails(ns, enabled, running, override, scriptExists, augCo
   return [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
     `Kategorien: ${activeCats || "keine"}`,
-    bufferText,
+    `Rep-Farming: ${augConfig.repFarming ? "ON" : "OFF"} | ${bufferText}`,
   ].join("\n");
 }
 
@@ -1152,6 +1185,7 @@ function getAugmentConfig(service) {
       charisma:    service.categories?.charisma    ?? false,
     },
     minMoneyBuffer: service.minMoneyBuffer ?? 0,
+    repFarming: service.repFarming ?? false,
   };
 }
 
@@ -1168,6 +1202,16 @@ function toggleAugmentCategory(ns, cat) {
   config.services.augments = {
     ...current,
     categories: aug.categories,
+  };
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleAugmentRepFarming(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.augments || {};
+  config.services.augments = {
+    ...current,
+    repFarming: !(current.repFarming ?? false),
   };
   saveConfig(ns, CONFIG_FILE, config);
 }

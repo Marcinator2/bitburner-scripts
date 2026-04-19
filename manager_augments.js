@@ -49,6 +49,7 @@ function getAugConfig(config) {
       charisma:    s.categories?.charisma    ?? false,
     },
     minMoneyBuffer: typeof s.minMoneyBuffer === "number" ? s.minMoneyBuffer : 0,
+    repFarming: s.repFarming ?? false,
   };
 }
 
@@ -173,6 +174,85 @@ export async function main(ns) {
       ns.print(`[REP] ${nearest.name} – noch ${ns.formatNumber(missing)} Rep (${nearest.faction})`);
     }
 
+  // Rep-Farming
+  manageRepFarming(ns, augConfig, repPending, candidates);
+
     await ns.sleep(loopMs);
+  }
+}
+
+/**
+ * Wählt die Fraktion mit den meisten ausstehenden (rep-blockierten) Augments
+ * und startet Fraktionsarbeit für sie. Stoppt wenn alle Augments dieser
+ * Fraktion kaufbar sind.
+ */
+function manageRepFarming(ns, augConfig, repPending, allCandidates) {
+  if (!augConfig.repFarming) {
+    // Farming deaktiviert – nichts tun
+    return;
+  }
+
+  if (repPending.length === 0) {
+    // Kein Rep-Bedarf mehr – laufende Fraktionsarbeit stoppen falls aktiv
+    try {
+      const work = ns.singularity.getCurrentWork();
+      if (work && work.type === "FACTION") {
+        ns.singularity.stopAction();
+        ns.print("[REP-FARM] Alle Augments kaufbar – Arbeit gestoppt.");
+      }
+    } catch (_) {}
+    return;
+  }
+
+  // Fraktion mit den meisten rep-blockierten Augments wählen
+  // Gang-Fraktion ausschließen (keine Arbeit möglich während man eine Gang hat)
+  let gangFaction = null;
+  try {
+    if (ns.gang) gangFaction = ns.gang.getGangInformation().faction;
+  } catch (_) {}
+
+  const validPending = gangFaction
+    ? repPending.filter(aug => aug.faction !== gangFaction)
+    : repPending;
+
+  if (validPending.length === 0) {
+    ns.print(`[REP-FARM] Alle rep-blockierten Augments gehören zur Gang-Fraktion (${gangFaction}) – übersprungen.`);
+    return;
+  }
+
+  const factionCount = new Map();
+  for (const aug of validPending) {
+    factionCount.set(aug.faction, (factionCount.get(aug.faction) ?? 0) + 1);
+  }
+  const targetFaction = [...factionCount.entries()]
+    .sort((a, b) => b[1] - a[1])[0][0];
+
+  // Prüfen ob bereits für diese Fraktion gearbeitet wird
+  try {
+    const work = ns.singularity.getCurrentWork();
+    if (work && work.type === "FACTION" && work.factionName === targetFaction) {
+      ns.print(`[REP-FARM] Arbeite für ${targetFaction} (${factionCount.get(targetFaction)} Augments)`);
+      return;
+    }
+  } catch (_) {}
+
+  // Besten verfügbaren Arbeitstyp bestimmen (Hacking > Field > Security)
+  const started =
+    tryFactionWork(ns, targetFaction, "hacking") ||
+    tryFactionWork(ns, targetFaction, "field") ||
+    tryFactionWork(ns, targetFaction, "security");
+
+  if (started) {
+    ns.print(`[REP-FARM] Gestartet: ${targetFaction} (${factionCount.get(targetFaction)} Augments offen)`);
+  } else {
+    ns.print(`[REP-FARM] Konnte keine Arbeit für ${targetFaction} starten.`);
+  }
+}
+
+function tryFactionWork(ns, faction, type) {
+  try {
+    return ns.singularity.workForFaction(faction, type, false);
+  } catch (_) {
+    return false;
   }
 }
