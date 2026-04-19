@@ -160,9 +160,7 @@ export async function main(ns) {
     const members = ns.gang.getMemberNames();
     const info = ns.gang.getGangInformation();
     const wantedPenalty = typeof info.wantedPenalty === "number" ? info.wantedPenalty : 1;
-    const wantedLevelGain = typeof info.wantedLevelGain === "number"
-      ? info.wantedLevelGain
-      : (typeof info.wantedLevelGainRate === "number" ? info.wantedLevelGainRate : 0);
+    const wantedLevelGain = typeof info.wantedLevelGainRate === "number" ? info.wantedLevelGainRate : 0;
     const wantedLevel = typeof info.wantedLevel === "number" ? info.wantedLevel : 0;
 
     // Dynamische Respect-Schwelle für Cyberterrorism langsam anpassen
@@ -388,7 +386,8 @@ export async function main(ns) {
 
       // PRIORITÄT 2: Wanted Level senken
       if (wantedLevel > 5000 || wantedLevelGain > 0) {
-        const threshold = wantedLevel > 10000 ? 0.7 : 0.3;
+        // Wenn Wanted aktiv wächst → alle cleanen; sonst nur einen Teil
+        const threshold = wantedLevelGain > 0 ? 1.0 : (wantedLevel > 10000 ? 0.7 : 0.5);
         const idx = trainedMemberNames.indexOf(name);
         const cleanerCount = Math.ceil(trainedMemberNames.length * threshold);
         ns.gang.setMemberTask(name, idx < cleanerCount ? "Ethical Hacking" : "Money Laundering");

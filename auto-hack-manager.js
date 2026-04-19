@@ -15,7 +15,7 @@ export async function main(ns) {
     const SHARE_QUOTA   = 0.01;   // Zielanteil pro Runner fuer share-ram.js; laufende Instanzen werden auf diese Groesse nachgezogen
     const HACK_FRACTION = 0.99;  // Maximaler Anteil des Max-Geldes pro Batch (so viel wie RAM erlaubt)
     const SPACING       = 200;   // ms Abstand zwischen den Finish-Zeitpunkten im Batch
-    const HOME_RESERVE  = 40;    // GB die auf home reserviert bleiben
+    const HOME_RESERVE  = 35;    // GB die auf home reserviert bleiben
     const LOOP_DELAY    = 1000;  // Intervall der Manager-Schleife in ms
     const MIN_MONEY_FRAC = 0.85; // Ziel gilt als bereit wenn es mindestens 85% seines Max-Geldes hat
     const MAX_BATCHES_PER_CYCLE = 300//250; // Harte Obergrenze pro Manager-Runde gegen Prozess-Explosionen
