@@ -112,6 +112,16 @@ const SERVICE_DEFINITIONS = [
     description: "Einmalige Uebersicht, standardmaessig aus",
     shouldRun: () => false,
   },
+  {
+    key: "augments",
+    script: "manager_augments.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [DEFAULT_CONFIG_FILE],
+    description: "Kauft Augmentationen automatisch (Hacking/Kampf/Hacknet/Bladeburner/Charisma)",
+    shouldRun: ns => Boolean(ns.singularity),
+  },
 ];
 
 export async function main(ns) {

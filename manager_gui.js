@@ -35,21 +35,24 @@ const SERVICES = [
   { key: "playerStatsWorker", script: "player_stats_worker.js", host: "home", label: "Stats Writer" },
   { key: "playerStatsView", script: "player_stats.js", host: "home", label: "Stats View" },
   { key: "overview", script: "overview.js", host: "home", label: "Overview" },
+  { key: "augments", script: "manager_augments.js", host: "home", label: "Augments" },
 ];
 
 const TABS = [
   { id: "services", label: "Services" },
   { id: "training", label: "Training" },
   { id: "gang", label: "Gang" },
+  { id: "augments", label: "Augments" },
   { id: "server", label: "Server" },
 ];
 
 // display type used when a tab pane is active
-const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", server: "block" };
+const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block" };
 
 function getServiceTab(key) {
   if (key === "negativeKarma" || key === "combatTrainer") return "training";
   if (key === "gang") return "gang";
+  if (key === "augments") return "augments";
   return "services";
 }
 
@@ -237,6 +240,10 @@ function buildPanel(doc) {
     pane.style.padding = "12px";
   }
 
+  // Augments pane: single block
+  const augmentsPane = tabPanes.get("augments");
+  augmentsPane.style.padding = "12px";
+
   function switchTab(id) {
     for (const [tid, pane] of tabPanes) {
       pane.style.display = tid === id ? TAB_DISPLAY_TYPE[tid] : "none";
@@ -323,17 +330,21 @@ function buildPanel(doc) {
 
       let statControls = null;
       let gangControls = null;
+      let augmentControls = null;
       if (service.key === "combatTrainer") {
         statControls = buildCombatStatControls(doc);
         row.append(top, details, statControls.wrap);
       } else if (service.key === "gang") {
         gangControls = buildGangControls(doc);
         row.append(top, details, gangControls.wrap);
+      } else if (service.key === "augments") {
+        augmentControls = buildAugmentControls(doc);
+        row.append(top, details, augmentControls.wrap);
       } else {
         row.append(top, details);
       }
 
-      rows.set(service.key, { toggle, details, row, statControls, gangControls });
+      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls });
     }
 
     pane.appendChild(row);
@@ -467,6 +478,47 @@ function buildGangControls(doc) {
     { key: "autoAscend", action: "toggle-gang-auto-ascend", label: "Mitglieder automatisch aufleveln" },
     { key: "autoEquipment", action: "toggle-gang-auto-equipment", label: "Equipment automatisch kaufen" },
     { key: "autoTerritoryWarfare", action: "toggle-gang-auto-territory", label: "Territory Warfare automatisch steuern" },
+  ];
+
+  for (const option of options) {
+    const label = doc.createElement("label");
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "6px";
+    label.style.cursor = "pointer";
+
+    const checkbox = doc.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.action = option.action;
+    checkbox.style.cursor = "pointer";
+
+    const text = doc.createElement("span");
+    text.textContent = option.label;
+
+    label.append(checkbox, text);
+    wrap.appendChild(label);
+    checkboxes.set(option.key, checkbox);
+  }
+
+  return { wrap, checkboxes };
+}
+
+function buildAugmentControls(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.display = "grid";
+  wrap.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+  wrap.style.gap = "6px 10px";
+  wrap.style.marginTop = "10px";
+  wrap.style.fontSize = "11px";
+  wrap.style.color = "#c6d8eb";
+
+  const checkboxes = new Map();
+  const options = [
+    { key: "hacking",     action: "toggle-augment-cat:hacking",     label: "Hacking" },
+    { key: "combat",      action: "toggle-augment-cat:combat",      label: "Kampf" },
+    { key: "hacknet",     action: "toggle-augment-cat:hacknet",     label: "Hacknet" },
+    { key: "bladeburner", action: "toggle-augment-cat:bladeburner", label: "Bladeburner" },
+    { key: "charisma",    action: "toggle-augment-cat:charisma",    label: "Charisma / Rep" },
   ];
 
   for (const option of options) {
@@ -782,6 +834,12 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action.startsWith("toggle-augment-cat:")) {
+      const cat = action.split(":")[1];
+      toggleAugmentCategory(ns, cat);
+      continue;
+    }
+
     if (action.startsWith("toggle:")) {
       const key = action.split(":")[1];
       toggleService(ns, key);
@@ -907,6 +965,7 @@ function renderPanel(ns, panel) {
   const combatTrainerConfig = getCombatTrainerConfig(config.services.combatTrainer || {});
   const gangConfig = getGangConfig(config.services.gang || {});
   const negativeKarmaConfig = getNegativeKarmaConfig(config.services.negativeKarma || {});
+  const augmentConfig = getAugmentConfig(config.services.augments || {});
 
   panel.status.textContent = `Main Manager: ${managerRunning ? "RUNNING" : "STOPPED"}`;
   panel.loop.textContent = `Loop: ${Math.floor(config.loopMs / 1000)}s`;
@@ -974,6 +1033,8 @@ function renderPanel(ns, panel) {
         ? buildGangDetails(enabled, running, override, scriptExists, gangConfig)
         : service.key === "negativeKarma"
           ? buildNegativeKarmaDetails(ns, enabled, running, override, scriptExists, negativeKarmaConfig, combatTrainerConfig)
+          : service.key === "augments"
+            ? buildAugmentDetails(ns, enabled, running, override, scriptExists, augmentConfig)
         : [
             `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"}`,
             `Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
@@ -994,6 +1055,12 @@ function renderPanel(ns, panel) {
       row.gangControls.checkboxes.get("autoAscend").checked = gangConfig.autoAscend;
       row.gangControls.checkboxes.get("autoEquipment").checked = gangConfig.autoEquipment;
       row.gangControls.checkboxes.get("autoTerritoryWarfare").checked = gangConfig.autoTerritoryWarfare;
+    }
+
+    if (service.key === "augments" && row.augmentControls) {
+      for (const [cat, checkbox] of row.augmentControls.checkboxes) {
+        checkbox.checked = augmentConfig.categories[cat] ?? false;
+      }
     }
   }
 }
@@ -1051,6 +1118,57 @@ function buildNegativeKarmaDetails(ns, enabled, running, override, scriptExists,
     `Mode: ${mode} | Zielchance: 90.0%`,
     `Trainer-Stats: ${trainerStats || "keine"}`,
   ].join("\n");
+}
+
+function buildAugmentDetails(ns, enabled, running, override, scriptExists, augConfig) {
+  const CAT_LABELS = {
+    hacking: "Hack", combat: "Kampf", hacknet: "HN",
+    bladeburner: "BB", charisma: "CHA",
+  };
+  const activeCats = Object.entries(augConfig.categories)
+    .filter(([, on]) => on)
+    .map(([k]) => CAT_LABELS[k] || k)
+    .join(", ");
+
+  const bufferText = augConfig.minMoneyBuffer > 0
+    ? `Buffer: ${ns.formatNumber(augConfig.minMoneyBuffer)}$`
+    : "Kein Geld-Buffer";
+
+  return [
+    `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+    `Kategorien: ${activeCats || "keine"}`,
+    bufferText,
+  ].join("\n");
+}
+
+function getAugmentConfig(service) {
+  return {
+    categories: {
+      hacking:     service.categories?.hacking     ?? true,
+      combat:      service.categories?.combat      ?? true,
+      hacknet:     service.categories?.hacknet     ?? false,
+      bladeburner: service.categories?.bladeburner ?? false,
+      charisma:    service.categories?.charisma    ?? false,
+    },
+    minMoneyBuffer: service.minMoneyBuffer ?? 0,
+  };
+}
+
+function toggleAugmentCategory(ns, cat) {
+  const VALID = ["hacking", "combat", "hacknet", "bladeburner", "charisma"];
+  if (!VALID.includes(cat)) return;
+
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.augments || {};
+  const aug = getAugmentConfig(current);
+
+  aug.categories[cat] = !aug.categories[cat];
+
+  config.services.augments = {
+    ...current,
+    categories: aug.categories,
+  };
+  saveConfig(ns, CONFIG_FILE, config);
 }
 
 function styleActionButton(button, mode) {
