@@ -37,6 +37,22 @@ const SERVICES = [
   { key: "overview", script: "overview.js", host: "home", label: "Overview" },
 ];
 
+const TABS = [
+  { id: "services", label: "Services" },
+  { id: "training", label: "Training" },
+  { id: "gang", label: "Gang" },
+  { id: "server", label: "Server" },
+];
+
+// display type used when a tab pane is active
+const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", server: "block" };
+
+function getServiceTab(key) {
+  if (key === "negativeKarma" || key === "combatTrainer") return "training";
+  if (key === "gang") return "gang";
+  return "services";
+}
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -98,7 +114,7 @@ function buildPanel(doc) {
   root.style.position = "fixed";
   root.style.top = "96px";
   root.style.right = "24px";
-  root.style.width = "340px";
+  root.style.width = "480px";
   root.style.maxHeight = "80vh";
   root.style.overflowY = "auto";
   root.style.zIndex = "10000";
@@ -166,7 +182,9 @@ function buildPanel(doc) {
   topBar.append(startButton, stopButton, refreshButton);
 
   const meta = doc.createElement("div");
-  meta.style.padding = "12px 16px";
+  meta.style.display = "flex";
+  meta.style.gap = "16px";
+  meta.style.padding = "8px 16px 0";
   meta.style.fontSize = "12px";
   meta.style.color = "#9fc0de";
 
@@ -174,20 +192,78 @@ function buildPanel(doc) {
   const loop = doc.createElement("div");
   meta.append(status, loop);
 
-  const list = doc.createElement("div");
-  list.style.padding = "0 12px 12px";
-  list.style.display = "grid";
-  list.style.gap = "10px";
+  // Tab bar
+  const tabBar = doc.createElement("div");
+  tabBar.style.display = "flex";
+  tabBar.style.padding = "0 16px";
+  tabBar.style.marginTop = "8px";
+  tabBar.style.borderBottom = "1px solid rgba(120,190,255,0.15)";
 
-  const admin = buildServerAdminSection(doc);
+  const tabButtons = new Map();
+  for (const tab of TABS) {
+    const btn = doc.createElement("button");
+    btn.textContent = tab.label;
+    btn.dataset.tab = tab.id;
+    btn.style.background = "none";
+    btn.style.border = "none";
+    btn.style.borderBottom = "2px solid transparent";
+    btn.style.color = "#8db3d9";
+    btn.style.padding = "8px 16px";
+    btn.style.cursor = "pointer";
+    btn.style.font = "inherit";
+    btn.style.fontSize = "13px";
+    tabBar.appendChild(btn);
+    tabButtons.set(tab.id, btn);
+  }
 
-  const content = doc.createElement("div");
-  content.append(topBar, meta, admin.wrap, list);
+  // Tab panes
+  const tabPanes = new Map();
+  for (const tab of TABS) {
+    const pane = doc.createElement("div");
+    pane.style.display = "none";
+    tabPanes.set(tab.id, pane);
+  }
+
+  // Services pane: 2-column grid
+  const servicesPane = tabPanes.get("services");
+  servicesPane.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+  servicesPane.style.gap = "8px";
+  servicesPane.style.padding = "12px";
+
+  // Training & Gang panes: single-column grid
+  for (const id of ["training", "gang"]) {
+    const pane = tabPanes.get(id);
+    pane.style.gap = "10px";
+    pane.style.padding = "12px";
+  }
+
+  function switchTab(id) {
+    for (const [tid, pane] of tabPanes) {
+      pane.style.display = tid === id ? TAB_DISPLAY_TYPE[tid] : "none";
+    }
+    for (const [tid, btn] of tabButtons) {
+      const active = tid === id;
+      btn.style.color = active ? "#e5eef7" : "#8db3d9";
+      btn.style.borderBottomColor = active ? "rgba(120,190,255,0.8)" : "transparent";
+      btn.style.fontWeight = active ? "700" : "400";
+    }
+  }
+
+  tabBar.addEventListener("click", event => {
+    const btn = event.target.closest("[data-tab]");
+    if (btn && tabPanes.has(btn.dataset.tab)) {
+      switchTab(btn.dataset.tab);
+    }
+  });
 
   const rows = new Map();
+  const admin = buildServerAdminSection(doc);
   for (const service of SERVICES) {
+    const tabId = getServiceTab(service.key);
+    const pane = tabPanes.get(tabId);
+    const isCompact = tabId === "services";
+
     const row = doc.createElement("div");
-    row.style.padding = "10px 12px";
     row.style.border = "1px solid rgba(255,255,255,0.08)";
     row.style.borderRadius = "10px";
     row.style.background = "rgba(255,255,255,0.03)";
@@ -196,45 +272,75 @@ function buildPanel(doc) {
     top.style.display = "flex";
     top.style.alignItems = "center";
     top.style.justifyContent = "space-between";
-    top.style.gap = "10px";
-
-    const labelWrap = doc.createElement("div");
-    const label = doc.createElement("div");
-    label.textContent = service.label;
-    label.style.fontSize = "14px";
-    label.style.fontWeight = "700";
-
-    const script = doc.createElement("div");
-    script.textContent = service.script;
-    script.style.fontSize = "11px";
-    script.style.color = "#7fa6c8";
-    script.style.marginTop = "3px";
-    labelWrap.append(label, script);
+    top.style.gap = isCompact ? "6px" : "10px";
 
     const toggle = makeButton(doc, "", `toggle:${service.key}`);
-    toggle.style.minWidth = "88px";
-    top.append(labelWrap, toggle);
 
-    const details = doc.createElement("div");
-    details.style.marginTop = "8px";
-    details.style.fontSize = "11px";
-    details.style.color = "#b9d1e7";
+    if (isCompact) {
+      row.style.padding = "8px 10px";
 
-    let statControls = null;
-    let gangControls = null;
-    if (service.key === "combatTrainer") {
-      statControls = buildCombatStatControls(doc);
-      row.append(top, details, statControls.wrap);
-    } else if (service.key === "gang") {
-      gangControls = buildGangControls(doc);
-      row.append(top, details, gangControls.wrap);
-    } else {
+      const labelEl = doc.createElement("div");
+      labelEl.textContent = service.label;
+      labelEl.style.fontSize = "13px";
+      labelEl.style.fontWeight = "700";
+      top.append(labelEl, toggle);
+
+      toggle.style.minWidth = "72px";
+      toggle.style.padding = "5px 8px";
+      toggle.style.fontSize = "11px";
+
+      const details = doc.createElement("div");
+      details.style.marginTop = "5px";
+      details.style.fontSize = "10px";
+      details.style.color = "#b9d1e7";
+      details.style.whiteSpace = "pre-line";
+
       row.append(top, details);
+      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null });
+    } else {
+      row.style.padding = "10px 12px";
+
+      const labelWrap = doc.createElement("div");
+      const labelEl = doc.createElement("div");
+      labelEl.textContent = service.label;
+      labelEl.style.fontSize = "14px";
+      labelEl.style.fontWeight = "700";
+
+      const scriptEl = doc.createElement("div");
+      scriptEl.textContent = service.script;
+      scriptEl.style.fontSize = "11px";
+      scriptEl.style.color = "#7fa6c8";
+      scriptEl.style.marginTop = "3px";
+      labelWrap.append(labelEl, scriptEl);
+
+      top.append(labelWrap, toggle);
+      toggle.style.minWidth = "88px";
+
+      const details = doc.createElement("div");
+      details.style.marginTop = "8px";
+      details.style.fontSize = "11px";
+      details.style.color = "#b9d1e7";
+
+      let statControls = null;
+      let gangControls = null;
+      if (service.key === "combatTrainer") {
+        statControls = buildCombatStatControls(doc);
+        row.append(top, details, statControls.wrap);
+      } else if (service.key === "gang") {
+        gangControls = buildGangControls(doc);
+        row.append(top, details, gangControls.wrap);
+      } else {
+        row.append(top, details);
+      }
+
+      rows.set(service.key, { toggle, details, row, statControls, gangControls });
     }
 
-    list.appendChild(row);
-    rows.set(service.key, { toggle, details, row, statControls, gangControls });
+    pane.appendChild(row);
   }
+
+  tabPanes.get("server").appendChild(admin.wrap);
+  switchTab("services");
 
   const launcher = makeButton(doc, "Manager GUI", "toggle-visibility");
   launcher.id = `${PANEL_ID}-launcher`;
@@ -247,6 +353,14 @@ function buildPanel(doc) {
   launcher.style.borderRadius = "999px";
   launcher.style.boxShadow = "0 8px 24px rgba(0,0,0,0.35)";
   styleActionButton(launcher, "neutral");
+
+  const tabContent = doc.createElement("div");
+  for (const pane of tabPanes.values()) {
+    tabContent.appendChild(pane);
+  }
+
+  const content = doc.createElement("div");
+  content.append(topBar, meta, tabBar, tabContent);
 
   root.append(header, content);
 
@@ -853,7 +967,7 @@ function renderPanel(ns, panel) {
 
     row.toggle.textContent = enabled ? "Disable" : "Enable";
     styleActionButton(row.toggle, enabled ? "stop" : "start");
-    row.details.style.whiteSpace = service.key === "combatTrainer" || service.key === "gang" || service.key === "negativeKarma" ? "pre-line" : "normal";
+    row.details.style.whiteSpace = "pre-line";
     row.details.textContent = service.key === "combatTrainer"
       ? buildCombatTrainerDetails(enabled, running, override, scriptExists, combatTrainerConfig)
       : service.key === "gang"
@@ -861,11 +975,9 @@ function renderPanel(ns, panel) {
         : service.key === "negativeKarma"
           ? buildNegativeKarmaDetails(ns, enabled, running, override, scriptExists, negativeKarmaConfig, combatTrainerConfig)
         : [
-            `Config: ${enabled ? "ON" : "OFF"}`,
-            `Runtime: ${running ? "RUNNING" : "STOPPED"}`,
-            `Threads: ${override.threads ?? 1}`,
-            scriptExists ? "Script: OK" : "Script: MISSING",
-          ].join(" | ");
+            `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"}`,
+            `Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+          ].join("\n");
     row.row.style.borderColor = enabled ? "rgba(86,201,120,0.35)" : "rgba(255,255,255,0.08)";
 
     if (service.key === "combatTrainer" && row.statControls) {
