@@ -1,0 +1,6 @@
+# Ignore the stable source folder (local copy)
+bitburner-src-stable/
+
+# Personal/working lists
+Merkliste.txt
+Maerkliste.txt
