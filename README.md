@@ -1,27 +1,27 @@
 # bitburner
 
-Projektuebersicht fuer die Bitburner-Skripte in diesem Repository. Ziel dieser Datei ist, die aktuellen Verantwortlichkeiten, Abhaengigkeiten und Arbeitsregeln festzuhalten, damit spaetere Aenderungen nachvollziehbar bleiben.
+Project overview for the Bitburner scripts in this repository. This README documents responsibilities, dependencies, and operating rules so that future changes remain traceable.
 
-## Zielbild
+## Purpose
 
-Das Repository ist kein einzelnes Script, sondern ein kleines Script-System mit drei Ebenen:
+This repository is not a single script but a small script system with three layers:
 
-1. `main_manager.js` als zentraler Supervisor.
-2. Mehrere Manager fuer einzelne Domainen wie Hacking, Stocks, Gang, Hacknet oder Player-Stats.
-3. Kleine Worker- und Utility-Skripte, die von Managern gestartet oder fuer Einzelaufgaben direkt ausgefuehrt werden.
+1. `main_manager.js` as the central supervisor.
+2. Multiple managers for specific domains such as Hacking, Stocks, Gang, Hacknet, or Player Stats.
+3. Small worker and utility scripts that managers start or that can be executed for one-off tasks.
 
-Der wichtigste Einstiegspunkt fuer den Alltagsbetrieb ist aktuell `main_manager.js` zusammen mit `main_manager_config.txt`.
+The primary entry point for daily operation is currently `main_manager.js` together with `main_manager_config.txt`.
 
-## Architektur
+## Architecture
 
-### 1. Supervisor-Ebene
+### 1. Supervisor layer
 
 `main_manager.js`
-- liest `main_manager_config.txt`
-- startet und ueberwacht einzelne Dienste per `ns.exec(...)`
-- trennt Aktivierung (`enabled`), Laufparameter (`args`) und Startschleife (`loopMs`)
+- reads `main_manager_config.txt`
+- starts and monitors individual services via `ns.exec(...)`
+- separates activation (`enabled`), runtime parameters (`args`) and the start loop (`loopMs`)
 
-Aktuell bekannte Services:
+Known services:
 - `hack` -> `auto-hack-manager.js`
 - `hacknet` -> `manager_hacknet.js`
 - `stocks` -> `manager_stocks.js`
@@ -32,115 +32,115 @@ Aktuell bekannte Services:
 - `playerStatsView` -> `player_stats.js`
 - `overview` -> `overview.js`
 
-### 2. Manager-Ebene
+### 2. Manager layer
 
 `auto-hack-manager.js`
-- scannt das Netzwerk per BFS
-- versucht Root-Zugang auf erreichbaren Servern zu erlangen
-- unterscheidet zwischen Targets und Runnern
-- verteilt `v_hack.js`, `v_grow.js`, `v_weaken.js` batchweise auf verfuegbare Hosts
-- reserviert auf `home` und auf gekauften `MeinServer_*`-Hosts gezielt RAM
-- startet auf gekauften Servern zusaetzlich `share-ram.js`
+- scans the network via BFS
+- attempts to obtain root access on reachable servers
+- distinguishes between targets and runners
+- deploys `v_hack.js`, `v_grow.js`, `v_weaken.js` in batches to available hosts
+- reserves RAM deliberately on `home` and on purchased `MyServer_*` hosts
+- additionally starts `share-ram.js` on purchased servers
 
 `manager_stocks.js`
-- handelt Aktien ueber die Stock-API
-- nutzt Forecast/Volatilitaet fuer Kauf- und Verkaufsentscheidungen
-- startet bei Bedarf ebenfalls `v_hack.js`, `v_grow.js`, `v_weaken.js` auf `home`
-- ist funktional ein eigener Manager und kein Unterprozess des Hack-Managers
+- trades stocks using the Stock API
+- uses forecast and volatility for buy/sell decisions
+- starts `v_hack.js`, `v_grow.js`, `v_weaken.js` on `home` as needed
+- is an independent manager (not a subprocess of the hack manager)
 
 `manager_gang.js`
-- verwaltet Gang-Mitglieder, Aufgaben, Equipment und Warfare-Verhalten
-- enthaelt relativ viel Fachlogik und viele Stellschrauben direkt im Script
-- ist eher ein eigenstaendiges Teilsystem als nur ein kleiner Helfer
+- manages gang members, tasks, equipment and territory warfare behavior
+- contains domain-specific logic and many tunables inside the script
+- functions as an autonomous subsystem rather than a small helper
 
 `manager_hacknet.js`
-- bewertet Upgrade-Optionen fuer Hacknet-Nodes ueber eine einfache ROI-Heuristik
-- kauft oder upgraded Nodes, sofern die API verfuegbar ist
+- evaluates upgrade options for Hacknet nodes using a simple ROI heuristic
+- purchases or upgrades nodes if the API is available
 
 `manager_stats.js`
-- trainiert Combat-Stats automatisch ueber die Singularity-API
-- ist aktuell nicht in `main_manager.js` eingebunden, aber logisch ein separater Manager/Trainer
+- trains combat stats automatically via the Singularity API
+- currently not integrated into `main_manager.js`, but conceptually a separate manager/trainer
 
 `combat_stat_trainer.js`
-- trainiert die im Config-/GUI-Modus ausgewaehlten Stats dauerhaft
-- ist jetzt direkt als Service `combatTrainer` in `main_manager.js` integrierbar
-- liest seine Auswahl live aus `main_manager_config.txt`, statt auf feste Zielwerte zu laufen
-- trainiert STR/DEF/DEX/AGI im Gym und CHARISMA ueber Uni/Kurs
+- trains the stats selected in the config/GUI continuously
+- is available as a `combatTrainer` service for `main_manager.js`
+- reads its selection live from `main_manager_config.txt` instead of using fixed targets
+- trains STR/DEF/DEX/AGI at gyms and CHARISMA at universities/courses
 
 `auto-leveler.js`
-- ist fuer automatische Programmbeschaffung gedacht
-- wird ueber den Service `programs` angesteuert
+- intended for automated program purchasing
+- controlled via the `programs` service
 
-### 3. Worker- und Utility-Ebene
+### 3. Worker and utility layer
 
 `v_hack.js`, `v_grow.js`, `v_weaken.js`
-- generische Worker fuer Batch-Hacking
-- werden hauptsaechlich vom Hack-Manager und teilweise vom Stock-Manager gestartet
+- generic workers for batch hacking
+- primarily started by the hack manager and occasionally by the stock manager
 
 `share-ram.js`
-- teilt freie RAM-Kapazitaet ueber `share()`
-- wird von mehreren Stellen eingesetzt und ist damit ein wiederverwendbarer Infrastruktur-Worker
-- auf `MeinServer_*` soll es nur einmal real laufen; der Hack-Manager reserviert dafuer nicht mehr doppelt zusaetzlichen RAM
-- der Auto-Hack-Manager startet es jetzt auch auf fremden Runnern mit Root-Zugang; Zielgroesse ist ca. 10% RAM, aber mindestens 1 Thread
-- wenn selbst 1 Share-Thread dazu fuehren wuerde, dass auf dem Host kein Platz mehr fuer H/G/W bleibt, wird Share dort nicht gestartet
+- shares free RAM time with `share()`
+- used by multiple systems and thus a reusable infrastructure worker
+- should only run once on each `MyServer_*` host; the hack manager will not reserve RAM for duplicate instances
+- the auto-hack manager also starts it on remote runners with root access; target size is ~10% of RAM but at least 1 thread
+- if even a single share thread would leave no room for H/G/W on a host, Share is not started there
 
 `player_stats_worker.js`
-- sammelt periodisch Spielerzustand
-- schreibt die Historie als JSON in `player_stats_data.txt`
+- periodically collects player state
+- writes history as JSON to `player_stats_data.txt`
 
 `player_stats.js`
-- liest `player_stats_data.txt`
-- rendert Trendtabellen und ASCII-Charts im Tail-Fenster
+- reads `player_stats_data.txt`
+- renders trend tables and ASCII charts in a tail window
 
 `overview.js`
-- erstellt eine einmalige Betriebsuebersicht ueber Einkommen, Prozesse, RAM und Serverstatus
+- creates a single operational overview of income, processes, RAM and server status
 
 `find-server.js`
-- berechnet per BFS den Connect-Pfad zu einem Zielserver
+- computes the connect path to a target server using BFS
 
 `profit-check.js`
-- Monitoring-/Hilfsskript fuer Profit- oder Einkommenspruefung auf Hosts
+- monitoring/utility script for profit or income checks on hosts
 
-## Wichtige Ablaufketten
+## Important workflows
 
-### Hauptbetrieb
+### Main operation
 
 `main_manager.js`
--> liest `main_manager_config.txt`
--> startet aktivierte Services
--> ueberwacht fortlaufend, ob diese bereits laufen oder neu gestartet werden muessen
+-> reads `main_manager_config.txt`
+-> starts enabled services
+-> continuously monitors whether services are running or need restarting
 
-### Player-Stats-Pipeline
+### Player stats pipeline
 
 `player_stats_worker.js`
--> schreibt `player_stats_data.txt`
--> `player_stats.js` liest dieselbe Datei und zeigt Trends an
+-> writes `player_stats_data.txt`
+-> `player_stats.js` reads the same file and displays trends
 
-Die Stats-Anzeige ist damit absichtlich von der Datensammlung getrennt.
+The separation ensures the stats display is intentionally decoupled from data collection.
 
-### Server-Kauf und Provisioning
+### Server purchase and provisioning
 
 `new_server_buy.js`
--> kauft einen neuen `MeinServer_*`
--> startet `new_server_setup.js`
+-> purchases a new `MyServer_*`
+-> starts `new_server_setup.js`
 
 `new_server_setup.js`
--> kopiert mehrere Skripte auf den neuen Server
--> startet dort `profit-check.js`
--> startet dort `manager_share-ram.js`
+-> copies several scripts to the new server
+-> starts `profit-check.js` there
+-> starts `manager_share-ram.js` there
 
 `manager_share-ram.js`
--> startet `share-ram.js` auf dem Zielhost
+-> starts `share-ram.js` on the target host
 
-### Direkter Einzel-Hack
+### Direct single-host hack
 
 `money-hack.js`
-- ist ein einfacherer, direkter Hack-/Grow-/Weaken-Loop fuer einen einzelnen Target-Host
-- wirkt im Vergleich zu `auto-hack-manager.js` wie ein aelterer oder alternativer Pfad
+- a simpler direct hack/grow/weaken loop for a single target host
+- is an older or alternative path compared to `auto-hack-manager.js`
 
-## Dateigruppen
+## File groups
 
-### Zentrale Dateien
+### Core files
 
 - `main_manager.js`
 - `main_manager_config.txt`
@@ -163,26 +163,26 @@ Die Stats-Anzeige ist damit absichtlich von der Datensammlung getrennt.
 - `manager_stocks.js`
 - `stock_manager_worker.js`
 
-### Player- und Combat-Stats
+### Player & Combat Stats
 
 - `player_stats_worker.js`
 - `player_stats.js`
 - `manager_stats.js`
 - `combat_stat_trainer.js`
 
-### Gang und Hacknet
+### Gang & Hacknet
 
 - `manager_gang.js`
 - `manager_hacknet.js`
 
-### Server-Management und Admin
+### Server management & admin
 
 - `new_server_buy.js`
 - `new_server_setup.js`
 - `upgrade_Server.js`
 - `umbenennen_server.js`
 
-### Utilities und Experimente
+### Utilities & experiments
 
 - `overview.js`
 - `find-server.js`
@@ -192,23 +192,23 @@ Die Stats-Anzeige ist damit absichtlich von der Datensammlung getrennt.
 - `test.js`
 - `Merkliste.txt`
 
-## Konfiguration und Daten
+## Configuration and data
 
-Wichtig fuer die VSCode-Bitburner-Erweiterung:
-- Runtime-Dateien wie `main_manager_config.txt` und `player_stats_data.txt` muessen nicht aus dem Workspace nach Bitburner gepusht werden.
-- Die Skripte legen diese Dateien bei Bedarf selbst im Spiel an oder reparieren sie, wenn sie ungueltig sind.
-- Dadurch sollten diese Dateien eher als Ingame-Runtime-Dateien behandelt werden, nicht als regulaere Sync-Dateien.
+Important for the VSCode Bitburner extension:
+- Runtime files such as `main_manager_config.txt` and `player_stats_data.txt` do not need to be pushed from the workspace into Bitburner.
+- Scripts create or repair these files in-game as needed.
+- Treat these files primarily as in-game runtime artifacts, not as regular synced files.
 
 ### `main_manager_config.txt`
 
-Die Datei ist die zentrale Schaltstelle fuer den Supervisor.
+This file is the central control for the supervisor.
 
-Wichtige Felder:
-- `loopMs`: Intervall, in dem `main_manager.js` den Dienstestatus prueft
-- `tail`: ob der Manager direkt ein Tail-Fenster oeffnen soll
-- `services`: Objekt mit Dienstkonfigurationen pro Service-Key
+Key fields:
+- `loopMs`: interval at which `main_manager.js` checks service status
+- `tail`: whether the manager should open a tail window automatically
+- `services`: object with per-service configuration by service key
 
-Beispielhafte Services:
+Example service settings:
 - `hack.enabled`
 - `stocks.enabled`
 - `gang.enabled`
@@ -218,17 +218,17 @@ Beispielhafte Services:
 
 ### `player_stats_data.txt`
 
-Wird zur Laufzeit erzeugt und enthaelt JSON mit etwa folgendem Schema:
+Created at runtime and contains JSON roughly matching:
 - `version`
 - `sampleMs`
 - `maxSamples`
 - `samples[]`
 
-Die Datei ist kein Handarbeitsartefakt, sondern ein Laufzeit-Datenspeicher.
+This file is a runtime data store, not a hand-edited artifact.
 
-## Vermuteter Reifegrad
+## Maturity estimate
 
-### Aktiv genutzte Kernelemente
+### Actively used core components
 
 - `main_manager.js`
 - `auto-hack-manager.js`
@@ -237,13 +237,13 @@ Die Datei ist kein Handarbeitsartefakt, sondern ein Laufzeit-Datenspeicher.
 - `manager_stocks.js`
 - `manager_gang.js`
 
-### Optional oder feature-gated
+### Optional or feature-gated
 
-- `manager_hacknet.js` nur sinnvoll, wenn die Hacknet-API verfuegbar ist
-- `manager_stats.js` benoetigt Singularity / Source-File 4
-- `auto-leveler.js` haengt von verfuegbaren APIs und Spielfortschritt ab
+- `manager_hacknet.js` – useful only if the Hacknet API is available
+- `manager_stats.js` – requires Singularity / Source-File 4
+- `auto-leveler.js` – depends on available APIs and game progress
 
-### Wahrscheinlich experimentell, alt oder unklar
+### Likely experimental, old or unclear
 
 - `1st-hackworm.js`
 - `hack-worker.js`
@@ -251,15 +251,15 @@ Die Datei ist kein Handarbeitsartefakt, sondern ein Laufzeit-Datenspeicher.
 - `scp_kopieren.js`
 - `test.js`
 
-Diese Dateien sollten vor groesseren Umbauten geprueft werden, damit keine stillen Abhaengigkeiten uebersehen werden.
+These files should be reviewed before major refactors to avoid missing hidden dependencies.
 
-## Status-Einteilung fuer Aufraeumen
+## Cleanup categories
 
-Ab jetzt sollte das Repo gedanklich in vier Klassen getrennt werden.
+Going forward, separate the repo into four conceptual classes.
 
-### A. Produktiv und aktiv pflegen
+### A. Production – actively maintained
 
-Diese Dateien sind Teil des aktuellen Zielsystems und sollten bei Aenderungen bevorzugt werden:
+Files in current production that should be prioritized when changing:
 
 - `main_manager.js`
 - `main_manager_config.txt`
@@ -279,9 +279,9 @@ Diese Dateien sind Teil des aktuellen Zielsystems und sollten bei Aenderungen be
 - `manager_share-ram.js`
 - `find-server.js`
 
-### B. Produktiv, aber eher Spezial- oder Einzelwerkzeug
+### B. Production but specialized or single-purpose
 
-Diese Dateien koennen weiter nuetzlich sein, sind aber nicht das zentrale Architektur-Rueckgrat:
+Useful files that are not the central architecture backbone:
 
 - `money-hack.js`
 - `profit-check.js`
@@ -290,114 +290,113 @@ Diese Dateien koennen weiter nuetzlich sein, sind aber nicht das zentrale Archit
 - `upgrade_Server.js`
 - `umbenennen_server.js`
 
-### C. Legacy behalten, aber nicht mehr als Fuehrungspfad verwenden
+### C. Legacy (keep but do not use as main path)
 
-Diese Dateien werden nicht geloescht, sollen aber nicht mehr der Standard fuer neue Erweiterungen sein:
+These files remain for historical reasons but should not be the default path for new features:
 
 - `1st-hackworm.js`
 - `hack-worker.js`
 
-Regel:
-- Wenn Hacking erweitert wird, dann im Pfad `auto-hack-manager.js` plus `v_*`-Worker.
-- Legacy-Dateien nur anfassen, wenn bewusst ein alter Ablauf repariert oder verglichen werden soll.
+Rule:
+- When extending hacking, prefer `auto-hack-manager.js` + `v_*` workers.
+- Only modify legacy files deliberately when comparing or repairing old flows.
 
-### D. Experimentell, Scratch oder Duplikat
+### D. Experimental / scratch / duplicate
 
-Diese Dateien gelten vorerst als nicht-produktiv:
+Files considered non-productive for now:
 
 - `befehltest.js`
 - `scp_kopieren.js`
 - `test.js`
 
-Regel:
-- Keine neue Logik auf diese Dateien aufbauen.
-- Wenn darin etwas Wertvolles steckt, die Logik in eine produktive Datei uebernehmen und den Rest spaeter archivieren oder entfernen.
+Rules:
+- Do not implement new logic in these files.
+- If valuable logic exists here, move it into a production file and archive or remove the remainder later.
 
-## Konkrete Aufraeumregeln
+## Concrete cleanup rules
 
-Damit produktiv und experimentell nicht erneut vermischt werden, gelten folgende Arbeitsregeln:
+To avoid mixing production and experimental code, follow these rules:
 
-1. Neue Features nur noch in produktive Klassen A oder B einbauen.
-2. Legacy-Dateien aus Klasse C nicht als Vorlage fuer neue Manager verwenden.
-3. Dateien aus Klasse D nur noch als Referenz lesen, nicht erweitern.
-4. Wenn Klasse-D-Code benoetigt wird, zuerst in eine produktive Datei uebertragen und dort sauber einbauen.
-5. Doppelte Logik vermeiden: fuer Server-Pfade nur `find-server.js`, fuer Batch-Hacking nur `auto-hack-manager.js` plus `v_*`.
+1. Add new features only to production classes A or B.
+2. Do not use legacy class C files as templates for new managers.
+3. Treat class D files as reference only; do not extend them.
+4. If you need code from class D, port it to a production file first and integrate it cleanly.
+5. Avoid duplicate logic: use `find-server.js` for server paths and `auto-hack-manager.js` + `v_*` workers for batch hacking.
 
-## Nächster sinnvoller Bereinigungsschritt
+## Next sensible cleanup steps
 
-Wenn wir im naechsten Schritt weiter aufraeumen wollen, ist die sinnvollste Reihenfolge:
+If we proceed with cleanup, the recommended order is:
 
-1. `test.js` gegen `find-server.js` endgueltig abgleichen und danach archivieren oder loeschen.
-2. `1st-hackworm.js` und `hack-worker.js` mit dem heutigen Hacking-Pfad vergleichen und entscheiden, ob sie noch einen echten Zweck haben.
-3. `befehltest.js` und `scp_kopieren.js` in einen klaren Archiv-/Scratch-Bereich ueberfuehren oder entfernen.
+1. Align `test.js` with `find-server.js` and then archive or delete.
+2. Compare `1st-hackworm.js` and `hack-worker.js` against the current hacking flow and decide whether they still serve a purpose.
+3. Move `befehltest.js` and `scp_kopieren.js` into a clear archive/scratch area or remove them.
 
-## Vorgaben fuer spaetere Aenderungen
+## Guidelines for future changes
 
-### 1. Einstiegspunkte klar halten
+### 1. Keep entry points clear
 
-Neue Automationen nach Moeglichkeit nicht direkt in mehrere Skripte verteilen, sondern ueber einen klaren Einstiegspunkt fuehren:
-- global ueber `main_manager.js`
-- fachlich ueber einen dedizierten Manager
-- technisch ueber kleine Worker
+Prefer a single entry point for new automations:
+- globally via `main_manager.js`
+- domain-specific via a dedicated manager
+- technically via small workers
 
-### 2. Konfiguration von Logik trennen
+### 2. Separate configuration from logic
 
-Was haeufig angepasst wird, gehoert bevorzugt in Konfigurationswerte statt fest codiert in lange Schleifen.
-Das gilt besonders fuer:
-- Aktivierungsflags
-- Timingwerte
-- Geld- und RAM-Reserven
-- Schwellen fuer Kauf, Verkauf oder Training
+Frequently changed values should be configuration, not hard-coded in loops. This applies to:
+- activation flags
+- timing values
+- money and RAM reserves
+- thresholds for buying, selling or training
 
-### 3. Gemeinsame Worker nicht duplizieren
+### 3. Do not duplicate shared workers
 
-Die `v_*`-Worker und `share-ram.js` sind gemeinsame Infrastruktur. Wenn ihr Verhalten geaendert wird, immer mitdenken:
-- Hack-Manager
-- Stock-Manager
-- Provisioning neuer Server
+`v_*` workers and `share-ram.js` are shared infrastructure. When changing them, consider:
+- hack manager
+- stock manager
+- provisioning of new servers
 
-### 4. Datenfluesse explizit halten
+### 4. Keep data flows explicit
 
-Wenn ein Skript Dateien schreibt, sollte mindestens dokumentiert sein:
-- welche Datei beschrieben wird
-- welches Format erwartet wird
-- wer diese Datei spaeter liest
+If a script writes a file, document at least:
+- which file is written
+- what format is expected
+- who reads the file later
 
-Aktuell ist die Player-Stats-Pipeline dafuer das sauberste Beispiel.
+The player stats pipeline is the cleanest example of this approach.
 
-### 5. Alte und neue Wege nicht unbemerkt mischen
+### 5. Avoid mixing old and new flows unnoticed
 
-Es gibt im Repo sowohl den neueren Manager-/Worker-Stil als auch aeltere Einzel-Skripte. Vor Erweiterungen sollte geklaert werden, welcher Pfad der bevorzugte ist.
+The repo contains both a newer manager/worker style and older single scripts. Before extending, choose the preferred path.
 
-Praktisch bedeutet das:
-- neue Hacking-Logik eher in `auto-hack-manager.js` plus `v_*`-Worker integrieren
-- `money-hack.js` und aeltere Hacking-Skripte nur gezielt behalten oder bewusst ausmustern
+Practically:
+- add new hacking logic to `auto-hack-manager.js` + `v_*` workers
+- keep `money-hack.js` and older scripts only if they have a clear purpose
 
-### 6. Script-Rollen im Dateinamen ernst nehmen
+### 6. Respect script naming conventions
 
-Empfohlene Bedeutung:
-- `main_*` = globaler Einstiegspunkt
-- `manager_*` = dauerlaufender Fachmanager
-- `*_worker` oder `v_*` = kleine, gezielt gestartete Ausfuehrungseinheit
-- Utility-Skripte nur fuer klar abgegrenzte Einzelaufgaben
+Recommended meaning:
+- `main_*` = global entrypoint
+- `manager_*` = long-running domain manager
+- `*_worker` or `v_*` = small, targeted execution unit
+- utility scripts for single, well-defined tasks only
 
-## Empfohlene Startpunkte
+## Recommended start commands
 
-Fuer den normalen Betrieb:
+For normal operation:
 - `run main_manager.js`
-- `run manager_gui.js` fuer ein GUI-Panel mit Buttons zum Aktivieren/Deaktivieren der Services
+- `run manager_gui.js` for a GUI panel with buttons to enable/disable services
 
-Fuer Status ohne Dauerloop:
+For one-off status checks:
 - `run main_manager.js status`
 - `run main_manager.js once`
 
-Fuer Einzelwerkzeuge:
+For single tools:
 - `run find-server.js n00dles`
 - `run player_stats.js player_stats_data.txt once`
 
-## GUI fuer den Manager
+## Manager GUI
 
-Es gibt jetzt einen ersten GUI-Pfad ueber `manager_gui.js`.
+There is now a first GUI path via `manager_gui.js`.
 
 Funktionen:
 - Start/Stop fuer `main_manager.js`
