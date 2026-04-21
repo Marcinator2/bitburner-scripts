@@ -2,7 +2,7 @@
 
 import { ensureJsonFile } from "./runtime_file_utils.js";
 
-const DEFAULT_CONFIG_FILE = "main_manager_config.txt";
+const DEFAULT_CONFIG_FILE = "main_manager_config.js";
 const DEFAULT_LOOP_MS = 5000;
 
 const SERVICE_DEFINITIONS = [
@@ -70,7 +70,7 @@ const SERVICE_DEFINITIONS = [
     enabled: false,
     args: [],
     description: "Purchases programs automatically",
-    shouldRun: ns => typeof ns.purchaseProgram === "function",
+    shouldRun: ns => Boolean(ns.singularity),
   },
   {
     key: "combatTrainer",

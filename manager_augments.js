@@ -1,6 +1,6 @@
 /** @param {NS} ns */
 
-const CONFIG_FILE = "main_manager_config.txt";
+const CONFIG_FILE = "main_manager_config.js";
 const NEUROFLUX = "NeuroFlux Governor";
 
 // Stat-Felder pro Kategorie (aus ns.singularity.getAugmentationStats)

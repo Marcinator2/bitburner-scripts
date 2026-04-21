@@ -1,6 +1,6 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  const configFile = String(ns.args[0] || "main_manager_config.txt");
+  const configFile = String(ns.args[0] || "main_manager_config.js");
   //ns.disableLog("ALL");
 
   const ascensionFactor = 1.8; // Ascension multiplier threshold (hack mult must increase by this factor)

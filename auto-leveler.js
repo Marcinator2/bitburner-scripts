@@ -14,21 +14,24 @@ export async function main(ns) {
     ns.clearLog();
     ns.print(`Starting cycle at ${new Date().toLocaleString()}`);
 
+    try { ns.singularity.purchaseTor(); } catch (_) {}
+
     for (const program of programs) {
       if (ns.fileExists(program, host)) {
         ns.print(`${program} already present.`);
         continue;
       }
 
-      if (ns.purchaseProgram(program)) {
-        ns.tprint(`Purchased: ${program}`);
-        continue;
-      }
-
       ns.print(`${program} not yet purchasable. Waiting and retrying...`);
       while (!ns.fileExists(program, host)) {
-        if (ns.purchaseProgram(program)) {
-          ns.tprint(`Purchased: ${program}`);
+        try {
+          if (ns.singularity.purchaseProgram(program)) {
+            ns.tprint(`Purchased: ${program}`);
+            break;
+          }
+        } catch (_) {
+          // Singularity API not available (no SF4) – skip
+          ns.print(`${program}: Singularity API not available, skipping.`);
           break;
         }
         await ns.sleep(retryDelay);

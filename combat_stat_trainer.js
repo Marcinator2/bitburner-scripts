@@ -10,7 +10,7 @@ import {
   selectBestUniversity,
 } from "./training_location_utils.js";
 
-const DEFAULT_CONFIG_FILE = "main_manager_config.txt";
+const DEFAULT_CONFIG_FILE = "main_manager_config.js";
 const DEFAULT_FOCUS = false;
 const DEFAULT_CHARISMA_COURSE = "Leadership";
 const CHECK_INTERVAL_MS = 15000;

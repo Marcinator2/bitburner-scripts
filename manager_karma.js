@@ -2,7 +2,7 @@
 
 import { ensureJsonFile } from "./runtime_file_utils.js";
 
-const DEFAULT_CONFIG_FILE = "main_manager_config.txt";
+const DEFAULT_CONFIG_FILE = "main_manager_config.js";
 const CHECK_INTERVAL_MS = 15000;
 const CRIME_CHANCE_TARGET = 0.9;
 const CRIME_FOCUS = false;

@@ -4,7 +4,7 @@ import { ensureJsonFile } from "./runtime_file_utils.js";
 import { getBestKarmaCrime } from "./manager_karma.js";
 import { normalizeUniversityCourse } from "./training_location_utils.js";
 
-const CONFIG_FILE = "main_manager_config.txt";
+const CONFIG_FILE = "main_manager_config.js";
 const PANEL_ID = "bitburner-main-manager-gui";
 const REFRESH_MS = 1000;
 const MAIN_MANAGER_SCRIPT = "main_manager.js";
@@ -47,7 +47,7 @@ const TABS = [
   { id: "server", label: "Server" },
 ];
 
-// display type used when a tab pane is active
+// display type used when a tab pane is active1
 const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block" };
 
 function getServiceTab(key) {
