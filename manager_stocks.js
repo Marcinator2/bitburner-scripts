@@ -7,7 +7,7 @@ export async function main(ns) {
     typeof ns.stock.purchaseTixApi !== "function" &&
     typeof ns.stock.hasTixApiAccess !== "function"
   )) {
-    ns.tprint("Stock API nicht verfügbar. Benötigt WSE/TIX API.");//test
+    ns.tprint("Stock API not available. Requires WSE/TIX API.");//test
     return;
   }
 
@@ -35,8 +35,8 @@ export async function main(ns) {
     }
   })();
 
-  const firma = ns.args[0] || "joesguns";
-  const symbol_Firma = ns.args[1] || "JGN";
+  const company = ns.args[0] || "joesguns";
+  const firmSymbol = ns.args[1] || "JGN";
   const host = "home";
 
   const v_hack = "v_hack.js";
@@ -44,19 +44,19 @@ export async function main(ns) {
   const v_weaken = "v_weaken.js";
   const weakenRam = ns.getScriptRam(v_weaken);
 
-  if (!ns.serverExists(firma)) {
-    ns.tprint(`Server ${firma} existiert nicht.`);
+  if (!ns.serverExists(company)) {
+    ns.tprint(`Server ${company} does not exist.`);
     return;
   }
   if (weakenRam <= 0) {
-    ns.tprint(`Script ${v_weaken} fehlt oder hat ungültige RAM-Kosten.`);
+    ns.tprint(`Script ${v_weaken} is missing or has invalid RAM cost.`);
     return;
   }
 
   const pct_MinMoney = 0.2;
   const pct_MaxMoney = 0.8;
-  const ramPuffer = 32;
-  const maxKaufMenge = 10_000_000_000;
+  const ramBuffer = 32;
+  const maxBuyQuantity = 10_000_000_000;
   const minCashReserve = 10_000_000;
   const txFee = 100_000;
   const buyForecast = 0.56;
@@ -72,9 +72,9 @@ export async function main(ns) {
   const rotationScoreMargin = 0.0015;
   const stockTickMs = Number(stockConstants.msPerStockUpdate) || 6_000;
   const minHoldMs = stockTickMs * 2;
-  const trailingStopPct = 0.10;  // Trailing Stop: Verkauf wenn Preis X% unter Höchststand fällt
+  const trailingStopPct = 0.10;  // Trailing Stop: sell if price drops X% below peak
   const rebuyBlockedUntil = {};
-  const positionPeak = {};       // Höchster Bid-Preis seit Kauf je Symbol
+  const positionPeak = {};       // Highest bid price since purchase per symbol
   const positionEntryForecast = {};
   const positionEntryTime = {};
   let noTradeCycles = 0;
@@ -83,13 +83,13 @@ export async function main(ns) {
   let singularityStatusLogged = false;
 
   function calcThreads() {
-    const freeRam = ns.getServerMaxRam(host) - ns.getServerUsedRam(host) - ramPuffer;
+    const freeRam = ns.getServerMaxRam(host) - ns.getServerUsedRam(host) - ramBuffer;
     return Math.max(0, Math.floor(freeRam / weakenRam));
   }
 
   function execWorker(script, threads) {
     if (threads <= 0) return false;
-    const pid = ns.exec(script, host, threads, firma);
+    const pid = ns.exec(script, host, threads, company);
     return pid > 0;
   }
 
@@ -147,7 +147,7 @@ export async function main(ns) {
 
     const summary = getStockAccessSummary();
     const statusText = summary.ready
-      ? "Aktien-Voraussetzungen erfüllt"
+      ? "Stock prerequisites met"
       : `Aktien-Voraussetzungen offen: ${summary.missing.join(", ")}`;
 
     if (purchases.length > 0) {
@@ -231,11 +231,11 @@ export async function main(ns) {
     let droppedForecast = 0;
     const heldPositions = [];
 
-    // Erst Exit-Regeln ausführen, damit Kapital frei wird.
+    // Execute exit rules first to free up capital.
     for (const sym of symbols) {
       const [shares, , avgBuyPrice] = ns.stock.getPosition(sym);
       if (shares <= 0) {
-        delete positionPeak[sym]; // Position ist weg, Peak zurücksetzen
+        delete positionPeak[sym]; // Position closed, reset peak
         delete positionEntryForecast[sym];
         delete positionEntryTime[sym];
         continue;
@@ -437,8 +437,8 @@ export async function main(ns) {
 
   if (!singularityStatusLogged) {
     ns.tprint(
-      `Singularity API ${ns.singularity ? "verfügbar" : "nicht verfügbar"}. ` +
-      "Börsen-Freischaltungen werden über ns.stock geprüft."
+      `Singularity API ${ns.singularity ? "available" : "not available"}. ` +
+      "Stock access will be checked via ns.stock."
     );
     singularityStatusLogged = true;
   }
@@ -461,12 +461,12 @@ export async function main(ns) {
 
     if (has4S()) {
       if (modeLogged !== "4S") {
-        ns.tprint("Stock-Manager Modus: 4S Forecast Trading (Multi-Symbol)");
+        ns.tprint("Stock Manager mode: 4S Forecast Trading (multi-symbol)");
         modeLogged = "4S";
       }
       const status = run4SStrategy();
       if (status?.regime && status.regime !== lastRegime) {
-        ns.tprint(`4S Regime-Wechsel: ${status.regime}`);
+        ns.tprint(`4S Regime change: ${status.regime}`);
         lastRegime = status.regime;
       }
       const now = Date.now();
@@ -484,97 +484,97 @@ export async function main(ns) {
     }
 
     if (modeLogged !== "MANIP") {
-      ns.tprint(`Stock-Manager Modus: Manipulation/Fallback (${symbol_Firma} auf ${firma})`);
+      ns.tprint(`Stock Manager mode: Manipulation/Fallback (${firmSymbol} on ${company})`);
       modeLogged = "MANIP";
     }
 
-    const curMoney = ns.getServerMoneyAvailable(firma);
-    const maxMoney = ns.getServerMaxMoney(firma);
-    const curSec = ns.getServerSecurityLevel(firma);
-    const minSec = ns.getServerMinSecurityLevel(firma);
-    const [longShares] = ns.stock.getPosition(symbol_Firma);
+    const curMoney = ns.getServerMoneyAvailable(company);
+    const maxMoney = ns.getServerMaxMoney(company);
+    const curSec = ns.getServerSecurityLevel(company);
+    const minSec = ns.getServerMinSecurityLevel(company);
+    const [longShares] = ns.stock.getPosition(firmSymbol);
 
-    // Threads IM Loop berechnen, damit wir immer aktuell sind
+    // Calculate threads inside the loop to always have up-to-date values
     let threads = calcThreads();
 
     if (threads <= 0) { await ns.sleep(1000); continue; }
 
-    // PRIORITÄT 1: SECURITY
+    // PRIORITY 1: SECURITY
     if (curSec > minSec + 2) {
-      ns.print("Security zu hoch...");
+      ns.print("Security too high...");
       execWorker(v_weaken, threads);
-      await ns.sleep(ns.getWeakenTime(firma) + 100);
+      await ns.sleep(ns.getWeakenTime(company) + 100);
     } 
     
-    // PRIORITÄT 2: LONG MANÖVER
+    // PRIORITY 2: LONG MANEUVER
     else if (curMoney < maxMoney * pct_MinMoney && longShares <= 0) {
-      if ((rebuyBlockedUntil[symbol_Firma] || 0) > Date.now()) {
+      if ((rebuyBlockedUntil[firmSymbol] || 0) > Date.now()) {
         await ns.sleep(500);
         continue;
       }
 
-      const maxAvailable = ns.stock.getMaxShares(symbol_Firma);
-      const askPrice = ns.stock.getAskPrice(symbol_Firma);
+      const maxAvailable = ns.stock.getMaxShares(firmSymbol);
+      const askPrice = ns.stock.getAskPrice(firmSymbol);
       const cash = ns.getPlayer().money;
       const budget = Math.max(0, cash - minCashReserve - txFee);
-      const durchBudget = Math.floor(budget / Math.max(1, askPrice));
-      const kaufMenge = Math.min(maxKaufMenge, Math.max(0, maxAvailable - longShares), durchBudget);
+      const byBudget = Math.floor(budget / Math.max(1, askPrice));
+      const buyQuantity = Math.min(maxBuyQuantity, Math.max(0, maxAvailable - longShares), byBudget);
       
-      if (kaufMenge <= 0) {
+      if (buyQuantity <= 0) {
         await ns.sleep(1000);
         continue;
       }
 
-      const kaufPreis = ns.stock.buyStock(symbol_Firma, kaufMenge);
+      const buyPrice = ns.stock.buyStock(firmSymbol, buyQuantity);
       
-      if (kaufPreis > 0) {
-        ns.tprint(`--- LONG START: ${kaufMenge} Aktien ---`);
-        while (ns.getServerMoneyAvailable(firma) < maxMoney * pct_MaxMoney) {
-          // Innerhalb der Schleife Threads neu berechnen!
+      if (buyPrice > 0) {
+        ns.tprint(`--- LONG START: ${buyQuantity} shares ---`);
+        while (ns.getServerMoneyAvailable(company) < maxMoney * pct_MaxMoney) {
+          // Recalculate threads inside the loop!
           let loopThreads = calcThreads();
           if (loopThreads <= 0) { await ns.sleep(1000); continue; }
 
-          if (ns.getServerSecurityLevel(firma) > minSec + 2) {
+          if (ns.getServerSecurityLevel(company) > minSec + 2) {
             execWorker(v_weaken, loopThreads);
-            await ns.sleep(ns.getWeakenTime(firma) + 100);
+            await ns.sleep(ns.getWeakenTime(company) + 100);
           } else {
             execWorker(v_grow, loopThreads);
-            await ns.sleep(ns.getGrowTime(firma) + 100);
+            await ns.sleep(ns.getGrowTime(company) + 100);
           }
         }
-        const [heldShares] = ns.stock.getPosition(symbol_Firma);
+        const [heldShares] = ns.stock.getPosition(firmSymbol);
         if (heldShares > 0) {
-          ns.stock.sellStock(symbol_Firma, heldShares);
-          rebuyBlockedUntil[symbol_Firma] = Date.now() + rebuyCooldownMs;
-          ns.tprint(`--- LONG VERKAUFT (${heldShares}) ---`);
+          ns.stock.sellStock(firmSymbol, heldShares);
+          rebuyBlockedUntil[firmSymbol] = Date.now() + rebuyCooldownMs;
+          ns.tprint(`--- LONG SOLD (${heldShares}) ---`);
         }
       } else {
-        ns.print("Kauf fehlgeschlagen (Geld oder Limit).");
+        ns.print("Purchase failed (money or limit).");
       }
     }
 
-// PRIORITÄT 3: VORBEREITUNG FÜR NÄCHSTEN KAUF (Hacken ohne Short)
+// PRIORITY 3: PREP FOR NEXT BUY (hack without short)
     else if (curMoney > maxMoney * pct_MaxMoney) {
-      ns.print("Preis ist hoch. Hacke Server leer für den nächsten Zyklus...");
+      ns.print("Price is high. Hacking server to empty for the next cycle...");
       
-      while (ns.getServerMoneyAvailable(firma) > maxMoney * pct_MinMoney) {
+      while (ns.getServerMoneyAvailable(company) > maxMoney * pct_MinMoney) {
         let loopThreads = calcThreads();
         if (loopThreads <= 0) { await ns.sleep(1000); continue; }
 
-        if (ns.getServerSecurityLevel(firma) > minSec + 2) {
+        if (ns.getServerSecurityLevel(company) > minSec + 2) {
           execWorker(v_weaken, loopThreads);
-          await ns.sleep(ns.getWeakenTime(firma) + 100);
+          await ns.sleep(ns.getWeakenTime(company) + 100);
         } else {
           execWorker(v_hack, loopThreads);
-          await ns.sleep(ns.getHackTime(firma) + 100);
+          await ns.sleep(ns.getHackTime(company) + 100);
         }
       }
-      ns.tprint("--- BODEN ERREICHT: BEREIT FÜR NÄCHSTEN LONG-KAUF ---");
+      ns.tprint("--- BOTTOM REACHED: READY FOR NEXT LONG BUY ---");
     }
     
     else {
       execWorker(v_grow, threads);
-      await ns.sleep(ns.getGrowTime(firma) + 100);
+      await ns.sleep(ns.getGrowTime(company) + 100);
     }
     await ns.sleep(200);
   }

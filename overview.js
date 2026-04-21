@@ -1,6 +1,6 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  // Alle Server per BFS sammeln
+  // Collect all servers via BFS
   const visited = new Set(["home"]);
   const allServers = ["home"];
   for (let i = 0; i < allServers.length; i++) {
@@ -12,12 +12,12 @@ export async function main(ns) {
     }
   }
 
-  // Einkommen über alle laufenden Skripte summieren (PID-basiert, robust bei vielen Instanzen)
+  // Sum income across all running scripts (PID-based, robust with many instances)
   let totalIncome = 0;
   let hackIncome = 0;
   let moneyHackCount = 0;
   
-  // Serverbasierten Überblick bauen
+  // Build a server-based overview
   const serverInfo = {};
   for (const server of allServers) {
     const procs = ns.ps(server);
@@ -56,19 +56,19 @@ export async function main(ns) {
     };
   }
 
-  // Ausgabe
+  // Output
   const message = [
     `═══════════════════════════════`,
-    `Gesamt-Einkommen: $${ns.formatNumber(totalIncome)}/sec`,
-    `Money-Hack (alle Server): $${ns.formatNumber(hackIncome)}/sec`,
-    `Money-Hack Prozesse: ${moneyHackCount}`,
+    `Total income: $${ns.formatNumber(totalIncome)}/sec`,
+    `Money-Hack (all servers): $${ns.formatNumber(hackIncome)}/sec`,
+    `Money-Hack processes: ${moneyHackCount}`,
     `═══════════════════════════════`,
     ``,
-    `Server-Übersicht (nach $/sec sortiert):`,
+    `Server overview (sorted by $/sec):`,
     ``,
   ];
 
-  // Server nach Einkommen sortieren
+  // Sort servers by income
   const serversByIncome = allServers.map(server => {
     let serverIncome = 0;
     for (const proc of ns.ps(server)) {
@@ -89,7 +89,7 @@ export async function main(ns) {
     const ramStr = `${ns.formatRam(info.usedRam)}/${ns.formatRam(info.maxRam)}`;
     const moneyStr = `$${ns.formatNumber(info.currentMoney)}/$${ns.formatNumber(info.maxMoney)}`;
     
-    // Berechne Server-Einkommen für Anzeige
+    // Calculate server income for display
     let serverIncome = 0;
     for (const proc of ns.ps(server)) {
       const running = ns.getRunningScript(proc.pid);

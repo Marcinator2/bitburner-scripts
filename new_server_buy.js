@@ -1,43 +1,43 @@
 /** @param {NS} ns */
 export async function main(ns) {
   const ram = sanitizeRam(ns.args[0], 2 ** 16);
-  const prefix = "MeinServer_";
+  const prefix = "MyServer_";
   const limit = ns.getPurchasedServerLimit();
   const purchased = ns.getPurchasedServers();
 
-  ns.tprint("Maximale Serverzahl: " + limit);
+  ns.tprint("Maximum server count: " + limit);
 
   if (purchased.length >= limit) {
-    ns.tprint("Kauf-Limit erreicht.");
+    ns.tprint("Purchase limit reached.");
     return;
   }
 
-  // nächster Index = Anzahl gekaufter Server
+  // Next index = number of already purchased servers
   const idx = purchased.length;
   const name = `${prefix}${idx}`;
 
   if (ns.serverExists(name)) {
-    ns.tprint(`Name ${name} existiert bereits — Abbruch.`);
+    ns.tprint(`Name ${name} already exists — aborting.`);
     return;
   }
 
   const cost = ns.getPurchasedServerCost(ram);
   const money = (typeof ns.getPlayer === "function") ? ns.getPlayer().money : ns.getServerMoneyAvailable("home");
 
-  ns.tprint(`Server-RAM: ${ns.formatRam(ram)} | Serverkosten: ${cost}`);
+  ns.tprint(`Server RAM: ${ns.formatRam(ram)} | Server cost: ${cost}`);
   
   if (money < cost) {
-    ns.tprint(`Nicht genug Geld für ${name}: benötigt ${Math.floor(cost).toLocaleString()}, verfügbar ${Math.floor(money).toLocaleString()}`);
+    ns.tprint(`Not enough money for ${name}: requires ${Math.floor(cost).toLocaleString()}, available ${Math.floor(money).toLocaleString()}`);
     return;
   }
 
   const purchasedName = ns.purchaseServer(name, ram);
   if (purchasedName) {
-    ns.tprint(`✅ Gekauft: ${purchasedName}`);
+    ns.tprint(`✅ Purchased: ${purchasedName}`);
     const pid = ns.exec("new_server_setup.js", "home", 1, purchasedName);
-    ns.tprint(pid > 0 ? `Setup gestartet (pid ${pid})` : `Setup konnte nicht gestartet werden.`);
+    ns.tprint(pid > 0 ? `Setup started (pid ${pid})` : `Setup could not be started.`);
   } else {
-    ns.tprint("❌ Kauf fehlgeschlagen.");
+    ns.tprint("❌ Purchase failed.");
   }
 }
 

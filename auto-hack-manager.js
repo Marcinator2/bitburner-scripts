@@ -1,30 +1,30 @@
 // auto-hack-manager.js
-// Bitburner Script: Optimierter HWGW-Batch-Manager2l
-// Alle erreichbaren Server werden gehackt. Nutzt home + MeinServer_ als Runner.12
-// Worker-Scripte (v_hack.js, v_grow.js, v_weaken.js) müssen delay als 2. Argument unterstützen.
+// Bitburner Script: Optimized HWGW batch manager
+// All reachable servers are hacked. Uses home + MyServer_ as runners.
+// Worker scripts (v_hack.js, v_grow.js, v_weaken.js) must support delay as the 2nd argument.
 
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("ALL");
 
-    // ── Konfiguration ────────────────────────────────────────────────────────
+    // ── Configuration ────────────────────────────────────────────────────────
     const H_SCRIPT      = "v_hack.js";
     const G_SCRIPT      = "v_grow.js";
     const W_SCRIPT      = "v_weaken.js";
     const SHARE_SCRIPT  = "share-ram.js";
-    const SHARE_QUOTA   = 0.01;   // Zielanteil pro Runner fuer share-ram.js; laufende Instanzen werden auf diese Groesse nachgezogen
-    const HACK_FRACTION = 0.99;  // Maximaler Anteil des Max-Geldes pro Batch (so viel wie RAM erlaubt)
-    const SPACING       = 200;   // ms Abstand zwischen den Finish-Zeitpunkten im Batch
-    const HOME_RESERVE  = 45;    // GB die auf home reserviert bleiben
-    const LOOP_DELAY    = 1000;  // Intervall der Manager-Schleife in ms
-    const MIN_MONEY_FRAC = 0.85; // Ziel gilt als bereit wenn es mindestens 85% seines Max-Geldes hat
-    const MAX_BATCHES_PER_CYCLE = 300//250; // Harte Obergrenze pro Manager-Runde gegen Prozess-Explosionen
-    const BATCH_YIELD_EVERY = 25; // Regelmaessig an die Engine zurueckgeben, damit keine Endlosschleife erkannt wird
+    const SHARE_QUOTA   = 0.01;   // Target share fraction per runner for share-ram.js; running instances are adjusted to this size
+    const HACK_FRACTION = 0.99;  // Maximum fraction of max money per batch (as much as RAM allows)
+    const SPACING       = 200;   // ms spacing between finish timestamps in a batch
+    const HOME_RESERVE  = 45;    // GB reserved on home
+    const LOOP_DELAY    = 1000;  // Manager loop interval in ms
+    const MIN_MONEY_FRAC = 0.85; // Target is considered ready when it has at least 85% of its max money
+    const MAX_BATCHES_PER_CYCLE = 300//250; // Hard cap per manager round against process explosions
+    const BATCH_YIELD_EVERY = 25; // Yield to the engine regularly so no infinite loop is detected
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── Hilfsfunktionen ──────────────────────────────────────────────────────
+    // ── Helper functions ──────────────────────────────────────────────────────
 
-    /** Alle erreichbaren Server per BFS */
+    /** All reachable servers via BFS */
     function scanAll() {
         const found = new Set(["home"]);
         const stack = ["home"];
@@ -36,14 +36,12 @@ export async function main(ns) {
         return [...found];
     }
 
-    /** Versucht Root-Zugang auf einem Server zu erlangen .ls
-     * 
-    */
+    /** Attempts to gain root access on a server */
     function tryNuke(s) {
         if (ns.hasRootAccess(s)) return true;
         if (ns.getServerRequiredHackingLevel(s) > ns.getHackingLevel()) return false;
 
-        // Ports öffnen mit verfügbaren Tools
+        // Open ports using available tools
         let openPorts = 0;
         if (ns.fileExists("BruteSSH.exe",  "home")) { ns.brutessh(s);   openPorts++; }
         if (ns.fileExists("FTPCrack.exe",  "home")) { ns.ftpcrack(s);   openPorts++; }
@@ -53,28 +51,28 @@ export async function main(ns) {
 
         if (openPorts >= ns.getServerNumPortsRequired(s)) {
             ns.nuke(s);
-            ns.tprint(`[Nuke] Root-Zugang erlangt: ${s}`);
+            ns.tprint(`[Nuke] Root access gained: ${s}`);
             return true;
         }
         return false;
     }
 
-    /** Ist der Server ein hackbares Ziel? */
+    /** Is the server a hackable target? */
     function isTarget(s) {
-        if (s === "home" || s.startsWith("MeinServer_")) return false;
+        if (s === "home" || s.startsWith("MyServer_")) return false;
         return ns.hasRootAccess(s)
             && ns.getServerRequiredHackingLevel(s) <= ns.getHackingLevel()
             && ns.getServerMaxMoney(s) > 0;
     }
 
-    /** Ist der Server ein Runner (führt Scripte aus)? */
+    /** Is the server a runner (executes scripts)? */
     function isRunner(s) {
         if (s === "home") return ns.getServerMaxRam(s) > HOME_RESERVE;
-        // Alle Server mit Root-Zugang und RAM nutzen
+        // Use all servers with root access and RAM
         return ns.hasRootAccess(s) && ns.getServerMaxRam(s) > 0;
     }
 
-    /** Freier RAM aller Runner als Array [{host, free}] – MeinServer_ zuerst, dann externe */
+    /** Free RAM of all runners as array [{host, free}] – MyServer_ first, then external */
     function runnerRamList(runners) {
         return runners.map(r => {
             let reserve = r === "home" ? HOME_RESERVE : 0;
@@ -84,13 +82,13 @@ export async function main(ns) {
             };
         })
         .filter(r => r.free > 0)
-        .sort((a, b) => b.free - a.free); // meisten freien RAM zuerst → home (4PB) wird bevorzugt
+        .sort((a, b) => b.free - a.free); // most free RAM first → home (4PB) is preferred
     }
 
     /**
-     * Verteile `threads` Instanzen von `script` über alle Runner.
-     * args werden an die Worker weitergegeben.
-     * Gibt true zurück wenn alle Threads gestartet werden konnten.
+     * Distribute `threads` instances of `script` across all runners.
+     * args are passed to the workers.
+     * Returns true if all threads could be started.
      */
     function distribute(ramList, script, threads, ...args) {
         const ramPer = ns.getScriptRam(script, "home");
@@ -106,7 +104,7 @@ export async function main(ns) {
         return remaining === 0;
     }
 
-    /** Scripte auf alle Runner kopieren */
+    /** Copy scripts to all runners */
     async function scpToRunners(runners) {
         const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT, SHARE_SCRIPT];
         for (const r of runners) {
@@ -164,7 +162,7 @@ export async function main(ns) {
             if (runningThreads === threads) continue;
 
             if (!canSpareRamForShare(host, threads, runningThreads)) {
-                ns.print(`[Share] ${host} übersprungen: share-ram.js würde keinen Platz mehr für H/G/W lassen.`);
+        ns.print(`[Share] ${host} skipped: share-ram.js would leave no room for H/G/W.`);
                 continue;
             }
 
@@ -174,8 +172,8 @@ export async function main(ns) {
 
             const pid = ns.exec(SHARE_SCRIPT, host, threads);
             if (pid > 0) {
-                const action = runningThreads > 0 ? "skaliert" : "gestartet";
-                ns.print(`[Share] ${SHARE_SCRIPT} auf ${host} mit ${threads} Thread(s) ${action}.`);
+                const action = runningThreads > 0 ? "scaled" : "started";
+                ns.print(`[Share] ${SHARE_SCRIPT} on ${host} with ${threads} thread(s) ${action}.`);
             }
         }
     }
@@ -183,17 +181,17 @@ export async function main(ns) {
     function safeGrowthThreads(target, multiplier) {
         const growMult = Number.isFinite(multiplier) ? multiplier : Number(multiplier);
         if (!Number.isFinite(growMult) || growMult < 1) {
-            ns.print(`[Warn] safeGrowthThreads: ungültiger growMult=${multiplier} für ${target}, setze 1`);
+            ns.print(`[Warn] safeGrowthThreads: invalid growMult=${multiplier} for ${target}, setting to 1`);
             return 1;
         }
         return Math.max(1, Math.ceil(ns.growthAnalyze(target, growMult)));
     }
 
-    // ── HWGW-Berechnungen ────────────────────────────────────────────────────
+    // ── HWGW calculations ────────────────────────────────────────────────────
 
     /**
-     * Berechne Thread-Anzahlen für einen HWGW-Batch.
-     * Annahme: Ziel ist auf minSec + maxMoney (vorbereitet).
+     * Calculate thread counts for a HWGW batch.
+     * Assumption: target is at minSec + maxMoney (prepared).
      */
     function calcBatch(target, fraction = HACK_FRACTION) {
         const hackPer = ns.hackAnalyze(target);
@@ -205,8 +203,8 @@ export async function main(ns) {
             ? Math.min(hackPer * hackThreads, 0.99)
             : 0.01;
 
-        // growthAnalyze liefert die minimale Threadzahl, um mindestens den Faktor zu erreichen.
-        // Die Maschine selbst kann das Ergebnis dann auf maxMoney begrenzen.
+        // growthAnalyze returns the minimum thread count to reach at least the given factor.
+        // The engine itself can cap the result at maxMoney.
         const growMult = 1 / (1 - stoleFrac);
         const growThreads = safeGrowthThreads(target, growMult);
 
@@ -217,25 +215,25 @@ export async function main(ns) {
         return { hackThreads, growThreads, w1Threads, w2Threads };
     }
 
-    /** Gesamter RAM-Bedarf eines Batches in GB */
+    /** Total RAM requirement of a batch in GB */
     function batchRam(b) {
         return b.hackThreads * ns.getScriptRam(H_SCRIPT, "home")
              + b.growThreads * ns.getScriptRam(G_SCRIPT, "home")
              + (b.w1Threads + b.w2Threads) * ns.getScriptRam(W_SCRIPT, "home");
     }
 
-    // ── Zustandsprüfung ──────────────────────────────────────────────────────
+    // ── State check ──────────────────────────────────────────────────────────
 
     function isReady(target) {
         return ns.getServerSecurityLevel(target) <= ns.getServerMinSecurityLevel(target) + 0.5
             && ns.getServerMoneyAvailable(target) >= ns.getServerMaxMoney(target) * MIN_MONEY_FRAC;
     }
 
-    // ── Vorbereitung ─────────────────────────────────────────────────────────
+    // ── Preparation ─────────────────────────────────────────────────────────
 
     /**
-     * Startet Weaken/Grow-Scripte um einen Server auf minSec + maxMoney zu bringen.
-     * Läuft nicht-blockierend – Scripte laufen im Hintergrund.
+     * Starts weaken/grow scripts to bring a server to minSec + maxMoney.
+     * Non-blocking – scripts run in the background.
      */
     function prepareTarget(target, ramList) {
         const minSec   = ns.getServerMinSecurityLevel(target);
@@ -256,18 +254,18 @@ export async function main(ns) {
         return launched;
     }
 
-    // ── HWGW-Batch starten ───────────────────────────────────────────────────
+    // ── Launch HWGW batch ───────────────────────────────────────────────────
 
     /**
-     * Startet einen vollständigen HWGW-Batch für `target`.
+     * Launches a complete HWGW batch for `target`.
      *
-     * Timing-Konzept (Finish-Reihenfolge: H → W1 → G → W2):
-     *   W1 startet sofort   (Referenz, finish = weakenTime)
-     *   H  startet mit delay = weakenTime - hackTime   - SPACING
-     *   G  startet mit delay = weakenTime - growTime   + SPACING
-     *   W2 startet mit delay = 2 * SPACING
+     * Timing concept (finish order: H → W1 → G → W2):
+     *   W1 starts immediately  (reference, finish = weakenTime)
+     *   H  starts with delay = weakenTime - hackTime   - SPACING
+     *   G  starts with delay = weakenTime - growTime   + SPACING
+     *   W2 starts with delay = 2 * SPACING
      *
-     * uid verhindert, dass ns.exec() doppelte Scripte ablehnt.
+     * uid prevents ns.exec() from rejecting duplicate scripts.
      */
     function launchBatch(target, ramList, uid) {
         const hackTime   = ns.getHackTime(target);
@@ -281,7 +279,7 @@ export async function main(ns) {
 
         const totalFree = ramList.reduce((s, r) => s + r.free, 0);
 
-        // Binärsuche: maximale Fraction die noch in den RAM passt
+        // Binary search: maximum fraction that still fits in RAM
         let lo = 0.001, hi = HACK_FRACTION;
         for (let i = 0; i < 20; i++) {
             const mid = (lo + hi) / 2;
@@ -293,16 +291,16 @@ export async function main(ns) {
         const totalNeeded = batchRam(batch);
         if (totalFree < totalNeeded) return false;
 
-        // Starte alle 4 Operationen – uid als letztes Arg damit PIDs eindeutig sind
+        // Launch all 4 operations – uid as last arg so PIDs are unique
         return distribute(ramList, W_SCRIPT, batch.w1Threads,  target, delay_W1, uid + "w1")
             && distribute(ramList, H_SCRIPT, batch.hackThreads, target, delay_H,  uid + "h")
             && distribute(ramList, G_SCRIPT, batch.growThreads, target, delay_G,  uid + "g")
             && distribute(ramList, W_SCRIPT, batch.w2Threads,  target, delay_W2, uid + "w2");
     }
 
-    // ── Profitabilität ───────────────────────────────────────────────────────
+    // ── Profitability ───────────────────────────────────────────────────────
 
-    /** Sortiere Ziele nach erwarteter Gewinnrate (höchstes zuerst) */
+    /** Sort targets by expected profit rate (highest first) */
     function sortByProfit(targets) {
         return [...targets].sort((a, b) => {
             const rate = t => ns.getServerMaxMoney(t)
@@ -313,11 +311,11 @@ export async function main(ns) {
         });
     }
 
-    // ── Programme kaufen / programmieren (benötigt Singularity SF4) ─────────
+    // ── Buy / create programs (requires Singularity SF4) ─────────────────
 
     /**
-     * Kauft fehlende Port-Cracker über den Darkweb-Shop oder programmiert sie.
-     * Wird per try/catch geschützt – ohne SF4 läuft das Script einfach weiter.
+     * Buys missing port crackers from the darkweb shop or programs them.
+     * Protected by try/catch – without SF4 the script simply continues.
      */
     function manageProgramAcquisition() {
         try {
@@ -332,17 +330,17 @@ export async function main(ns) {
             const missing = programs.filter(p => !ns.fileExists(p, "home"));
             if (missing.length === 0) return;
 
-            // TOR-Router kaufen (nötig für Darkweb-Käufe)
+            // Buy TOR router (required for darkweb purchases)
             ns.singularity.purchaseTor();
 
-            // Programme kaufen falls genug Geld vorhanden
+            // Buy programs if enough money is available
             for (const prog of missing) {
                 if (ns.singularity.purchaseProgram(prog)) {
-                    ns.tprint(`[Prog] Gekauft: ${prog}`);
+                    ns.tprint(`[Prog] Purchased: ${prog}`);
                 }
             }
 
-            // Noch fehlende Programme selbst programmieren
+            // Write still-missing programs manually
             const stillMissing = programs.filter(p => !ns.fileExists(p, "home"));
             if (stillMissing.length === 0) return;
 
@@ -350,19 +348,19 @@ export async function main(ns) {
             const alreadyCoding = currentWork !== null && currentWork.type === "CREATE_PROGRAM";
             if (!alreadyCoding) {
                 if (ns.singularity.createProgram(stillMissing[0], false)) {
-                    ns.print(`[Prog] Programmiere: ${stillMissing[0]}`);
+                    ns.print(`[Prog] Writing: ${stillMissing[0]}`);
                 }
             }
         } catch (_) {
-            // Singularity API nicht verfügbar (kein SF4) – wird ignoriert
+            // Singularity API not available (no SF4) – ignored
         }
     }
 
-    // ── Hauptschleife ────────────────────────────────────────────────────────
+    // ── Main loop ────────────────────────────────────────────────────────────
 
-    // ── Einmalige Initialisierung ────────────────────────────────────────────
+    // ── One-time initialization ────────────────────────────────────────────
 
-    /** Fremde Scripte auf Runnern beenden, Worker-Scripte bleiben erhalten */
+    /** Stop foreign scripts on runners; worker scripts are kept */
     async function initRunners(runners) {
         const workerScripts = new Set([H_SCRIPT, G_SCRIPT, W_SCRIPT, SHARE_SCRIPT]);
         let killed = false;
@@ -371,13 +369,13 @@ export async function main(ns) {
             for (const proc of ns.ps(r)) {
                 if (!workerScripts.has(proc.filename)) {
                     ns.kill(proc.pid);
-                    ns.print(`[Init] Beendet: ${proc.filename} auf ${r}`);
+                    ns.print(`[Init] Killed: ${proc.filename} on ${r}`);
                     killed = true;
                 }
             }
         }
         if (killed) await ns.sleep(200);
-        // Worker-Scripte auf alle Runner kopieren
+        // Copy worker scripts to all runners
         const scripts = [H_SCRIPT, G_SCRIPT, W_SCRIPT, SHARE_SCRIPT];
         for (const r of runners) {
             if (r !== "home") await ns.scp(scripts, r);
@@ -385,9 +383,9 @@ export async function main(ns) {
         ensureShareOnRunners(runners);
     }
 
-    ns.tprint("Auto-Hack Manager gestartet.");
+    ns.tprint("Auto-Hack Manager started.");
 
-    // Einmalig beim Start: MeinServer_ leeren
+    // One-time at startup: clear MyServer_
     {
         const initServers = scanAll().filter(isRunner);
         await initRunners(initServers);
@@ -400,7 +398,7 @@ export async function main(ns) {
 
         const allServers = scanAll();
 
-        // Versuche Root-Zugang auf allen noch nicht gehackten Servern
+        // Try to gain root access on all not-yet-hacked servers
         for (const s of allServers) {
             if (!ns.hasRootAccess(s)) tryNuke(s);
         }
@@ -408,7 +406,7 @@ export async function main(ns) {
         const runners = allServers.filter(isRunner);
         const targets = allServers.filter(isTarget);
 
-        // Worker-Scripte auf neue Runner kopieren (bereits laufende bleiben)
+        // Copy worker scripts to new runners (already running ones stay)
         await scpToRunners(runners);
         ensureShareOnRunners(runners);
 
@@ -421,7 +419,7 @@ export async function main(ns) {
         const readyTargets  = sortedTargets.filter(isReady);
         const notReady      = sortedTargets.filter(t => !isReady(t));
 
-        // Vorbereitung für nicht-bereite Server
+        // Preparation for servers that are not yet ready
         for (const target of notReady) {
             const alreadyPreparing = runners.some(r =>
                 ns.ps(r).some(p => p.args[0] === target
@@ -434,8 +432,8 @@ export async function main(ns) {
             }
         }
 
-        // Round-Robin: jedes bereite Ziel bekommt reihum einen Batch,
-        // bis kein RAM mehr für irgendeinen Batch reicht.
+        // Round-robin: every ready target gets a batch in turn,
+        // until no RAM is left for any batch.
         let anyLaunched = true;
         let cycleCapped = false;
         while (anyLaunched && batched < MAX_BATCHES_PER_CYCLE) {
@@ -462,21 +460,21 @@ export async function main(ns) {
             cycleCapped = true;
         }
 
-        // Status-Anzeige im Log
+        // Status display in log
         const totalFree = ramList.reduce((s, r) => s + r.free, 0).toFixed(1);
         const ready = targets.filter(isReady).length;
         ns.clearLog();
         ns.print("╔══════════════════════════════╗");
         ns.print(`║  Auto-Hack Manager           ║`);
         ns.print("╠══════════════════════════════╣");
-        ns.print(`║  Ziele:        ${String(targets.length).padStart(4)}           ║`);
-        ns.print(`║  Bereit:       ${String(ready).padStart(4)}           ║`);
-        ns.print(`║  In Vorber.:   ${String(prepping).padStart(4)}           ║`);
-        ns.print(`║  Batches gest: ${String(batched).padStart(4)}           ║`);
-        ns.print(`║  Kein RAM:     ${String(noRam).padStart(4)}           ║`);
-        ns.print(`║  Runner:       ${String(runners.length).padStart(4)}           ║`);
-        ns.print(`║  Freier RAM:   ${String(totalFree).padStart(7)} GB       ║`);
-        ns.print(`║  Batch-Cap:    ${(cycleCapped ? "JA" : "nein").padStart(4)}           ║`);
+        ns.print(`║  Targets:      ${String(targets.length).padStart(4)}           ║`);
+        ns.print(`║  Ready:        ${String(ready).padStart(4)}           ║`);
+        ns.print(`║  Preparing:    ${String(prepping).padStart(4)}           ║`);
+        ns.print(`║  Batches lnch: ${String(batched).padStart(4)}           ║`);
+        ns.print(`║  No RAM:       ${String(noRam).padStart(4)}           ║`);
+        ns.print(`║  Runners:      ${String(runners.length).padStart(4)}           ║`);
+        ns.print(`║  Free RAM:     ${String(totalFree).padStart(7)} GB       ║`);
+        ns.print(`║  Batch cap:    ${(cycleCapped ? "YES" : "no").padStart(4)}           ║`);
         ns.print("╠══════════════════════════════╣");
         // RAM pro Runner anzeigen (Top 10)
         const displayList = ramList.slice(0, 10);
@@ -485,7 +483,7 @@ export async function main(ns) {
             ns.print(`║  ${label}  ${String(r.free.toFixed(0)).padStart(5)} GB       ║`);
         }
         if (ramList.length > 10) {
-            ns.print(`║  ... +${String(ramList.length - 10).padStart(2)} weitere Runner          ║`);
+            ns.print(`║  ... +${String(ramList.length - 10).padStart(2)} more runners               ║`);
         }
         ns.print("╚══════════════════════════════╝");
 

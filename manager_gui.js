@@ -62,7 +62,7 @@ export async function main(ns) {
 
   const doc = getDocument();
   if (!doc) {
-    ns.tprint("GUI nicht verfuegbar. Alternativ kann ich dir ein Prompt-Menue bauen.");
+    ns.tprint("GUI not available. Alternatively, a prompt-based menu could be built.");
     return;
   }
 
@@ -433,14 +433,14 @@ function buildCombatStatControls(doc) {
     checkboxes.set(stat, checkbox);
   }
 
-  // Trennlinie
+  // Divider
   const divider = doc.createElement("div");
   divider.style.gridColumn = "1 / -1";
   divider.style.borderTop = "1px solid rgba(255,255,255,0.10)";
   divider.style.marginTop = "4px";
   wrap.appendChild(divider);
 
-  // Focus-Checkbox
+  // Focus checkbox
   const focusLabel = doc.createElement("label");
   focusLabel.style.display = "flex";
   focusLabel.style.alignItems = "center";
@@ -454,7 +454,7 @@ function buildCombatStatControls(doc) {
   focusCheckbox.style.cursor = "pointer";
 
   const focusText = doc.createElement("span");
-  focusText.textContent = "Training mit Focus";
+  focusText.textContent = "Train with Focus";
 
   focusLabel.append(focusCheckbox, focusText);
   wrap.appendChild(focusLabel);
@@ -473,10 +473,10 @@ function buildGangControls(doc) {
 
   const checkboxes = new Map();
   const options = [
-    { key: "autoAscend",            action: "toggle-gang-auto-ascend",      label: "Mitglieder automatisch aufleveln" },
-    { key: "autoEquipment",         action: "toggle-gang-auto-equipment",   label: "Equipment automatisch kaufen" },
-    { key: "autoTerritoryWarfare",  action: "toggle-gang-auto-territory",   label: "Territory Warfare automatisch steuern" },
-    { key: "prepCombatMode",        action: "toggle-gang-prep-combat",      label: "Kampfwerte trainieren (Prep-Modus)" },
+    { key: "autoAscend",            action: "toggle-gang-auto-ascend",      label: "Auto-level members" },
+    { key: "autoEquipment",         action: "toggle-gang-auto-equipment",   label: "Auto-buy equipment" },
+    { key: "autoTerritoryWarfare",  action: "toggle-gang-auto-territory",   label: "Auto-manage Territory Warfare" },
+    { key: "prepCombatMode",        action: "toggle-gang-prep-combat",      label: "Train combat stats (prep mode)" },
   ];
 
   for (const option of options) {
@@ -514,7 +514,7 @@ function buildAugmentControls(doc) {
   const checkboxes = new Map();
   const options = [
     { key: "hacking",     action: "toggle-augment-cat:hacking",     label: "Hacking" },
-    { key: "combat",      action: "toggle-augment-cat:combat",      label: "Kampf" },
+    { key: "combat",      action: "toggle-augment-cat:combat",      label: "Combat" },
     { key: "hacknet",     action: "toggle-augment-cat:hacknet",     label: "Hacknet" },
     { key: "bladeburner", action: "toggle-augment-cat:bladeburner", label: "Bladeburner" },
     { key: "charisma",    action: "toggle-augment-cat:charisma",    label: "Charisma / Rep" },
@@ -540,7 +540,7 @@ function buildAugmentControls(doc) {
     checkboxes.set(option.key, checkbox);
   }
 
-  // Trennlinie + Rep-Farming-Checkbox
+  // Divider + Rep-Farming-Checkbox
   const divider = doc.createElement("div");
   divider.style.gridColumn = "1 / -1";
   divider.style.borderTop = "1px solid rgba(255,255,255,0.10)";
@@ -560,7 +560,7 @@ function buildAugmentControls(doc) {
   repCheckbox.style.cursor = "pointer";
 
   const repText = doc.createElement("span");
-  repText.textContent = "Rep-Farming wenn Rep fehlt";
+  repText.textContent = "Rep-Farming when rep is missing";
 
   repLabel.append(repCheckbox, repText);
   wrap.appendChild(repLabel);
@@ -643,7 +643,7 @@ function buildServerAdminSection(doc) {
   details.style.color = "#b9d1e7";
   details.style.whiteSpace = "pre-line";
 
-  // Auto-Upgrade Checkbox
+  // Auto-Upgrade checkbox
   const autoUpgradeRow = doc.createElement("div");
   autoUpgradeRow.style.marginTop = "8px";
   autoUpgradeRow.style.display = "flex";
@@ -669,8 +669,8 @@ function buildServerAdminSection(doc) {
     return cb;
   }
 
-  const autoUpgradeCheckbox = makeAutoCheckbox("toggle-auto-upgrade-server", "Auto-Upgrade: Server upgraden wenn Geld reicht");
-  const autoBuyCheckbox     = makeAutoCheckbox("toggle-auto-buy-server",     "Auto-Buy: neue Server kaufen wenn Geld reicht");
+  const autoUpgradeCheckbox = makeAutoCheckbox("toggle-auto-upgrade-server", "Auto-Upgrade: upgrade servers when there is enough money");
+  const autoBuyCheckbox     = makeAutoCheckbox("toggle-auto-buy-server",     "Auto-Buy: buy new servers when there is enough money");
 
   card.append(title, subtitle, buyRow, upgradeRow, confirmWrap, autoUpgradeRow, details);
   wrap.appendChild(card);
@@ -981,7 +981,7 @@ function clamp(value, min, max) {
 function renderPanel(ns, panel) {
   const config = loadConfig(ns, CONFIG_FILE);
   const managerRunning = ns.scriptRunning(MAIN_MANAGER_SCRIPT, "home");
-  const purchasedServers = ns.getPurchasedServers().filter(server => server.startsWith("MeinServer_"));
+  const purchasedServers = ns.getPurchasedServers().filter(server => server.startsWith("MyServer_"));
   const purchasedLimit = ns.getPurchasedServerLimit();
   const buyScriptExists = ns.fileExists(NEW_SERVER_BUY_SCRIPT, "home");
   const upgradeScriptExists = ns.fileExists(UPGRADE_SERVER_SCRIPT, "home");
@@ -1004,7 +1004,7 @@ function renderPanel(ns, panel) {
   styleActionButton(panel.startButton, managerRunning ? "disabled" : "start");
   styleActionButton(panel.stopButton, managerRunning ? "stop" : "disabled");
 
-  // Auto-Upgrade: automatisch upgraden wenn aktiviert und genug Geld vorhanden
+  // Auto-Upgrade: automatically upgrade when enabled and enough money is available
   const autoUpgradeEnabled = panel.admin.autoUpgradeCheckbox.checked;
   if (autoUpgradeEnabled && upgradeScriptExists && !upgradeRunning
       && upgradePlan.upgradableCount > 0 && upgradePlan.totalCost > 0
@@ -1012,9 +1012,9 @@ function renderPanel(ns, panel) {
     startScriptIfIdle(ns, UPGRADE_SERVER_SCRIPT, upgradeRam, true);
   }
 
-  // Auto-Buy: automatisch neuen Server kaufen (immer kleinstes RAM = 8 GB, um Slots zu fuellen)
+  // Auto-Buy: automatically buy a new server (always smallest RAM = 8 GB, to fill slots)
   const autoBuyEnabled = panel.admin.autoBuyCheckbox.checked;
-  const autoBuyRam = RAM_OPTIONS[0]; // immer 8 GB
+  const autoBuyRam = RAM_OPTIONS[0]; // always 8 GB
   const autoBuyCost = ns.getPurchasedServerCost(autoBuyRam);
   const autoBuyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, autoBuyRam);
   if (autoBuyEnabled && buyScriptExists && !buyRunning && !autoBuyPlan.blocked
@@ -1034,11 +1034,11 @@ function renderPanel(ns, panel) {
   styleActionButton(panel.admin.confirmUpgradeButton, panel.admin.confirmUpgradeButton.disabled ? "disabled" : "stop");
   styleActionButton(panel.admin.cancelUpgradeButton, panel.admin.cancelUpgradeButton.disabled ? "disabled" : "neutral");
   panel.admin.confirmWrap.style.display = panel.admin.upgradePending ? "block" : "none";
-  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} Server auf ${ns.formatRam(upgradeRam)} fuer insgesamt ${ns.formatNumber(upgradePlan.totalCost)}$. ${upgradePlan.blockedDowngrades > 0 ? `${upgradePlan.blockedDowngrades} groessere Server bleiben unveraendert.` : ""}`.trim(); 
+  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} servers to ${ns.formatRam(upgradeRam)} for a total of ${ns.formatNumber(upgradePlan.totalCost)}$. ${upgradePlan.blockedDowngrades > 0 ? `${upgradePlan.blockedDowngrades} larger servers remain unchanged.` : ""}`.trim(); 
   panel.admin.details.textContent = [
-    `MeinServer: ${purchasedServers.length}/${purchasedLimit} | Geld: ${ns.formatNumber(playerMoney)}$`,
-    `Buy ${ns.formatRam(buyRam)} -> ${buyPlan.targetName} | Kosten: ${ns.formatNumber(buyPlan.cost)}$ | ${buyPlan.status}`,
-    `Upgrade ${ns.formatRam(upgradeRam)} -> ${upgradePlan.upgradableCount}/${purchasedServers.length} Server | Kosten: ${ns.formatNumber(upgradePlan.totalCost)}$ | ${upgradePlan.status}`,
+    `MyServer: ${purchasedServers.length}/${purchasedLimit} | Money: ${ns.formatNumber(playerMoney)}$`,
+    `Buy ${ns.formatRam(buyRam)} -> ${buyPlan.targetName} | Cost: ${ns.formatNumber(buyPlan.cost)}$ | ${buyPlan.status}`,
+    `Upgrade ${ns.formatRam(upgradeRam)} -> ${upgradePlan.upgradableCount}/${purchasedServers.length} servers | Cost: ${ns.formatNumber(upgradePlan.totalCost)}$ | ${upgradePlan.status}`,
     `Buy Script: ${buyScriptExists ? (buyRunning ? "RUNNING" : "READY") : "MISSING"} | Upgrade Script: ${upgradeScriptExists ? (upgradeRunning ? "RUNNING" : "READY") : "MISSING"}`,
   ].join("\n");
 
@@ -1106,7 +1106,7 @@ function buildCombatTrainerDetails(enabled, running, override, scriptExists, tra
 
   return [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
-    `Stats: ${activeStats || "keine"} | Focus: ${trainerConfig.focus ? "ON" : "OFF"}`,
+    `Stats: ${activeStats || "none"} | Focus: ${trainerConfig.focus ? "ON" : "OFF"}`,
     `Combat: Auto best gym (XP/s)`,
     `Charisma: Auto best university (XP/s) / ${trainerConfig.charismaCourse}`,
   ].join("\n");
@@ -1134,28 +1134,28 @@ function buildNegativeKarmaDetails(ns, enabled, running, override, scriptExists,
   if (!bestCrime) {
     return [
       `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
-      "Crime: nicht verfuegbar",
+      "Crime: not available",
       "Chance/Karma: n/a",
     ].join("\n");
   }
 
   const mode = negativeKarmaConfig.trainerManaged && combatTrainerConfigEnabled(combatTrainerConfig, currentWork)
-    ? "Training fuer 90%"
+    ? "Training for 90%"
     : isCrimeWork(currentWork, bestCrime.type)
-      ? "Crime aktiv"
-      : "Bereit";
+      ? "Crime active"
+      : "Ready";
 
   return [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
     `Crime: ${bestCrime.type} | Chance: ${(bestCrime.chance * 100).toFixed(1)}% | Karma/s: ${bestCrime.karmaPerSecond.toFixed(3)}`,
-    `Mode: ${mode} | Zielchance: 90.0%`,
-    `Trainer-Stats: ${trainerStats || "keine"}`,
+    `Mode: ${mode} | Target chance: 90.0%`,
+    `Trainer Stats: ${trainerStats || "none"}`,
   ].join("\n");
 }
 
 function buildAugmentDetails(ns, enabled, running, override, scriptExists, augConfig) {
   const CAT_LABELS = {
-    hacking: "Hack", combat: "Kampf", hacknet: "HN",
+    hacking: "Hack", combat: "Combat", hacknet: "HN",
     bladeburner: "BB", charisma: "CHA",
   };
   const activeCats = Object.entries(augConfig.categories)
@@ -1165,11 +1165,11 @@ function buildAugmentDetails(ns, enabled, running, override, scriptExists, augCo
 
   const bufferText = augConfig.minMoneyBuffer > 0
     ? `Buffer: ${ns.formatNumber(augConfig.minMoneyBuffer)}$`
-    : "Kein Geld-Buffer";
+    : "No money buffer";
 
   return [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
-    `Kategorien: ${activeCats || "keine"}`,
+    `Categories: ${activeCats || "none"}`,
     `Rep-Farming: ${augConfig.repFarming ? "ON" : "OFF"} | ${bufferText}`,
   ].join("\n");
 }
@@ -1519,7 +1519,7 @@ function sanitizeGuiRam(value, fallback) {
 
 function getBuyPlan(ns, purchasedServers, purchasedLimit, ram) {
   const index = purchasedServers.length;
-  const targetName = `MeinServer_${index}`;
+  const targetName = `MyServer_${index}`;
   const cost = ns.getPurchasedServerCost(ram);
   const atLimit = purchasedServers.length >= purchasedLimit;
   const nameExists = ns.serverExists(targetName);

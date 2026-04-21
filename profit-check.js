@@ -1,12 +1,12 @@
 /** @param {NS} ns */
-//1. Alle Server per BFS sammeln
-//2. Filtern: maxMoney > 0, nicht in blacklist
-//3. Sortieren nach maxMoney
-//4. Ausgabe in Tabelle mit Root-Zugriff, Name, Max-Money, Required Level
+//1. Collect all servers via BFS
+//2. Filter: maxMoney > 0, not in blacklist
+//3. Sort by maxMoney
+//4. Output in table with root access, name, max money, required level
 export async function main(ns) {
   const blacklist = new Set(["home"]);
 
-  // Alle Server per BFS sammeln
+  // Collect all servers via BFS
   const visited = new Set(["home"]);
   const queue = ["home"];
   while (queue.length) {
@@ -20,7 +20,7 @@ export async function main(ns) {
 
   const HACK_FRACTION = 0.5;
 
-  // Filtern, Profit-Rate berechnen und sortieren
+  // Filter, calculate profit rate and sort
   const servers = [...visited]
     .filter(s => !blacklist.has(s) && ns.getServerMaxMoney(s) > 0)
     .map(s => ({
@@ -33,9 +33,9 @@ export async function main(ns) {
     }))
     .sort((a, b) => b.rate - a.rate);
 
-  // Ausgabe sortiert nach Profit-Rate
+  // Output sorted by profit rate
   ns.tprint("╔══════════════════════════════════════════════════════════════════════╗");
-  ns.tprint("║  Server sortiert nach Profit-Rate ($/s)                              ║");
+  ns.tprint("║  Servers sorted by profit rate ($/s)                                 ║");
   ns.tprint("╠══════════════════════════════════════════════════════════════════════╣");
   ns.tprint(`║  ${"#".padEnd(3)} ${"Server".padEnd(18)} ${"Max-Money".padStart(11)} ${"Cur-Money".padStart(11)} ${"$/s".padStart(10)} ${"Req".padStart(4)}  ║`);
   ns.tprint("╠══════════════════════════════════════════════════════════════════════╣");
@@ -51,5 +51,5 @@ export async function main(ns) {
     ns.tprint(`║ ${root} ${num} ${name} ${money} ${cur} ${rate} ${lvl}  ║`);
   }
   ns.tprint("╚══════════════════════════════════════════════════════════════════════╝");
-  ns.tprint(`  ${servers.length} Server gefunden.`);
+  ns.tprint(`  ${servers.length} servers found.`);
 }

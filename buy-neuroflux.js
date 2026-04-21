@@ -7,14 +7,14 @@ export async function main(ns) {
   const preferredFaction = ns.args[0] ? String(ns.args[0]) : null;
 
   if (!ns.singularity) {
-    ns.tprint("Singularity API nicht verfügbar. Benötigt Source-File 4.");
+    ns.tprint("Singularity API not available. Requires Source-File 4.");
     return;
   }
 
   const player = ns.getPlayer();
   const factions = Array.isArray(player.factions) ? player.factions : [];
   if (factions.length === 0) {
-    ns.tprint("Du bist in keiner Fraktion. NeuroFlux kann nur über eine Fraktion gekauft werden.");
+    ns.tprint("You are not in any faction. NeuroFlux can only be purchased through a faction.");
     return;
   }
 
@@ -28,7 +28,7 @@ export async function main(ns) {
   });
 
   if (candidateFactions.length === 0) {
-    ns.tprint(`Keine Fraktion mit ${augName} gefunden. Bitte tritt einer passenden Fraktion bei.`);
+    ns.tprint(`No faction found with ${augName}. Please join a suitable faction.`);
     return;
   }
 
@@ -37,10 +37,10 @@ export async function main(ns) {
     : candidateFactions[0];
 
   if (preferredFaction && !candidateFactions.includes(preferredFaction)) {
-    ns.tprint(`Bevorzugte Fraktion '${preferredFaction}' hat ${augName} nicht oder ist nicht verfügbar. Nutze ${buyFaction} statt dessen.`);
+    ns.tprint(`Preferred faction '${preferredFaction}' does not have ${augName} or is not available. Using ${buyFaction} instead.`);
   }
 
-  ns.tprint(`Starte endlosen Kaufloop für ${augName} über Fraktion '${buyFaction}' (Reserve ${ns.formatNumber(reserveMoney)}$).`);
+  ns.tprint(`Starting endless buy loop for ${augName} via faction '${buyFaction}' (reserve ${ns.formatNumber(reserveMoney)}$).`);
 
   while (true) {
     try {
@@ -59,39 +59,39 @@ export async function main(ns) {
       if (canAfford && factionRep >= repReq) {
         const success = ns.singularity.purchaseAugmentation(buyFaction, augName);
         if (success) {
-          ns.tprint(`Kauf erfolgreich: ${augName} von ${buyFaction} für ${ns.formatNumber(price)}$. Kontostand jetzt ${ns.formatNumber(ns.getPlayer().money)}$.`);
+          ns.tprint(`Purchase successful: ${augName} from ${buyFaction} for ${ns.formatNumber(price)}$. Balance now ${ns.formatNumber(ns.getPlayer().money)}$.`);
           await ns.sleep(1000);
           continue;
         }
 
-        ns.tprint(`Kaufversuch fehlgeschlagen: ${augName} von ${buyFaction}. Prüfe, ob die Voraussetzungen erfüllt sind.`);
+        ns.tprint(`Purchase attempt failed: ${augName} from ${buyFaction}. Check whether prerequisites are met.`);
       }
 
       if (!canAfford) {
-        ns.tprint(`Nicht genug Geld für ${augName} (Preis ${ns.formatNumber(price)}$, Reserve ${ns.formatNumber(reserveMoney)}$). Kontostand ${ns.formatNumber(money)}$.`);
+        ns.tprint(`Not enough money for ${augName} (price ${ns.formatNumber(price)}$, reserve ${ns.formatNumber(reserveMoney)}$). Balance ${ns.formatNumber(money)}$.`);
       }
 
       if (factionRep < repReq) {
-        ns.tprint(`Nicht genug Ruf bei ${buyFaction} für ${augName} (${ns.formatNumber(factionRep)}/${ns.formatNumber(repReq)}).`);
+        ns.tprint(`Not enough reputation at ${buyFaction} for ${augName} (${ns.formatNumber(factionRep)}/${ns.formatNumber(repReq)}).`);
         if (canDonate && money > reserveMoney + 1e6) {
           const donateAmount = Math.max(0, Math.min(money - reserveMoney, price * 2));
           if (donateAmount > 0) {
             const donated = ns.singularity.donateToFaction(buyFaction, donateAmount);
             if (donated) {
-              ns.tprint(`Gespendet ${ns.formatNumber(donateAmount)}$ an ${buyFaction} für Rufgewinn. Kontostand ${ns.formatNumber(ns.getPlayer().money)}$.`);
+              ns.tprint(`Donated ${ns.formatNumber(donateAmount)}$ to ${buyFaction} for reputation gain. Balance ${ns.formatNumber(ns.getPlayer().money)}$.`);
               await ns.sleep(1000);
               continue;
             }
-            ns.tprint(`Spende an ${buyFaction} fehlgeschlagen, obwohl Favor vorhanden. Warte kurz...`);
+            ns.tprint(`Donation to ${buyFaction} failed despite sufficient favor. Waiting briefly...`);
           }
         } else if (!canDonate) {
-          ns.tprint(`Du hast noch nicht genug Favor bei ${buyFaction}, um dort zu spenden.`);
+          ns.tprint(`You do not yet have enough favor at ${buyFaction} to donate there.`);
         }
       }
 
       await ns.sleep(5000);
     } catch (error) {
-      ns.tprint(`Fehler im Kaufloop: ${String(error)}`);
+      ns.tprint(`Error in buy loop: ${String(error)}`);
       await ns.sleep(10000);
     }
   }

@@ -399,48 +399,48 @@ For single tools:
 There is now a first GUI path via `manager_gui.js`.
 
 Funktionen:
-- Start/Stop fuer `main_manager.js`
-- Button pro Service zum Aktivieren oder Deaktivieren
-- Anzeige von Config-Status, Runtime-Status und Script-Verfuegbarkeit
-- Fenster ist per Header ziehbar
-- Fenster kann ueber `Hide` ausgeblendet und ueber einen schwebenden Button wieder eingeblendet werden
-- Server-Admin-Bereich mit Buttons fuer `new_server_buy.js` und `upgrade_Server.js`
-- getrennte RAM-Auswahl fuer Kauf und Upgrade direkt im GUI
-- Live-Kostenanzeige fuer Kauf und Upgrade direkt im GUI
-- Upgrade-Bestaetigung direkt im GUI statt ueber `ns.prompt`, wenn ueber das Panel gestartet
-- RAM-Auswahl geht bis `2^20` = `1048576 GB`
-- zuletzt gewaehlte GUI-Einstellungen fuer Kauf/Upgrade und Fensterposition werden gespeichert
-- offener Upgrade-Bestaetigungszustand wird bei relevanten GUI-Aenderungen sauber zurueckgesetzt
-- Stat-Trainer zeigt aktive Stats sowie Combat-/Charisma-Trainingsorte direkt im GUI an
+- Start/Stop for `main_manager.js`
+- Button per service to enable or disable
+- Display of config status, runtime status and script availability
+- Window is draggable via the header
+- Window can be hidden via `Hide` and shown again via a floating button
+- Server admin area with buttons for `new_server_buy.js` and `upgrade_Server.js`
+- Separate RAM selection for buy and upgrade directly in the GUI
+- Live cost display for buy and upgrade directly in the GUI
+- Upgrade confirmation directly in the GUI instead of via `ns.prompt`, when started via the panel
+- RAM selection goes up to `2^20` = `1048576 GB`
+- Last selected GUI settings for buy/upgrade and window position are saved
+- Open upgrade confirmation state is cleanly reset on relevant GUI changes
+- Stat-Trainer shows active stats and combat/charisma training locations directly in the GUI
 
-Hinweis zum Combat-Trainer:
-Hinweis zum Stat-Trainer:
-- Im GUI gibt es Checkboxen fuer STR, DEF, DEX, AGI und CHA.
-- Der Trainer laeuft mit den aktuell aktivierten Stats weiter, bis du die Auswahl aenderst.
-- Combat-Stats nutzen `combatCity` plus Gym, Charisma nutzt `charismaCity` plus University/Kurs aus `services.combatTrainer.args`.
+Note on the Combat Trainer:
+Note on the Stat Trainer:
+- In the GUI there are checkboxes for STR, DEF, DEX, AGI and CHA.
+- The trainer continues running with the currently enabled stats until you change the selection.
+- Combat stats use `combatCity` plus gym, charisma uses `charismaCity` plus university/course from `services.combatTrainer.args`.
 
-Wichtig:
-- Die GUI schreibt direkt in `main_manager_config.txt`.
-- Beim Deaktivieren wird der jeweilige Scriptprozess sofort gestoppt.
-- Beim Aktivieren wird der Main-Manager gestartet, falls er noch nicht laeuft.
+Important:
+- The GUI writes directly to `main_manager_config.txt`.
+- When disabling, the respective script process is stopped immediately.
+- When enabling, the main manager is started if it is not already running.
 
-Einschraenkung:
-- Die GUI nutzt den DOM-Zugriff der Bitburner-Oberflaeche. Wenn diese Umgebung einmal nicht verfuegbar ist, waere als Fallback ein Prompt-Menue der robustere Weg.
+Limitation:
+- The GUI uses DOM access of the Bitburner interface. If this environment is ever unavailable, a prompt-based menu would be the more robust fallback.
 
-## Offene Punkte fuer spaeter
+## Open questions for later
 
-- Soll `manager_stats.js` in den zentralen `main_manager.js` aufgenommen werden?
-- Welche alten Hacking-Skripte sind noch produktiv relevant und welche koennen archiviert werden?
-- Sollten die vielen fest eingebauten Konstanten in `manager_gang.js`, `manager_stocks.js` und `auto-hack-manager.js` schrittweise in Konfigurationsdateien wandern?
-- Soll es eine zweite Doku geben, die nur Laufbefehle und Setup-Reihenfolgen sammelt?
+- Should `manager_stats.js` be included in the central `main_manager.js`?
+- Which old hacking scripts are still productively relevant and which can be archived?
+- Should the many hard-coded constants in `manager_gang.js`, `manager_stocks.js` and `auto-hack-manager.js` gradually move into config files?
+- Should there be a second doc that only collects run commands and setup sequences?
 
-## Kurzfazit
+## Short summary
 
-Das Projekt ist bereits als kleines Automationssystem aufgebaut. Der zentrale Zusammenhang ist:
+The project is already structured as a small automation system. The central relationship is:
 
-`main_manager.js` orchestriert Manager,
-Manager orchestrieren Worker,
-und nur wenige Skripte schreiben dauerhafte Laufzeitdaten.
+`main_manager.js` orchestrates managers,
+managers orchestrate workers,
+and only a few scripts write persistent runtime data.
 
-Wenn wir spaeter erweitern oder aufraeumen, sollten wir diesen Aufbau erhalten statt neue Sonderwege daneben zu setzen.
+If we extend or clean up later, we should preserve this structure instead of adding new one-off paths alongside it.
 

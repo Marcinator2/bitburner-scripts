@@ -66,10 +66,10 @@ export function selectBestUniversity(ns, player, courseName, configuredLocation)
     configuredLocation,
     getStartupCost: option => getUniversityStartupCost(option, courseName, player.city),
     getXpPerSecond: option => getUniversityXpPerSecond(ns, player, courseName, option),
-    configuredLabel: "konfigurierte Uni als Fallback",
-    bestLabel: "beste XP/s Uni",
-    affordableLabel: "beste bezahlbare XP/s Uni",
-    cheapestLabel: "guenstigste erreichbare Vorbereitung",
+    configuredLabel: "configured university as fallback",
+    bestLabel: "best XP/s university",
+    affordableLabel: "best affordable XP/s university",
+    cheapestLabel: "cheapest reachable preparation",
   });
 }
 
@@ -81,10 +81,10 @@ export function selectBestGym(ns, player, stat, configuredLocation) {
     configuredLocation,
     getStartupCost: option => getGymStartupCost(option, player.city),
     getXpPerSecond: option => getGymXpPerSecond(ns, player, stat, option),
-    configuredLabel: "konfiguriertes Gym als Fallback",
-    bestLabel: "bestes XP/s Gym",
-    affordableLabel: "bestes bezahlbares XP/s Gym",
-    cheapestLabel: "guenstigste erreichbare Vorbereitung",
+    configuredLabel: "configured gym as fallback",
+    bestLabel: "best XP/s gym",
+    affordableLabel: "best affordable XP/s gym",
+    cheapestLabel: "cheapest reachable preparation",
   });
 }
 
@@ -147,7 +147,7 @@ function selectBestLocation({
       ...choice,
       reason: choice.name === best.name
         ? `${bestLabel} (${formatRate(choice.xpPerSecond)} XP/s)`
-        : `${affordableLabel} (${formatRate(choice.xpPerSecond)} XP/s, ${ns.formatNumber(choice.startupCost)}$ Startkosten)`,
+        : `${affordableLabel} (${formatRate(choice.xpPerSecond)} XP/s, ${ns.formatNumber(choice.startupCost)}$ startup cost)`,
     };
   }
 

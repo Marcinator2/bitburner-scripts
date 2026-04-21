@@ -3,28 +3,28 @@ export async function main(ns) {
   const configFile = String(ns.args[0] || "main_manager_config.txt");
   //ns.disableLog("ALL");
 
-  const verbesserungsFaktor = 1.8; // Ascension-Multiplikator-Schwelle (hack-Mult muss sich verdreifachen)
-  const combatAscendFaktor = 1.35; // Combat-Ascension-Schwelle für War-Team
-  const minHackFuerCrime = 200;    // Hack-Stat-Schwelle: darunter → trainieren statt Crime
-  const minHackShare = 0.2;       // Mindestens 50% der Gang bleiben auf Hacking-Tasks
-  const powerFarmMode = false;      // true = Power über Territory Warfare farmen, aber ohne Clashes
-  const powerFarmShare = 0.8;     // Anteil der Gang für Power-Farming, zusätzlich begrenzt durch minHackShare
-  const prepDexFocus = false;       // true = Swap anhand DEX-Fortschritt, false = anhand Combat-Summe
-  const dexFloorRatio = 0.6;       // Bei DEX-Fokus: dex muss mind. X% vom höchsten anderen Combat-Stat sein
-  const swapMinAbs = 120;          // Absoluter Mindestfortschritt für Swap
-  const swapPct = 0.2;             // Relativer Fortschritt für Swap (0.2=20% vom Startwert)
-  const territoryPrepTarget = 0.98; // Bis zu diesem Wert aktiv auf Territory vorbereiten
-  const startWarChance = 0.60;     // Territory Warfare einschalten ab dieser Ø-Chance
-  const stopWarChance = 0.52;      // Territory Warfare ausschalten unter dieser Ø-Chance
-  const geldPuffer = 10_000_000;   // Mindestgeld auf dem Konto nach Equipment-Kauf
-  const maxAmortisationStunden = 4; //1 Equipment wird nur gekauft wenn es sich in X Spielstunden amortisiert
-  const loopDelayMs = 2000;         // Schleifenzeit in ms (muss mit ns.sleep übereinstimmen)
-  const prepStatusEveryLoops = 5;   // Status-Ausgabe nur jede X Schleifen
-  const minRespectForCyberterrorismMin = 12_500_000; // Untergrenze für dynamische Cyberterrorism-Schwelle
-  const minRespectForCyberterrorismMax = 20_000_000; // Obergrenze für dynamische Cyberterrorism-Schwelle
-  const respectRaiseFactor = 1.2;   // Schwelle steigt bei stabiler Wanted-Lage
-  const respectLowerFactor = 0.9;   // Schwelle sinkt bei instabiler Wanted-Lage
-  const respectAdjustEveryLoops = 30; // Anpassung alle X Schleifen (bei 2s Loop = 60s)
+  const ascensionFactor = 1.8; // Ascension multiplier threshold (hack mult must increase by this factor)
+  const combatAscendFactor = 1.35; // Combat ascension threshold for war team
+  const minHackForCrime = 200;    // Hack stat threshold: below this → train instead of Crime
+  const minHackShare = 0.2;       // Minimum 50% of gang stays on hacking tasks
+  const powerFarmMode = false;      // true = farm Power via Territory Warfare, but without Clashes
+  const powerFarmShare = 0.8;     // Fraction of gang for Power farming, additionally limited by minHackShare
+  const prepDexFocus = false;       // true = swap based on DEX progress, false = based on combat sum
+  const dexFloorRatio = 0.6;       // With DEX focus: dex must be at least X% of the highest other combat stat
+  const swapMinAbs = 120;          // Absolute minimum progress for swap
+  const swapPct = 0.2;             // Relative progress for swap (0.2 = 20% of base value)
+  const territoryPrepTarget = 0.98; // Actively prepare territory up to this value
+  const startWarChance = 0.60;     // Enable Territory Warfare at this average chance
+  const stopWarChance = 0.52;      // Disable Territory Warfare below this average chance
+  const moneyBuffer = 10_000_000;   // Minimum money on account after equipment purchase
+  const maxAmortizationHours = 4; // Equipment is only bought if it pays off within X game hours
+  const loopDelayMs = 2000;         // Loop time in ms (must match ns.sleep)
+  const prepStatusEveryLoops = 5;   // Status output only every X loops
+  const minRespectForCyberterrorismMin = 12_500_000; // Lower bound for dynamic Cyberterrorism threshold
+  const minRespectForCyberterrorismMax = 20_000_000; // Upper bound for dynamic Cyberterrorism threshold
+  const respectRaiseFactor = 1.2;   // Threshold rises with stable wanted situation
+  const respectLowerFactor = 0.9;   // Threshold drops with unstable wanted situation
+  const respectAdjustEveryLoops = 30; // Adjustment every X loops (at 2s loop = 60s)
 
   function loadGangConfig() {
     try {
@@ -47,29 +47,29 @@ export async function main(ns) {
   }
 
   if (!ns.gang || typeof ns.gang.inGang !== "function") {
-    ns.tprint("Fehler: Gang API nicht verfuegbar.");
+    ns.tprint("Error: Gang API not available.");
     return;
   }
 
   if (!ns.gang.inGang()) {
-    ns.tprint("Noch in keiner Gang. manager_gang.js wird beendet.");
+    ns.tprint("Not in a gang yet. manager_gang.js terminating.");
     return;
   }
 
   const allServers = ns.scan("home").filter(s => s !== "home");
   const visited = new Set(["home"]);
-  const prepBaseCombat = new Map(); // name -> Combat-Startwert
-  const prepBaseDex = new Map(); // name -> DEX-Startwert
-  const prepDoneMembers = new Set(); // Members, die +100 erreicht haben
-  const activePrepCombatMembers = new Set(); // Aktuelle Combat-Trainingsgruppe (stabil bis +100 erreicht)
+  const prepBaseCombat = new Map(); // name -> combat base value
+  const prepBaseDex = new Map(); // name -> DEX base value
+  const prepDoneMembers = new Set(); // Members who have reached +100
+  const activePrepCombatMembers = new Set(); // Current combat training group (stable until +100 reached)
   let prepRound = 1;
   let loopCount = 0;
   let minRespectForCyberterrorism = 2_000_000;
 
-  // Equipment-Listen nach Preis vorberechnen
+  // Pre-calculate equipment lists sorted by price
   const hackEquipments = ns.gang.getEquipmentNames()
     .map(e => ({ name: e, cost: ns.gang.getEquipmentCost(e), stats: ns.gang.getEquipmentStats(e) }))
-    .filter(e => e.stats.hack > 1) // Nur Hack-relevante
+    .filter(e => e.stats.hack > 1) // Hack-relevant only
     .sort((a, b) => a.cost - b.cost);
 
   const combatEquipments = ns.gang.getEquipmentNames()
@@ -105,43 +105,43 @@ export async function main(ns) {
 
     for (const { name, stats: mStats } of memberStats) {
       const memberInfo = ns.gang.getMemberInformation(name);
-      const istAmTrainieren = memberInfo.task === "Train Hacking";
-      const istWarrior = combatRoleSet.has(name);
-      const equipList = istWarrior ? combatEquipments : hackEquipments;
+      const isTraining = memberInfo.task === "Train Hacking";
+      const isWarrior = combatRoleSet.has(name);
+      const equipList = isWarrior ? combatEquipments : hackEquipments;
 
       for (const equip of equipList) {
         const money = ns.getPlayer().money;
 
-        // Schon gekauft?
+        // Already purchased?
         if (memberInfo.upgrades.includes(equip.name) || memberInfo.augmentations.includes(equip.name)) continue;
-        // Genug Geld?
-        if (money <= equip.cost + geldPuffer) continue;
+        // Enough money?
+        if (money <= equip.cost + moneyBuffer) continue;
 
-        // ROI-Prüfung:
-        // Beim Training immer kaufen — Equipment beschleunigt Stat-Wachstum
-        // Im Crime-Modus (Hack-Equipment): Amortisationszeit berechnen
-        let kaufen = false;
-        if (istWarrior) {
-          // War-Team priorisiert Combat-Stats statt ROI
-          kaufen = true;
-        } else if (istAmTrainieren || memberInfo.moneyGain <= 0) {
-          kaufen = true; // Training-Equipment lohnt sich immer
+        // ROI check:
+        // While training always buy — equipment accelerates stat growth
+        // In crime mode (hack equipment): calculate amortization time
+        let shouldBuy = false;
+        if (isWarrior) {
+          // War team prioritizes combat stats over ROI
+          shouldBuy = true;
+        } else if (isTraining || memberInfo.moneyGain <= 0) {
+          shouldBuy = true; // Training equipment is always worth it
         } else {
-          // Zusätzlicher Gewinn pro Loop-Zyklus ≈ aktueller Gewinn × Hack-Multiplikator-Anteil
-          const zusatzGewinnProZyklus = memberInfo.moneyGain * ((equip.stats.hack || 1) - 1);
-          if (zusatzGewinnProZyklus > 0) {
-            const amortisationMs = (equip.cost / zusatzGewinnProZyklus) * loopDelayMs;
-            const amortisationStunden = amortisationMs / (1000 * 60 * 60);
-            kaufen = amortisationStunden <= maxAmortisationStunden;
-            if (!kaufen) {
-              ns.print(`SKIP: ${equip.name} für ${name} — Amortisation: ${amortisationStunden.toFixed(1)}h (Limit: ${maxAmortisationStunden}h)`);
+          // Additional profit per loop cycle ≈ current profit × hack multiplier portion
+          const additionalProfitPerCycle = memberInfo.moneyGain * ((equip.stats.hack || 1) - 1);
+          if (additionalProfitPerCycle > 0) {
+            const amortizationMs = (equip.cost / additionalProfitPerCycle) * loopDelayMs;
+            const amortizationHours = amortizationMs / (1000 * 60 * 60);
+            shouldBuy = amortizationHours <= maxAmortizationHours;
+            if (!shouldBuy) {
+              ns.print(`SKIP: ${equip.name} for ${name} — amortization: ${amortizationHours.toFixed(1)}h (limit: ${maxAmortizationHours}h)`);
             }
           }
         }
 
-        if (kaufen && ns.gang.purchaseEquipment(name, equip.name)) {
-          const istAmort = istAmTrainieren ? "Training" : "ROI ok";
-          ns.print(`KAUF [${istAmort}]: ${name} → ${equip.name} (${ns.formatNumber(equip.cost)})`);
+        if (shouldBuy && ns.gang.purchaseEquipment(name, equip.name)) {
+          const reason = isTraining ? "Training" : "ROI ok";
+          ns.print(`BUY [${reason}]: ${name} → ${equip.name} (${ns.formatNumber(equip.cost)})`);
         }
       }
     }
@@ -152,7 +152,7 @@ export async function main(ns) {
     const gangConfig = loadGangConfig();
     const prepCombatMode = gangConfig.prepCombatMode;
 
-    // Neue Mitglieder rekrutieren (while: manchmal sind mehrere auf einmal verfügbar)
+    // Recruit new members (while: sometimes multiple are available at once)
     while (ns.gang.canRecruitMember()) {
       const newName = "GangMember_" + ns.gang.getMemberNames().length;
       ns.gang.recruitMember(newName);
@@ -164,7 +164,7 @@ export async function main(ns) {
     const wantedLevelGain = typeof info.wantedLevelGainRate === "number" ? info.wantedLevelGainRate : 0;
     const wantedLevel = typeof info.wantedLevel === "number" ? info.wantedLevel : 0;
 
-    // Dynamische Respect-Schwelle für Cyberterrorism langsam anpassen
+    // Dynamic respect threshold for Cyberterrorism: slowly adjust
     if (loopCount % respectAdjustEveryLoops === 0) {
       const oldTarget = minRespectForCyberterrorism;
       if (wantedPenalty >= 0.97 && wantedLevelGain <= 0.01) {
@@ -186,7 +186,7 @@ export async function main(ns) {
       }
     }
 
-    // Aufgeräumt halten (falls Member entfernt/ersetzt wurden)
+    // Keep clean (in case members were removed/replaced)
     for (const name of prepBaseCombat.keys()) {
       if (!members.includes(name)) {
         prepBaseCombat.delete(name);
@@ -200,11 +200,11 @@ export async function main(ns) {
     const maxWarriors = Math.max(0, members.length - minHackers);
     const powerFarmCount = Math.min(maxWarriors, Math.floor(members.length * powerFarmShare));
 
-    // Member-Stats einmal pro Zyklus laden (nicht mehrfach pro Member)
+    // Load member stats once per cycle (not multiple times per member)
     const memberStats = members.map(n => ({ name: n, stats: ns.gang.getMemberInformation(n) }));
 
     if (prepCombatMode) {
-      // Neue Runde: Startwerte setzen
+      // New round: set base values
       for (const { name, stats } of memberStats) {
         if (!prepBaseCombat.has(name)) {
           prepBaseCombat.set(name, combatScore(stats));
@@ -214,7 +214,7 @@ export async function main(ns) {
         }
       }
 
-      // Fortschritt prüfen (dynamisches Ziel je Member, optional DEX-fokussiert)
+      // Check progress (dynamic target per member, optionally DEX-focused)
       for (const { name, stats } of memberStats) {
         const base = prepBaseValue(stats, name);
         const target = swapTargetForBase(base);
@@ -227,7 +227,7 @@ export async function main(ns) {
         }
       }
 
-      // Wenn alle Members ihr Ziel erreicht haben, neue Runde starten
+      // When all members have reached their target, start a new round
       if (memberStats.length > 0 && prepDoneMembers.size === memberStats.length) {
         prepRound++;
         prepDoneMembers.clear();
@@ -236,13 +236,13 @@ export async function main(ns) {
           prepBaseCombat.set(name, combatScore(stats));
           prepBaseDex.set(name, stats.dex);
         }
-        ns.print(`Prep-Runde ${prepRound} gestartet (alle haben ihr ${prepDexFocus ? "DEX" : "Combat"}-Ziel erreicht).`);
+        ns.print(`Prep round ${prepRound} started (all members reached their ${prepDexFocus ? "DEX" : "Combat"} target).`);
       }
     } else {
       prepDoneMembers.clear();
     }
 
-    // Clash-Chance über aktive Gegengangs mitteln
+    // Average clash chance across active enemy gangs
     const otherGangs = ns.gang.getOtherGangInformation();
     const enemyNames = Object.keys(otherGangs).filter(g => g !== info.faction && otherGangs[g].territory > 0);
     let avgClashChance = 0;
@@ -265,16 +265,16 @@ export async function main(ns) {
       }
     ns.gang.setTerritoryWarfare(territoryWarfareOn);
 
-    // Nur trainierte Members für Crime/Wanted-Logik heranziehen
+    // Only use trained members for Crime/Wanted logic
     const trainedMembers = memberStats
-      .filter(m => m.stats.hack >= minHackFuerCrime);
+      .filter(m => m.stats.hack >= minHackForCrime);
 
-    // Combat-Rolle bestimmen:
-    // - Prep-Mode: rotierende Trainingsgruppe, bis je Member +100 Combat erreicht sind
-    // - Normal: Territory Warfare-Gruppe
+    // Combat role assignment:
+    // - Prep mode: rotating training group, until each member gained +100 Combat
+    // - Normal: Territory Warfare group
     let combatRoleSet = new Set();
     if (prepCombatMode) {
-      // 1) Genau einen fertigen Combat-Trainee pro Loop aus der aktiven Gruppe entfernen
+      // 1) Remove exactly one finished combat trainee per loop from the active group
       let removedThisLoop = null;
       let removedProgress = 0;
       let removedTarget = 0;
@@ -294,8 +294,8 @@ export async function main(ns) {
         activePrepCombatMembers.delete(removedThisLoop);
       }
 
-      // 2) Freie Slots auffüllen: bei normalem Betrieb genau einen neuen Member nachrutschen lassen
-      // Beim Start (oder nach Recruit) kann bis zur Zielgröße aufgefüllt werden.
+      // 2) Fill free slots: during normal operation let exactly one new member slot in
+      // At startup (or after recruit) can fill up to target size.
       const addedThisLoop = [];
       while (activePrepCombatMembers.size < maxWarriors) {
         const candidates = memberStats
@@ -314,7 +314,7 @@ export async function main(ns) {
           : `${added.name} (Combat ${Math.floor(combatScore(added.stats))})`;
         addedThisLoop.push(addedLabel);
 
-        // Wenn nur ein Slot frei wurde, exakt ein Member nachrutschen lassen
+        // If only one slot opened, let exactly one member slot in
         if (removedThisLoop !== null) break;
       }
 
@@ -322,9 +322,9 @@ export async function main(ns) {
         const metric = prepDexFocus ? "DEX" : "Combat";
         const removeText = removedThisLoop !== null
           ? `${removedThisLoop} (+${removedProgress}/${removedTarget})`
-          : "keiner";
-        const addText = addedThisLoop.length > 0 ? addedThisLoop.join(", ") : "keiner";
-        ns.print(`[PREP-SWAP ${metric}] raus: ${removeText} | rein: ${addText}`);
+          : "none";
+        const addText = addedThisLoop.length > 0 ? addedThisLoop.join(", ") : "none";
+        ns.print(`[PREP-SWAP ${metric}] out: ${removeText} | in: ${addText}`);
       }
 
       combatRoleSet = new Set(activePrepCombatMembers);
@@ -351,53 +351,53 @@ export async function main(ns) {
     const trainedMemberNames = trainedMembers.map(m => m.name);
 
     for (const { name, stats } of memberStats) {
-      const istWarrior = combatRoleSet.has(name);
+      const isWarrior = combatRoleSet.has(name);
 
-      // Ascension: Hacker über Hack-Mult, War-Team über Combat-Mults
+      // Ascension: Hackers by hack mult, War team by combat mults
       const res = ns.gang.getAscensionResult(name);
       if (gangConfig.autoAscend && res) {
-        const shouldAscendHack = res.hack >= verbesserungsFaktor;
-        const shouldAscendCombat = istWarrior && (
-          res.str >= combatAscendFaktor ||
-          res.def >= combatAscendFaktor ||
-          res.dex >= combatAscendFaktor ||
-          res.agi >= combatAscendFaktor
+        const shouldAscendHack = res.hack >= ascensionFactor;
+        const shouldAscendCombat = isWarrior && (
+          res.str >= combatAscendFactor ||
+          res.def >= combatAscendFactor ||
+          res.dex >= combatAscendFactor ||
+          res.agi >= combatAscendFactor
         );
 
         if (shouldAscendHack || shouldAscendCombat) {
           ns.gang.ascendMember(name);
-          // Nach Ascension: Stats wurden zurückgesetzt → direkt trainieren
+          // After ascension: stats were reset → train immediately
           ns.gang.setMemberTask(name, "Train Hacking");
           continue;
         }
       }
 
-      // PRIORITÄT 1: Für Territory Wars vorgesehene Kämpfer
-      if (istWarrior) {
+      // PRIORITY 1: Fighters designated for Territory Wars
+      if (isWarrior) {
         ns.gang.setMemberTask(name, prepCombatMode ? "Train Combat" : "Territory Warfare");
         continue;
       }
 
-      // PRIORITÄT 0: Zu schwach für Crime → trainieren
-      // (gilt auch für gerade-ascendete Members, da ihr hack-Stat zurückgesetzt wurde)
-      if (stats.hack < minHackFuerCrime) {
+      // PRIORITY 0: Too weak for Crime → train
+      // (also applies to freshly-ascended members since their hack stat was reset)
+      if (stats.hack < minHackForCrime) {
         ns.gang.setMemberTask(name, "Train Hacking");
         continue;
       }
 
-      // PRIORITÄT 2: Wanted Level senken
+      // PRIORITY 2: Lower Wanted Level
       if (wantedLevel > 5000 || wantedLevelGain > 0) {
-        // Wenn Wanted aktiv wächst → alle cleanen; sonst nur einen Teil
+        // If Wanted is actively growing → everyone cleans; otherwise only a portion
         const threshold = wantedLevelGain > 0 ? 1.0 : (wantedLevel > 10000 ? 0.7 : 0.5);
         const idx = trainedMemberNames.indexOf(name);
         const cleanerCount = Math.ceil(trainedMemberNames.length * threshold);
         ns.gang.setMemberTask(name, idx < cleanerCount ? "Ethical Hacking" : "Money Laundering");
       }
-      // PRIORITÄT 3: Respekt farmen
+      // PRIORITY 3: Farm respect
       else if (info.respect < minRespectForCyberterrorism) {
         ns.gang.setMemberTask(name, "Cyberterrorism");
       }
-      // PRIORITÄT 4: Geld verdienen
+      // PRIORITY 4: Make money
       else {
         ns.gang.setMemberTask(name, "Money Laundering");
       }
@@ -413,19 +413,19 @@ export async function main(ns) {
           return `${m.name} (+${progress}/${target})`;
         });
 
-      const traineeText = activeTrainees.length > 0 ? activeTrainees.join(", ") : "keine";
+      const traineeText = activeTrainees.length > 0 ? activeTrainees.join(", ") : "none";
       const metric = prepDexFocus ? "DEX" : "Combat";
       const dexFloorText = prepDexFocus ? ` | DEX-Floor: ${Math.floor(dexFloorRatio * 100)}%` : "";
       ns.print(
-        `[PREP ${metric}] Runde ${prepRound} | Fertig: ${prepDoneMembers.size}/${memberStats.length} | Aktiv: ${activeTrainees.length}${dexFloorText} | RespectTarget: ${ns.formatNumber(minRespectForCyberterrorism)} | Trainees: ${traineeText}`
+        `[PREP ${metric}] Round ${prepRound} | Done: ${prepDoneMembers.size}/${memberStats.length} | Active: ${activeTrainees.length}${dexFloorText} | RespectTarget: ${ns.formatNumber(minRespectForCyberterrorism)} | Trainees: ${traineeText}`
       );
     } else if (powerFarmMode && (loopCount % prepStatusEveryLoops === 0)) {
       const powerFarmers = memberStats
         .filter(m => combatRoleSet.has(m.name))
         .map(m => `${m.name} (Power ${Math.floor(combatScore(m.stats))})`);
-      const powerFarmerText = powerFarmers.length > 0 ? powerFarmers.join(", ") : "keine";
+      const powerFarmerText = powerFarmers.length > 0 ? powerFarmers.join(", ") : "none";
       ns.print(
-        `[POWER-FARM] Aktiv: ${powerFarmers.length} | Clashes: AUS | RespectTarget: ${ns.formatNumber(minRespectForCyberterrorism)} | Fighters: ${powerFarmerText}`
+        `[POWER-FARM] Active: ${powerFarmers.length} | Clashes: OFF | RespectTarget: ${ns.formatNumber(minRespectForCyberterrorism)} | Fighters: ${powerFarmerText}`
       );
     }
 

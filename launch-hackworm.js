@@ -11,13 +11,13 @@ export async function main(ns) {
   if (!host) {
     host = ns.purchaseServer(HOST, RAM);
     if (!host) {
-      ns.tprint(`❌ Kauf fehlgeschlagen – zu wenig Geld für ${RAM} GB Server.`);
-      ns.tprint(`   Benötigte RAM: ${RAM} GB`);
+      ns.tprint(`❌ Purchase failed – not enough money for a ${RAM} GB server.`);
+      ns.tprint(`   Required RAM: ${RAM} GB`);
       return;
     }
-    ns.tprint(`✅ Server "${HOST}" (${RAM} GB) gekauft.`);
+    ns.tprint(`✅ Server "${HOST}" (${RAM} GB) purchased.`);
   } else {
-    ns.tprint(`ℹ️  Nutze vorhandenen Server "${HOST}".`);
+    ns.tprint(`ℹ️  Using existing server "${HOST}".`);
   }
 
   // Copy manager + workers to the host
@@ -30,9 +30,9 @@ export async function main(ns) {
   // Launch
   const pid = ns.exec(SCRIPT, host, 1);
   if (pid > 0) {
-    ns.tprint(`✅ ${SCRIPT} läuft jetzt auf "${HOST}" – home-RAM vollständig für Worker frei.`);
+    ns.tprint(`✅ ${SCRIPT} is now running on "${HOST}" – home RAM fully free for workers.`);
   } else {
     const needed = ns.getScriptRam(SCRIPT, "home");
-    ns.tprint(`❌ Start fehlgeschlagen. ${HOST} hat ${ns.getServerMaxRam(host)} GB, Skript benötigt ${needed} GB.`);
+    ns.tprint(`❌ Start failed. ${HOST} has ${ns.getServerMaxRam(host)} GB, script requires ${needed} GB.`);
   }
 }
