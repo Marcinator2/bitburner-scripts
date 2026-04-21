@@ -132,6 +132,16 @@ const SERVICE_DEFINITIONS = [
     description: "Installs backdoors on all reachable servers",
     shouldRun: ns => Boolean(ns.singularity),
   },
+  {
+    key: "ipvgo",
+    script: "manager_ipvgo.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: ["Slum Snakes", 7],
+    description: "Plays IPvGO Subnet matches automatically",
+    shouldRun: () => true,
+  },
 ];
 
 export async function main(ns) {
