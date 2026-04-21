@@ -106,6 +106,18 @@ function pickMove(board, validMoves, liberties, size) {
       // Mild center preference in opening
       score += Math.min(x, y, size - 1 - x, size - 1 - y) * 0.3;
 
+      // Bonus: puts opponent chain in atari
+      score += opponentChainsInAtariAfterMove(sim, x, y, size) * 8;
+
+      // Penalty: self-atari (own new chain ends up with 1 lib, no captures)
+      const ownChain = traceChain(sim, x, y, 'X', size);
+      const ownLibs  = chainLiberties(sim, ownChain, size);
+      if (ownLibs === 1 && caps === 0) score -= 30;
+      else if (ownLibs === 2 && caps === 0) score -= 6;
+
+      // Penalty: filling own eye
+      if (isEye(cur, x, y, 'X', size)) score -= 20;
+
       if (score > bestScore) { bestScore = score; bestMove = { x, y }; }
     }
   }
@@ -139,7 +151,7 @@ function traceChain(b, sx, sy, color, size) {
   const stack = [[sx, sy]];
   while (stack.length) {
     const [x, y] = stack.pop();
-    const k = x * 25 + y;
+    const k = x * size + y;
     if (seen.has(k) || b[x]?.[y] !== color) continue;
     seen.add(k);
     chain.push([x, y]);
@@ -172,7 +184,7 @@ function countTerritory(b, size) {
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
-      const k = x * 25 + y;
+      const k = x * size + y;
       if (b[x]?.[y] !== '.' || seen.has(k)) continue;
 
       const region = [];
@@ -181,7 +193,7 @@ function countTerritory(b, size) {
 
       while (queue.length) {
         const [cx, cy] = queue.shift();
-        const ck = cx * 25 + cy;
+        const ck = cx * size + cy;
         if (seen.has(ck)) continue;
         const cell = b[cx]?.[cy];
         if (!cell || cell === '#') continue;
@@ -209,5 +221,29 @@ function neighbors(x, y, size) {
   if (y > 0)        r.push([x, y-1]);
   if (y < size - 1) r.push([x, y+1]);
   return r;
+}
+
+// ── Eye detection ─────────────────────────────────────────────────────────────
+
+function isEye(b, x, y, color, size) {
+  if (b[x]?.[y] !== '.') return false;
+  for (const [nx, ny] of neighbors(x, y, size)) {
+    if (b[nx]?.[ny] !== color) return false;
+  }
+  return true;
+}
+
+function opponentChainsInAtariAfterMove(after, mx, my, size) {
+  let count = 0;
+  const seen = new Set();
+  for (const [nx, ny] of neighbors(mx, my, size)) {
+    if (after[nx]?.[ny] !== 'O') continue;
+    const k = nx * size + ny;
+    if (seen.has(k)) continue;
+    const chain = traceChain(after, nx, ny, 'O', size);
+    for (const [cx, cy] of chain) seen.add(cx * size + cy);
+    if (chainLiberties(after, chain, size) === 1) count++;
+  }
+  return count;
 }
 
