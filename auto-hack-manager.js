@@ -59,7 +59,7 @@ export async function main(ns) {
 
     /** Is the server a hackable target? */
     function isTarget(s) {
-        if (s === "home" || s.startsWith("MyServer_")) return false;
+        if (s === "home" || ns.getPurchasedServers().includes(s)) return false;
         return ns.hasRootAccess(s)
             && ns.getServerRequiredHackingLevel(s) <= ns.getHackingLevel()
             && ns.getServerMaxMoney(s) > 0;

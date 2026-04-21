@@ -12,7 +12,7 @@ export async function main(ns) {
     return;
   }
 
-  // Next index = number of already purchased servers
+  // Next index = number of already purchased servers4
   const idx = purchased.length;
   const name = `${prefix}${idx}`;
 

@@ -48,11 +48,12 @@ export async function main(ns) {
   while (true) {
     const allServers = scanAll();
     const hackLevel = ns.getHackingLevel();
+    const purchasedSet = new Set(ns.getPurchasedServers());
 
     // Candidates: root access, hack level ok, no backdoor yet, not a player server
     const candidates = allServers.filter(s =>
       s !== "home"
-      && !s.startsWith("MyServer_")
+      && !purchasedSet.has(s)
       && ns.hasRootAccess(s)
       && ns.getServerRequiredHackingLevel(s) <= hackLevel
       && !ns.getServer(s).backdoorInstalled
@@ -81,7 +82,7 @@ export async function main(ns) {
     }
 
     const done = allServers.filter(s =>
-      s !== "home" && !s.startsWith("MyServer_") && ns.getServer(s).backdoorInstalled
+      s !== "home" && !purchasedSet.has(s) && ns.getServer(s).backdoorInstalled
     ).length;
     ns.clearLog();
     ns.print(`[Backdoor] Done. Installed: ${done} | Open: ${candidates.length}`);

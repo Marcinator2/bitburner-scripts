@@ -30,7 +30,7 @@ const SERVICES = [
   { key: "stocks", script: "manager_stocks.js", host: "home", label: "Stocks" },
   { key: "gang", script: "manager_gang.js", host: "home", label: "Gang" },
   { key: "negativeKarma", script: "manager_karma.js", host: "home", label: "Negative Karma" },
-  { key: "programs", script: "auto-leveler.js", host: "home", label: "Programs" },
+  { key: "programs", script: "auto-leveler.js", host: "home", label: "Buy Programs" },
   { key: "combatTrainer", script: "combat_stat_trainer.js", host: "home", label: "Stat Trainer" },
   { key: "playerStatsWorker", script: "player_stats_worker.js", host: "home", label: "Stats Writer" },
   { key: "playerStatsView", script: "player_stats.js", host: "home", label: "Stats View" },
@@ -981,7 +981,7 @@ function clamp(value, min, max) {
 function renderPanel(ns, panel) {
   const config = loadConfig(ns, CONFIG_FILE);
   const managerRunning = ns.scriptRunning(MAIN_MANAGER_SCRIPT, "home");
-  const purchasedServers = ns.getPurchasedServers().filter(server => server.startsWith("MyServer_"));
+  const purchasedServers = ns.getPurchasedServers();
   const purchasedLimit = ns.getPurchasedServerLimit();
   const buyScriptExists = ns.fileExists(NEW_SERVER_BUY_SCRIPT, "home");
   const upgradeScriptExists = ns.fileExists(UPGRADE_SERVER_SCRIPT, "home");

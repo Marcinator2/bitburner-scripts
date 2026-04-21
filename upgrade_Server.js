@@ -3,9 +3,9 @@ export async function main(ns) {
   const ram = sanitizeRam(ns.args[0], 2 ** 12);
   const skipPrompt = ns.args[1] === true || String(ns.args[1] || "").toLowerCase() === "true";
 
-  const servers = ns.getPurchasedServers().filter(s => s.startsWith("MyServer_"));
+  const servers = ns.getPurchasedServers();
   if (servers.length === 0) {
-    ns.tprint("No MyServer_ servers found.");
+    ns.tprint("No purchased servers found.");
     return;
   }
 
