@@ -3,20 +3,20 @@ export async function main(ns) {
   ns.disableLog("sleep");
   ns.clearLog();
 
-  // Konfiguration
-  const reserveCash = 0//500_000_000; // festen Betrag in $ behalten (anstatt Prozent)
-  const minAffordableMargin = 0; // minimale Reserve in $, zusätzlich zur reserveCash
-  const maxShownOptions = 0//8; // wie viele Optionen in der Übersicht gezeigt werden
-  const loopDelayMs = 30; // Pause zwischen Durchläufen (30 Sekunden)
+  // Configuration
+  const reserveCash = 0//500_000_000; // keep a fixed amount in $ (instead of a percentage)
+  const minAffordableMargin = 0; // minimum reserve in $, in addition to reserveCash
+  const maxShownOptions = 0//8; // how many options to show in the summary
+  const loopDelayMs = 30; // pause between passes (30 seconds)
 
-  // Prüfe ob hacknet-API vorhanden (frühzeitig)
+  // Check if hacknet API is present (early exit)
   if (!ns.hacknet || typeof ns.hacknet.numNodes !== "function") {
-   // ns.tprint("❌ ns.hacknet API nicht verfügbar. Script beendet.");
+   // ns.tprint("❌ ns.hacknet API not available. Script terminated.");
     return;
   }
 
   while (true) {
-    // Hole verfügbares Geld (bevorzugt ns.getPlayer())
+    // Get available money (prefer ns.getPlayer())
     let playerMoney = 0;
     try {
       if (typeof ns.getPlayer === "function") {
@@ -34,27 +34,27 @@ export async function main(ns) {
       }
     }
     const availableCash = Math.max(0, playerMoney - reserveCash - minAffordableMargin);
-   // ns.tprint(`ℹ️ Verfügbares Geld (nach Reserve ${reserveCash.toLocaleString()}): ${Math.floor(availableCash).toLocaleString()}`);
+   // ns.tprint(`ℹ️ Available money (after reserve ${reserveCash.toLocaleString()}): ${Math.floor(availableCash).toLocaleString()}`);
 
-    // Lese Nodes
+    // Read nodes
     const numNodes = ns.hacknet.numNodes();
     let nodes = [];
     for (let i = 0; i < numNodes; i++) {
       try {
         nodes.push(ns.hacknet.getNodeStats(i));
       } catch (e) {
-       // ns.tprint("❌ ns.hacknet.getNodeStats nicht verfügbar oder Fehler beim Lesen von Node " + i);
+       // ns.tprint("❌ ns.hacknet.getNodeStats not available or error reading node " + i);
         return;
       }
     }
 
-    // Durchschnittsproduktion pro Node (für neue Nodes-Schätzung)
+    // Average production per node (for new node estimation)
     const avgProd = nodes.length ? (nodes.reduce((s, n) => s + (n.production || 0), 0) / nodes.length) : 0.1;
 
-    // Sammle mögliche Aktionen mit geschätztem deltaProd und Kosten
+    // Collect possible actions with estimated deltaProd and cost
     let actions = [];
 
-    // Upgrade-Optionen für existierende Nodes
+    // Upgrade options for existing nodes
     for (let i = 0; i < numNodes; i++) {
       const s = nodes[i];
       const curProd = s.production ?? 0.000001;
@@ -74,14 +74,14 @@ export async function main(ns) {
         }
       }
 
-      // RAM Upgrade +1
+      // RAM upgrade +1
       if (typeof ns.hacknet.getRamUpgradeCost === "function") {
         const cost = ns.hacknet.getRamUpgradeCost(i, 1);
         if (isFinite(cost) && cost > 0) {
           const newRam = ram * 2;
           const estNewProd = curProd * (newRam / Math.max(1, ram));
           const delta = Math.max(0, estNewProd - curProd);
-          actions.push({ type: "ram", index: i, cost, delta, desc: `Node ${i} ram*2 (geschätzt)` });
+          actions.push({ type: "ram", index: i, cost, delta, desc: `Node ${i} ram*2 (estimated)` });
         }
       }
 
@@ -96,100 +96,100 @@ export async function main(ns) {
         }
       }
 
-      // Cache +1 (konservativ +10%)
+      // Cache +1 (conservative +10%)
       if (typeof ns.hacknet.getCacheUpgradeCost === "function") {
         const cost = ns.hacknet.getCacheUpgradeCost(i, 1);
         if (isFinite(cost) && cost > 0) {
           const estNewProd = curProd * 1.10;
           const delta = Math.max(0, estNewProd - curProd);
-          actions.push({ type: "cache", index: i, cost, delta, desc: `Node ${i} cache+1 (geschätzt +10%)` });
+          actions.push({ type: "cache", index: i, cost, delta, desc: `Node ${i} cache+1 (estimated +10%)` });
         }
       }
     }
 
-    // Kauf eines neuen Node
+    // Purchase a new node
     if (typeof ns.hacknet.getPurchaseNodeCost === "function" && typeof ns.hacknet.purchaseNode === "function") {
       const cost = ns.hacknet.getPurchaseNodeCost();
       if (isFinite(cost) && cost > 0) {
         const estNewProd = Math.max(0.1, avgProd);
         const delta = estNewProd;
-        actions.push({ type: "purchase", cost, delta, desc: `Kaufe neuen Node (geschätzte prod ${estNewProd.toFixed(6)}/s)` });
+        actions.push({ type: "purchase", cost, delta, desc: `Buy new node (estimated prod ${estNewProd.toFixed(6)}/s)` });
       }
     }
 
     if (actions.length === 0) {
-    //  ns.tprint("ℹ️ Keine Hacknet-Aktionen gefunden (API-Funktionen fehlen oder keine Nodes/Optionen).");
+    //  ns.tprint("ℹ️ No hacknet actions found (API functions missing or no nodes/options).");
       return;
     }
 
-    // ROI berechnen und sortieren (deltaProd / cost), höhere ROI zuerst
+    // Calculate ROI and sort (deltaProd / cost), higher ROI first
     actions = actions
       .map(a => ({ ...a, roi: a.cost > 0 ? (a.delta / a.cost) : 0 }))
       .sort((a, b) => b.roi - a.roi);
 
-    // Ausgabe der Top-Optionen
-   // ns.tprint("🔎 Top Hacknet-Optionen (geschätztes Δprod / $):");
+    // Output top options
+   // ns.tprint("🔎 Top hacknet options (estimated Δprod / $):");
     for (let i = 0; i < Math.min(maxShownOptions, actions.length); i++) {
       const a = actions[i];
      // ns.tprint(`${i + 1}. ${a.desc} — cost: ${Math.floor(a.cost).toLocaleString()} | est Δprod: ${a.delta.toFixed(6)} | ROI: ${a.roi.toExponential(6)}`);
     }
 
     const best = actions[0];
-   // ns.tprint(`➡️ Beste Aktion: ${best.desc} | cost ${Math.floor(best.cost).toLocaleString()} | est Δprod ${best.delta.toFixed(6)} | ROI ${best.roi.toExponential(6)}`);
+   // ns.tprint(`➡️ Best action: ${best.desc} | cost ${Math.floor(best.cost).toLocaleString()} | est Δprod ${best.delta.toFixed(6)} | ROI ${best.roi.toExponential(6)}`);
 
     if (best.cost > availableCash) {
-    //  ns.tprint(`❌ Nicht genug Geld für die beste Aktion. Benötigt ${Math.floor(best.cost).toLocaleString()}, verfügbar ${Math.floor(availableCash).toLocaleString()}.`);
-      // Warte und wiederhole später
+    //  ns.tprint(`❌ Not enough money for the best action. Required ${Math.floor(best.cost).toLocaleString()}, available ${Math.floor(availableCash).toLocaleString()}.`);
+      // Wait and retry later
       await ns.sleep(loopDelayMs);
       continue;
     }
 
-    // Aktion ausführen (mit Prüfung, ob jeweilige Funktion existiert)
+    // Execute action (check whether the respective function exists)
     let success = false;
     try {
       switch (best.type) {
         case "purchase":
           if (typeof ns.hacknet.purchaseNode === "function") {
             success = ns.hacknet.purchaseNode();
-            ns.tprint(success ? `✅ Neuer Node gekauft.` : `❌ Kauf fehlgeschlagen.`);
-          } else ns.tprint("❌ purchaseNode nicht verfügbar.");
+            ns.tprint(success ? `✅ New node purchased.` : `❌ Purchase failed.`);
+          } else ns.tprint("❌ purchaseNode not available.");
           break;
         case "level":
           if (typeof ns.hacknet.upgradeLevel === "function") {
             success = ns.hacknet.upgradeLevel(best.index, 1);
-            ns.tprint(success ? `✅ Node ${best.index} Level+1` : `❌ Level-Upgrade fehlgeschlagen (Node ${best.index}).`);
-          } else ns.tprint("❌ upgradeLevel nicht verfügbar.");
+            ns.tprint(success ? `✅ Node ${best.index} level+1` : `❌ Level upgrade failed (node ${best.index}).`);
+          } else ns.tprint("❌ upgradeLevel not available.");
           break;
         case "ram":
           if (typeof ns.hacknet.upgradeRam === "function") {
             success = ns.hacknet.upgradeRam(best.index, 1);
-            ns.tprint(success ? `✅ Node ${best.index} RAM upgrade` : `❌ RAM-Upgrade fehlgeschlagen (Node ${best.index}).`);
-          } else ns.tprint("❌ upgradeRam nicht verfügbar.");
+            ns.tprint(success ? `✅ Node ${best.index} RAM upgrade` : `❌ RAM upgrade failed (node ${best.index}).`);
+          } else ns.tprint("❌ upgradeRam not available.");
           break;
         case "cores":
           if (typeof ns.hacknet.upgradeCore === "function") {
             success = ns.hacknet.upgradeCore(best.index, 1);
-            ns.tprint(success ? `✅ Node ${best.index} Cores+1` : `❌ Core-Upgrade fehlgeschlagen (Node ${best.index}).`);
-          } else ns.tprint("❌ upgradeCore nicht verfügbar.");
+            ns.tprint(success ? `✅ Node ${best.index} cores+1` : `❌ Core upgrade failed (node ${best.index}).`);
+          } else ns.tprint("❌ upgradeCore not available.");
           break;
         case "cache":
           if (typeof ns.hacknet.upgradeCache === "function") {
             success = ns.hacknet.upgradeCache(best.index, 1);
-            ns.tprint(success ? `✅ Node ${best.index} Cache+1` : `❌ Cache-Upgrade fehlgeschlagen (Node ${best.index}).`);
-          } else ns.tprint("❌ upgradeCache nicht verfügbar.");
+            ns.tprint(success ? `✅ Node ${best.index} cache+1` : `❌ Cache upgrade failed (node ${best.index}).`);
+          } else ns.tprint("❌ upgradeCache not available.");
           break;
         default:
-          ns.tprint("❌ Unbekannte Aktion: " + best.type);
+          ns.tprint("❌ Unknown action: " + best.type);
       }
     } catch (e) {
-      ns.tprint("❌ Fehler beim Ausführen der Aktion: " + String(e));
+      ns.tprint("❌ Error executing action: " + String(e));
       success = false;
     }
 
-    if (success) ns.tprint("ℹ️ Aktion erfolgreich ausgeführt.");
-   // else ns.tprint("ℹ️ Aktion konnte nicht ausgeführt werden (vermutlich Race-Condition oder fehlende Mittel).");
+    if (success) ns.tprint("ℹ️ Action executed successfully.");
+   // else ns.tprint("ℹ️ Action could not be executed (probably race condition or insufficient funds).");
 
-    // Warte vor dem nächsten Durchlaufkkkk
+    // Wait before the next pass
     await ns.sleep(loopDelayMs);
   }
 }

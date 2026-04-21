@@ -1,4 +1,4 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  ns.renamePurchasedServer("MeinServer_01", "MeinServer_1")
+  ns.renamePurchasedServer("MyServer_01", "MyServer_1")
 }

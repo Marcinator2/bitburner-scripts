@@ -1,5 +1,5 @@
-// STATUSS: Legacy-Hacking-Manager. Aktuell nicht vom main_manager referenziert.
-// Nur behalten fuer Vergleich oder Rueckgriff, neue Hacking-Logik in auto-hack-manager.js pflegen.
+// STATUS: Legacy hacking manager. Not currently referenced by main_manager.
+// Kept for comparison or fallback; maintain new hacking logic in auto-hack-manager.js.
 /** @param {NS} ns */
 
 //dd1
@@ -10,11 +10,11 @@ export async function main(ns) {
   const WORKERS = ["v_hack.js", "v_grow.js", "v_weaken.js"];
   const LOOP_DELAY = 10000;
   const SECURITY_MARGIN = 3;
-  const MONEY_RATIO = 0.2; //ab hier wird gegrowt
+  const MONEY_RATIO = 0.2; // grow below this threshold
   const MIN_RAM_TO_RUN = 1;
 
   if (!WORKERS.every(script => ns.fileExists(script, "home"))) {
-    print("❌ Fehlende Worker-Skripte auf home. Bitte lege v_hack.js, v_grow.js und v_weaken.js auf home ab.");
+    print("❌ Missing worker scripts on home. Please place v_hack.js, v_grow.js and v_weaken.js on home.");
     return;
   }
 
@@ -81,7 +81,7 @@ export async function main(ns) {
 
     if (portToolsCount() >= ns.getServerNumPortsRequired(host)) {
       ns.nuke(host);
-      print(`🔓 Nuke erfolgreich: ${host}`);
+      ns.tprint(`🔓 Nuke successful: ${host}`);
       return true;
     }
     return false;
@@ -122,7 +122,7 @@ export async function main(ns) {
     if (threads <= 0) return false;
     const pid = ns.exec(script, host, threads, target, 0);
     if (pid > 0) {
-      ns.tprint(`🚀 ${script} auf ${host} gestartet: ${threads} Threads für ${target}`);
+      ns.tprint(`🚀 ${script} started on ${host}: ${threads} threads for ${target}`);
       return true;
     }
     return false;
@@ -145,21 +145,21 @@ export async function main(ns) {
 
     const targets = chooseTargets(servers, 3);
     if (targets.length === 0) {
-      print("ℹ️ Keine geeigneten Ziele gefunden. Scanne erneut...");
+      print("ℹ️ No suitable targets found. Rescanning...");
       await ns.sleep(LOOP_DELAY);
       continue;
     }
 
     const runners = findRunners(servers);
     if (runners.length === 0) {
-      print("⚠️ Keine freien Runner mit verfügbarer RAM gefunden.");
+      print("⚠️ No free runners with available RAM found.");
       await ns.sleep(LOOP_DELAY);
       continue;
     }
 
     for (const runner of runners) {
       if (!await ensureWorkerScripts(runner)) {
-        print(`❌ Worker-Skripte konnten nicht nach ${runner} kopiert werden.`);
+        print(`❌ Worker scripts could not be copied to ${runner}.`);
         continue;
       }
 

@@ -1,16 +1,16 @@
-// STATUS: Einfacher Legacy-Worker fuer ein einzelnes Target.
-// Wird derzeit von keinem Manager gestartet; produktive Batch-Worker sind v_hack.js, v_grow.js und v_weaken.js.
+// STATUS: Simple legacy worker for a single target.
+// Not currently started by any manager; the active batch workers are v_hack.js, v_grow.js, and v_weaken.js.
 /** @param {NS} ns */
 export async function main(ns) {
   const target = String(ns.args[0] ?? "");
 
   if (!target) {
-    ns.tprint("Nutzung: run hack-worker.js <target>");
+    ns.tprint("Usage: run hack-worker.js <target>");
     return;
   }
 
   if (!ns.hasRootAccess(target)) {
-    ns.tprint(`Kein Root auf ${target}. Script beendet.`);
+    ns.tprint(`No root access on ${target}. Script terminated.`);
     return;
   }
 

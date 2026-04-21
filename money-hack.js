@@ -3,31 +3,31 @@ export async function main(ns) {
   let target = ns.args[0];
   const pct_maxMoney = 0.9;
 
-  // Sicherheitscheck: Falls kein Argument übergeben wurde
+  // Safety check: no argument was passed
   if (!target) {
-    ns.tprint("Fehler: Kein Ziel-Server angegeben!");
+    ns.tprint("Error: No target server specified!");
     return;
   }
 
   const target_skill_level = ns.getServerRequiredHackingLevel(target);
   if (target_skill_level > ns.getHackingLevel()) {
-    ns.tprint("Skilllevel von Server zu hoch!");
+    ns.tprint("Server skill level too high!");
     return;
   }
 
-  // MaxMoney korrekt ermitteln und Script beenden, falls 0
+  // Determine maxMoney correctly and stop script if 0
   const targetMaxMoney = ns.getServerMaxMoney(target);
   const targetMaxRam = ns.getServerMaxRam(target);
 
   if (targetMaxMoney === 0 && targetMaxRam > 0) {
-    ns.tprint(`Info: Ziel ${target} hat maxMoney = 0. Script wird beendet und RAM geteilt.`);
+    ns.tprint(`Info: Target ${target} has maxMoney = 0. Script ending and sharing RAM.`);
     ns.scriptKill("share-ram.js", ns.getHostname());
     await ns.scp("share-ram.js", target);
     ns.exec("share-ram.js", target, 1);
     return;
   }
 
-  // Dynamische Grenzwerte
+  // Dynamic thresholds
   const moneyThreshold = targetMaxMoney * pct_maxMoney;
   const minSec = ns.getServerMinSecurityLevel(target);
   const maxSec = minSec + 5;

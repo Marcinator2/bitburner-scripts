@@ -16,12 +16,12 @@ export async function main(ns) {
   ns.disableLog("read");
 
   if (!Number.isFinite(sampleMs) || sampleMs < 1000) {
-    ns.tprint("Fehler: sampleMs muss mindestens 1000 sein.");
+    ns.tprint("Error: sampleMs must be at least 1000.");
     return;
   }
 
   if (!Number.isFinite(maxSamples) || maxSamples < 2) {
-    ns.tprint("Fehler: maxSamples muss mindestens 2 sein.");
+    ns.tprint("Error: maxSamples must be at least 2.");
     return;
   }
 
@@ -67,7 +67,7 @@ function loadHistory(ns, file) {
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.samples)) {
-      throw new Error("ungueltiges Format");
+      throw new Error("invalid format");
     }
 
     return {
@@ -77,7 +77,7 @@ function loadHistory(ns, file) {
       samples: parsed.samples,
     };
   } catch {
-    ns.print(`Warnung: ${file} konnte nicht gelesen werden. Historie wird neu aufgebaut.`);
+    ns.print(`Warning: ${file} could not be read. History will be rebuilt.`);
     return {
       version: 1,
       sampleMs: DEFAULT_SAMPLE_MS,

@@ -1,7 +1,7 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  const ziel  = ns.args[0];
+  const target = ns.args[0];
   const delay = ns.args[1] || 0;
   if (delay > 0) await ns.sleep(delay);
-  await ns.hack(ziel, { stock: true });
+  await ns.hack(target, { stock: true });
 }

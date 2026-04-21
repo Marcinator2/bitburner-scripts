@@ -1,20 +1,20 @@
 /** @param {NS} ns */
 
 // manager_backdoor.js
-// Installiert Backdoors auf allen erreichbaren Servern (benötigt Singularity SF4).
-// Läuft als eigenständiger Service – blockiert nicht den Hack-Manager.
+// Installs backdoors on all reachable servers (requires Singularity SF4).
+// Runs as a standalone service – does not block the hack manager.
 
 export async function main(ns) {
   ns.disableLog("ALL");
 
   if (typeof ns.singularity?.installBackdoor !== "function") {
-    ns.tprint("FEHLER: Singularity API nicht verfügbar (SF4 benötigt).");
+    ns.tprint("ERROR: Singularity API not available (SF4 required).");
     return;
   }
 
-  const LOOP_DELAY_MS = 30_000; // Pause zwischen vollständigen Durchläufen
+  const LOOP_DELAY_MS = 30_000; // Pause between full passes
 
-  /** BFS-Pfad von 'home' zu 'target' */
+  /** BFS path from 'home' to 'target' */
   function findPath(target) {
     const parent = new Map([["home", null]]);
     const queue = ["home"];
@@ -33,7 +33,7 @@ export async function main(ns) {
     return null;
   }
 
-  /** Alle Server per BFS */
+  /** All servers via BFS */
   function scanAll() {
     const found = new Set(["home"]);
     const queue = ["home"];
@@ -49,20 +49,20 @@ export async function main(ns) {
     const allServers = scanAll();
     const hackLevel = ns.getHackingLevel();
 
-    // Kandidaten: Root-Access, Hack-Level ok, noch kein Backdoor, kein eigener Server
+    // Candidates: root access, hack level ok, no backdoor yet, not a player server
     const candidates = allServers.filter(s =>
       s !== "home"
-      && !s.startsWith("MeinServer_")
+      && !s.startsWith("MyServer_")
       && ns.hasRootAccess(s)
       && ns.getServerRequiredHackingLevel(s) <= hackLevel
       && !ns.getServer(s).backdoorInstalled
     );
 
-    // Kürzeste Hack-Zeit zuerst → minimale Wartezeit
+    // Shortest hack time first → minimize wait time
     candidates.sort((a, b) => ns.getHackTime(a) - ns.getHackTime(b));
 
     ns.clearLog();
-    ns.print(`[Backdoor] ${candidates.length} Server offen. Starte...`);
+    ns.print(`[Backdoor] ${candidates.length} servers open. Starting...`);
 
     for (const target of candidates) {
       const path = findPath(target);
@@ -70,22 +70,22 @@ export async function main(ns) {
 
       try {
         for (const hop of path.slice(1)) ns.singularity.connect(hop);
-        ns.print(`[Backdoor] Installiere auf: ${target} (${ns.tFormat(ns.getHackTime(target))})`);
+        ns.print(`[Backdoor] Installing on: ${target} (${ns.tFormat(ns.getHackTime(target))})`);
         await ns.singularity.installBackdoor();
         ns.print(`[Backdoor] ✓ ${target}`);
       } catch (e) {
-        ns.print(`[Backdoor] Fehler bei ${target}: ${e}`);
+        ns.print(`[Backdoor] Error on ${target}: ${e}`);
       } finally {
         try { ns.singularity.connect("home"); } catch (_) {}
       }
     }
 
     const done = allServers.filter(s =>
-      s !== "home" && !s.startsWith("MeinServer_") && ns.getServer(s).backdoorInstalled
+      s !== "home" && !s.startsWith("MyServer_") && ns.getServer(s).backdoorInstalled
     ).length;
     ns.clearLog();
-    ns.print(`[Backdoor] Fertig. Installiert: ${done} | Offen: ${candidates.length}`);
-    ns.print(`[Backdoor] Nächster Durchlauf in ${LOOP_DELAY_MS / 1000}s`);
+    ns.print(`[Backdoor] Done. Installed: ${done} | Open: ${candidates.length}`);
+    ns.print(`[Backdoor] Next pass in ${LOOP_DELAY_MS / 1000}s`);
 
     await ns.sleep(LOOP_DELAY_MS);
   }

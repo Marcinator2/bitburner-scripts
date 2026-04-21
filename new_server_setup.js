@@ -1,7 +1,7 @@
 /** @param {NS} ns */
 export async function main(ns) {
-  // Lese Argument (Servername) aus
-  const server = ns.args[0] || "MeinServer_0";
+  // Read argument (server name)
+  const server = ns.args[0] || "MyServer_0";
   const hackScript = ([
     "money-hack.js", 
     "share-ram.js", 
@@ -12,16 +12,16 @@ export async function main(ns) {
     "v_weaken.js" 
 ]);
 
-  ns.tprint(`Setup läuft für: ${server}`);
+  ns.tprint(`Setup running for: ${server}`);
 
-  // Kopiere das Script von home auf den neuen Server
+  // Copy scripts from home to the new server
   const ok = await ns.scp(hackScript, server);
   if (!ok) {
-    ns.tprint(`❌ scp fehlgeschlagen: ${hackScript} -> ${server}`);
+    ns.tprint(`❌ scp failed: ${hackScript} -> ${server}`);
     return;
   }
 
-  // Berechne freien RAM auf Zielserver
+  // Calculate free RAM on target server
   const freeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
   const scriptCost = ns.getScriptRam(hackScript[0], server);
   const threads = Math.floor(freeRam / scriptCost);
@@ -31,14 +31,14 @@ export async function main(ns) {
 /*
   if (threads > 0) {
     ns.exec("profit-check.js", server)
-    const pid = ns.exec(hackScript[0], server, threads, server); // du kannst server noch als arg an das hackScript übergeben
-    if (pid > 0) ns.tprint(`🚀 ${hackScript[0]} auf ${server} gestartet (Threads: ${threads}, pid: ${pid})`);
+    const pid = ns.exec(hackScript[0], server, threads, server); // you can also pass server as an arg to the hackScript
+    if (pid > 0) ns.tprint(`🚀 ${hackScript[0]} started on ${server} (Threads: ${threads}, pid: ${pid})`);
     
-    else ns.tprint(`⚠️ Exec fehlgeschlagen auf ${server} (Threads berechnet: ${threads})`);
+    else ns.tprint(`⚠️ Exec failed on ${server} (threads calculated: ${threads})`);
   } 
   
   else {
-    ns.tprint(`⚠️ Nicht genug freier RAM auf ${server} für ${hackScript[0]}`);
+    ns.tprint(`⚠️ Not enough free RAM on ${server} for ${hackScript[0]}`);
   }
   */
 }

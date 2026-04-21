@@ -31,7 +31,7 @@ const DEFAULT_TRAINER_STATS = {
 
 export async function main(ns) {
   if (!ns.singularity) {
-    ns.tprint("Fehler: Singularity API nicht verfuegbar. Benoetigt Source-File 4.");
+    ns.tprint("Error: Singularity API not available. Requires Source-File 4.");
     return;
   }
 
@@ -52,7 +52,7 @@ export async function main(ns) {
     if (!bestCrime) {
       ns.print("NEGATIVE KARMA");
       ns.print("");
-      ns.print("Kein passendes Crime mit Karma gefunden.");
+      ns.print("No suitable crime with karma found.");
       await ns.sleep(CHECK_INTERVAL_MS);
       continue;
     }
@@ -252,13 +252,13 @@ function printStatus(ns, crime, trainingMode) {
   const chancePct = (crime.chance * 100).toFixed(1);
   const statsText = crime.trainingStats.length > 0
     ? crime.trainingStats.map(stat => stat.slice(0, 3).toUpperCase()).join(", ")
-    : "keine";
+    : "none";
 
   ns.print("NEGATIVE KARMA");
   ns.print("");
   ns.print(`Crime: ${crime.type}`);
   ns.print(`Karma/s: ${crime.karmaPerSecond.toFixed(3)}`);
   ns.print(`Chance: ${chancePct}%`);
-  ns.print(`Mode: ${trainingMode ? "Trainiere fuer 90%" : "Farme Crime"}`);
-  ns.print(`Trainer-Stats: ${statsText}`);
+  ns.print(`Mode: ${trainingMode ? "Training for 90%" : "Farming Crime"}`);
+  ns.print(`Trainer Stats: ${statsText}`);
 }

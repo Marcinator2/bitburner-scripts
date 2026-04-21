@@ -19,7 +19,7 @@ const SERVICE_KEY = "combatTrainer";
 
 export async function main(ns) {
   if (!ns.singularity) {
-    ns.tprint("Fehler: Singularity API nicht verfuegbar. Benoetigt Source-File 4.");
+    ns.tprint("Error: Singularity API not available. Requires Source-File 4.");
     return;
   }
 
@@ -50,7 +50,7 @@ export async function main(ns) {
       }
 
       ns.print("");
-      ns.print("Keine Combat-Stats ausgewaehlt. Warte auf Aenderung...");
+      ns.print("No combat stats selected. Waiting for change...");
       await ns.sleep(CHECK_INTERVAL_MS);
       continue;
     }
@@ -58,7 +58,7 @@ export async function main(ns) {
     if (currentStat !== nextStat) {
       const started = startTraining(ns, trainerConfig, nextStat, gymChoice, universityChoice);
       if (!started) {
-        ns.print(`Fehler: Training fuer ${nextStat} konnte nicht gestartet werden.`);
+        ns.print(`Error: Training for ${nextStat} could not be started.`);
         await ns.sleep(CHECK_INTERVAL_MS);
         continue;
       }
@@ -179,7 +179,7 @@ function printStatus(ns, skills, trainerConfig, selectedStats, currentStat, gymC
   ns.print(`Uni-Wahl: ${universityChoice.reason}`);
   ns.print(`Focus: ${trainerConfig.focus ? "ON" : "OFF"}`);
   ns.print("");
-  ns.print(`Aktive Stats: ${selectedStats.length > 0 ? selectedStats.map(formatStatName).join(", ") : "keine"}`);
+  ns.print(`Active stats: ${selectedStats.length > 0 ? selectedStats.map(formatStatName).join(", ") : "none"}`);
   ns.print(`Aktuell: ${currentStat ? formatStatName(currentStat) : "idle"}`);
   ns.print("");
 

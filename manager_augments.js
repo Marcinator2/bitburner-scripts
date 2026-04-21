@@ -57,7 +57,7 @@ export async function main(ns) {
   ns.disableLog("ALL");
 
   if (!ns.singularity || typeof ns.singularity.getAugmentationsFromFaction !== "function") {
-    ns.tprint("FEHLER: Singularity API nicht verfügbar.");
+    ns.tprint("ERROR: Singularity API not available.");
     return;
   }
 
@@ -68,10 +68,10 @@ export async function main(ns) {
     const augConfig = getAugConfig(config);
     const loopMs = config.loopMs ?? 10000;
 
-    // Bereits besessene + in Warteschlange stehende Augments
+    // Already owned + queued augments
     const owned = new Set(ns.singularity.getOwnedAugmentations(true));
 
-    // Pro Augment: Faction mit höchstem Rep ermitteln
+    // Per augment: find faction with highest rep
     const augFactionMap = new Map(); // augName → { faction, rep }
     for (const faction of ns.getPlayer().factions) {
       let factionRep;
@@ -92,13 +92,13 @@ export async function main(ns) {
       }
     }
 
-    // Kandidaten klassifizieren und filtern
+    // Classify and filter candidates
     const candidates = [];
     for (const [aug, { faction, rep }] of augFactionMap) {
       const stats = ns.singularity.getAugmentationStats(aug);
       const cats = classifyAugment(stats);
 
-      // Unkategorisiert → immer kaufen (z.B. reine Intelligence-Augments)
+      // Uncategorized → always buy (e.g. pure Intelligence augments)
       const isWanted = cats.size === 0 || [...cats].some(c => augConfig.categories[c]);
       if (!isWanted) continue;
 
@@ -109,21 +109,21 @@ export async function main(ns) {
       candidates.push({ name: aug, faction, rep, repReq, price, prereqs, cats });
     }
 
-    // Teuerste zuerst kaufen (senkt Gesamtkosten wegen 1.9× Preiseskalation)
+    // Buy most expensive first (reduces total cost due to 1.9× price escalation)
     candidates.sort((a, b) => b.price - a.price);
 
     const bought   = [];
     const pending  = [];
 
     for (const aug of candidates) {
-      // Voraussetzungen prüfen
+      // Check prerequisites
       const missingPrereq = aug.prereqs.find(p => !owned.has(p));
       if (missingPrereq) {
         pending.push({ ...aug, reason: `prereq:${missingPrereq}` });
         continue;
       }
 
-      // Aktuellen Preis abfragen (steigt nach jedem Kauf um Faktor 1.9)
+      // Query current price (rises by factor 1.9 after each purchase)
       const currentPrice = ns.singularity.getAugmentationPrice(aug.name);
       const currentRep   = ns.singularity.getFactionRep(aug.faction);
       const money        = ns.getPlayer().money;
@@ -139,18 +139,18 @@ export async function main(ns) {
       }
 
       if (ns.singularity.purchaseAugmentation(aug.faction, aug.name)) {
-        owned.add(aug.name); // für nachfolgende Prereq-Checks
+        owned.add(aug.name); // for subsequent prereq checks
         bought.push(aug.name);
-        ns.print(`KAUF: ${aug.name} (${aug.faction}) – ${ns.formatNumber(currentPrice)}$`);
+        ns.print(`BUY: ${aug.name} (${aug.faction}) – ${ns.formatNumber(currentPrice)}$`);
       } else {
         pending.push({ ...aug, price: currentPrice, reason: "failed" });
       }
     }
 
-    // Status ausgeben
+    // Output status
     ns.clearLog();
     if (bought.length > 0) {
-      ns.print(`[KAUF x${bought.length}] ${bought.join(", ")}`);
+      ns.print(`[BUY x${bought.length}] ${bought.join(", ")}`);
     }
 
     const repPending    = pending.filter(p => p.reason === "rep");
@@ -158,20 +158,20 @@ export async function main(ns) {
     const prereqPending = pending.filter(p => p.reason.startsWith("prereq"));
 
     ns.print(
-      `[STATUS] Owned: ${owned.size} | Offen: ${pending.length}` +
-      ` (Rep: ${repPending.length}, Geld: ${moneyPending.length}, Prereq: ${prereqPending.length})`
+      `[STATUS] Owned: ${owned.size} | Pending: ${pending.length}` +
+      ` (Rep: ${repPending.length}, Money: ${moneyPending.length}, Prereq: ${prereqPending.length})`
     );
 
     if (moneyPending.length > 0) {
-      // Günstigstes Ausstehende = letzte in absteigend-sortierter Liste
+      // Cheapest pending = last in descending sorted list
       const next = moneyPending[moneyPending.length - 1];
-      ns.print(`[NÄCHST] ${next.name} – ${ns.formatNumber(next.price)}$ (${next.faction})`);
+      ns.print(`[NEXT] ${next.name} – ${ns.formatNumber(next.price)}$ (${next.faction})`);
     }
 
     if (repPending.length > 0) {
       const nearest = [...repPending].sort((a, b) => a.repReq - b.repReq)[0];
       const missing = Math.max(0, nearest.repReq - nearest.rep);
-      ns.print(`[REP] ${nearest.name} – noch ${ns.formatNumber(missing)} Rep (${nearest.faction})`);
+      ns.print(`[REP] ${nearest.name} – still ${ns.formatNumber(missing)} Rep needed (${nearest.faction})`);
     }
 
   // Rep-Farming
@@ -182,30 +182,30 @@ export async function main(ns) {
 }
 
 /**
- * Wählt die Fraktion mit den meisten ausstehenden (rep-blockierten) Augments
- * und startet Fraktionsarbeit für sie. Stoppt wenn alle Augments dieser
- * Fraktion kaufbar sind.
+ * Selects the faction with the most pending (rep-blocked) augments
+ * and starts faction work for it. Stops when all augments of that
+ * faction are purchasable.
  */
 function manageRepFarming(ns, augConfig, repPending, allCandidates) {
   if (!augConfig.repFarming) {
-    // Farming deaktiviert – nichts tun
+    // Farming disabled – do nothing
     return;
   }
 
   if (repPending.length === 0) {
-    // Kein Rep-Bedarf mehr – laufende Fraktionsarbeit stoppen falls aktiv
+    // No more rep needed – stop running faction work if active
     try {
       const work = ns.singularity.getCurrentWork();
       if (work && work.type === "FACTION") {
         ns.singularity.stopAction();
-        ns.print("[REP-FARM] Alle Augments kaufbar – Arbeit gestoppt.");
+        ns.print("[REP-FARM] All augments purchasable – work stopped.");
       }
     } catch (_) {}
     return;
   }
 
-  // Fraktion mit den meisten rep-blockierten Augments wählen
-  // Gang-Fraktion ausschließen (keine Arbeit möglich während man eine Gang hat)
+  // Select faction with the most rep-blocked augments
+  // Exclude gang faction (no work possible while in a gang)
   let gangFaction = null;
   try {
     if (ns.gang) gangFaction = ns.gang.getGangInformation().faction;
@@ -216,7 +216,7 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
     : repPending;
 
   if (validPending.length === 0) {
-    ns.print(`[REP-FARM] Alle rep-blockierten Augments gehören zur Gang-Fraktion (${gangFaction}) – übersprungen.`);
+    ns.print(`[REP-FARM] All rep-blocked augments belong to the gang faction (${gangFaction}) – skipped.`);
     return;
   }
 
@@ -227,25 +227,25 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
   const targetFaction = [...factionCount.entries()]
     .sort((a, b) => b[1] - a[1])[0][0];
 
-  // Prüfen ob bereits für diese Fraktion gearbeitet wird
+  // Check if already working for this faction
   try {
     const work = ns.singularity.getCurrentWork();
     if (work && work.type === "FACTION" && work.factionName === targetFaction) {
-      ns.print(`[REP-FARM] Arbeite für ${targetFaction} (${factionCount.get(targetFaction)} Augments)`);
+      ns.print(`[REP-FARM] Working for ${targetFaction} (${factionCount.get(targetFaction)} augments)`);
       return;
     }
   } catch (_) {}
 
-  // Besten verfügbaren Arbeitstyp bestimmen (Hacking > Field > Security)
+  // Determine best available work type (Hacking > Field > Security)
   const started =
     tryFactionWork(ns, targetFaction, "hacking") ||
     tryFactionWork(ns, targetFaction, "field") ||
     tryFactionWork(ns, targetFaction, "security");
 
   if (started) {
-    ns.print(`[REP-FARM] Gestartet: ${targetFaction} (${factionCount.get(targetFaction)} Augments offen)`);
+    ns.print(`[REP-FARM] Started: ${targetFaction} (${factionCount.get(targetFaction)} augments open)`);
   } else {
-    ns.print(`[REP-FARM] Konnte keine Arbeit für ${targetFaction} starten.`);
+    ns.print(`[REP-FARM] Could not start work for ${targetFaction}.`);
   }
 }
 

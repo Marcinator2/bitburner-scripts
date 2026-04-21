@@ -44,7 +44,7 @@ function renderDashboard(ns, file) {
   if (!history || history.samples.length < 2) {
     ns.print("PLAYER STATS");
     ns.print("");
-    ns.print(`Keine ausreichenden Daten in ${file}.`);
+    ns.print(`Insufficient data in ${file}.`);
     ns.print("Starte zuerst den Worker:");
     ns.print("run player_stats_worker.js");
     return;
@@ -81,7 +81,7 @@ function renderDashboard(ns, file) {
   printTrendTable(ns, samples);
   ns.print("");
 
-  ns.print("Kampfstats im Fenster:");
+  ns.print("Combat stats in window:");
   printStatDelta(ns, "STR", first.skills.strength, last.skills.strength);
   printStatDelta(ns, "DEF", first.skills.defense, last.skills.defense);
   printStatDelta(ns, "DEX", first.skills.dexterity, last.skills.dexterity);
@@ -89,11 +89,11 @@ function renderDashboard(ns, file) {
   printStatDelta(ns, "CHA", first.skills.charisma, last.skills.charisma);
   ns.print("");
 
-  printChartSection(ns, "Geldverlauf", samples, sample => sample.money, value => ns.formatNumber(value));
-  printChartSection(ns, "Hack-XP Verlauf", samples, sample => sample.exp.hacking, value => ns.formatNumber(value));
-  printChartSection(ns, "Combat Avg Verlauf", samples, getAverageCombatLevel, value => value.toFixed(1));
-  printChartSection(ns, "STR Verlauf", samples, sample => sample.skills.strength, value => value.toFixed(0));
-  printChartSection(ns, "DEX Verlauf", samples, sample => sample.skills.dexterity, value => value.toFixed(0));
+  printChartSection(ns, "Money trend", samples, sample => sample.money, value => ns.formatNumber(value));
+  printChartSection(ns, "Hack XP trend", samples, sample => sample.exp.hacking, value => ns.formatNumber(value));
+  printChartSection(ns, "Combat Avg trend", samples, getAverageCombatLevel, value => value.toFixed(1));
+  printChartSection(ns, "STR trend", samples, sample => sample.skills.strength, value => value.toFixed(0));
+  printChartSection(ns, "DEX trend", samples, sample => sample.skills.dexterity, value => value.toFixed(0));
 }
 
 function loadHistory(ns, file) {
@@ -125,7 +125,7 @@ function printTrendTable(ns, samples) {
   for (const window of TREND_WINDOWS) {
     const windowSamples = getSamplesForWindow(samples, window.seconds);
     if (windowSamples.length < 2) {
-      ns.print(`${padRight(window.label, 6)} nicht genug Daten`);
+      ns.print(`${padRight(window.label, 6)} not enough data`);
       continue;
     }
 

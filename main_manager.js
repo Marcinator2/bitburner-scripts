@@ -13,7 +13,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: true,
     args: [],
-    description: "Zentraler Hacking-Manager",
+    description: "Central hacking manager",
     shouldRun: () => true,
   },
   {
@@ -23,7 +23,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [],
-    description: "Hacknet-Verwaltung",
+    description: "Hacknet management",
     shouldRun: ns => Boolean(ns.hacknet && typeof ns.hacknet.numNodes === "function"),
   },
   {
@@ -33,7 +33,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [],
-    description: "Aktien-Manager",
+    description: "Stock manager",
     shouldRun: ns => Boolean(
       ns.stock && (
         typeof ns.stock.buyStock === "function" ||
@@ -49,7 +49,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [],
-    description: "Gang-Manager",
+    description: "Gang manager",
     shouldRun: ns => Boolean(ns.gang && typeof ns.gang.inGang === "function" && ns.gang.inGang()),
   },
   {
@@ -59,7 +59,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [DEFAULT_CONFIG_FILE],
-    description: "Farmt negatives Karma und trainiert bis 90% Crime-Chance",
+    description: "Farms negative karma and trains until 90% crime chance",
     shouldRun: ns => Boolean(ns.singularity),
   },
   {
@@ -69,7 +69,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [],
-    description: "Kauft Programme automatisch",
+    description: "Purchases programs automatically",
     shouldRun: ns => typeof ns.purchaseProgram === "function",
   },
   {
@@ -79,7 +79,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [DEFAULT_CONFIG_FILE, false, "Leadership"],
-    description: "Trainiert ausgewaehlte Stats dauerhaft, inklusive Charisma",
+    description: "Trains selected stats continuously, including Charisma",
     shouldRun: ns => Boolean(ns.singularity),
   },
   {
@@ -89,7 +89,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: true,
     args: ["player_stats_data.txt", 10000, 360],
-    description: "Sammelt Player-Stat-Historie",
+    description: "Collects player stat history",
     shouldRun: () => true,
   },
   {
@@ -99,7 +99,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: true,
     args: ["player_stats_data.txt"],
-    description: "Zeigt Player-Stat-Dashboard",
+    description: "Shows player stat dashboard",
     shouldRun: () => true,
   },
   {
@@ -109,7 +109,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: true,
     args: [],
-    description: "Einmalige Uebersicht, standardmaessig aus",
+    description: "One-time overview, off by default",
     shouldRun: () => false,
   },
   {
@@ -119,7 +119,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [DEFAULT_CONFIG_FILE],
-    description: "Kauft Augmentationen automatisch (Hacking/Kampf/Hacknet/Bladeburner/Charisma)",
+    description: "Buys augmentations automatically (Hacking/Combat/Hacknet/Bladeburner/Charisma)",
     shouldRun: ns => Boolean(ns.singularity),
   },
   {
@@ -129,7 +129,7 @@ const SERVICE_DEFINITIONS = [
     threads: 1,
     enabled: false,
     args: [],
-    description: "Installiert Backdoors auf allen erreichbaren Servern",
+    description: "Installs backdoors on all reachable servers",
     shouldRun: ns => Boolean(ns.singularity),
   },
 ];
@@ -189,7 +189,7 @@ function supervise(ns, configFile, runOnce) {
     state.startedPid = pid;
     state.running = pid > 0;
     if (pid <= 0) {
-      state.error = "Start fehlgeschlagen";
+      state.error = "Start failed";
     }
   }
 
@@ -197,7 +197,7 @@ function supervise(ns, configFile, runOnce) {
 
   if (!runOnce) {
     ns.print("");
-    ns.print(`Naechste Pruefung in ${Math.floor(config.loopMs / 1000)}s`);
+    ns.print(`Next check in ${Math.floor(config.loopMs / 1000)}s`);
   }
 
   return config;
@@ -217,7 +217,7 @@ function inspectServices(ns, config) {
       running,
       startedPid: 0,
       stopped: false,
-      error: scriptExists ? "" : "Script fehlt",
+      error: scriptExists ? "" : "Script missing",
     };
   });
 }

@@ -1,27 +1,27 @@
-// STATUS: Test-/Duplikat-Skript von find-server.js.
-// Fuer produktive Nutzung find-server.js verwenden; Aenderungen nur dort pflegen.
+// STATUS: Test/duplicate script of find-server.js.
+// Use find-server.js for production use; keep changes there only.
 /** @param {NS} ns */
 export async function main(ns) {
-  // ns.args[0] ist das erste Wort nach dem Skriptnamen
+  // ns.args[0] is the first word after the script name
   const target = ns.args[0]; 
 
-  // Sicherheitscheck: Wurde überhaupt ein Argument übergeben?ttgg
+  // Safety check: was an argument actually passed?
   if (!target) {
-    ns.tprint("❌ Fehler: Bitte gib einen Zielserver an.");
-    ns.tprint("Beispiel: run find-server.js n00dles");
+    ns.tprint("❌ Error: Please specify a target server.");
+    ns.tprint("Example: run find-server.js n00dles");
     return;
   }
 
   let path = findPath(ns, "home", target);
 
   if (path) {
-    ns.tprint("🚀 Pfad zu " + target + " gefunden:");
+    ns.tprint("🚀 Path to " + target + " found:");
     ns.tprint(path.join(" -> "));
     
-    // Kleiner Bonus: Direkt den fertigen Befehl zum Kopieren ausgeben
+    // Bonus: directly output the finished command for copy-pasting
     ns.tprint("Terminal: connect " + path.slice(1).join("; connect "));
   } else {
-    ns.tprint("❌ Pfad zu " + target + " nicht gefunden. Tippfehler?");
+    ns.tprint("❌ Path to " + target + " not found. Typo?");
   }
 }
 

@@ -3,55 +3,55 @@ export async function main(ns) {
   const ram = sanitizeRam(ns.args[0], 2 ** 12);
   const skipPrompt = ns.args[1] === true || String(ns.args[1] || "").toLowerCase() === "true";
 
-  const servers = ns.getPurchasedServers().filter(s => s.startsWith("MeinServer_"));
+  const servers = ns.getPurchasedServers().filter(s => s.startsWith("MyServer_"));
   if (servers.length === 0) {
-    ns.tprint("Keine MeinServer_-Server gefunden.");
+    ns.tprint("No MyServer_ servers found.");
     return;
   }
 
   const plan = buildUpgradePlan(ns, servers, ram);
   if (plan.upgradable.length === 0) {
     if (plan.blockedDowngrades > 0) {
-      ns.tprint(`Ziel-RAM ${ns.formatRam(ram)} ist kleiner als bei ${plan.blockedDowngrades} vorhandenen Servern. Downgrade wird nicht ausgefuehrt.`);
+      ns.tprint(`Target RAM ${ns.formatRam(ram)} is smaller than ${plan.blockedDowngrades} existing servers. Downgrade will not be performed.`);
     }
-    ns.tprint(`Keine MeinServer_ koennen auf ${ns.formatRam(ram)} upgegradet werden.`);
+    ns.tprint(`No MyServer_ servers can be upgraded to ${ns.formatRam(ram)}.`);
     return;
   }
 
   if (plan.blockedDowngrades > 0) {
-    ns.tprint(`Hinweis: ${plan.blockedDowngrades} Server liegen bereits ueber ${ns.formatRam(ram)} und werden nicht verkleinert.`);
+    ns.tprint(`Note: ${plan.blockedDowngrades} servers already exceed ${ns.formatRam(ram)} and will not be downgraded.`);
   }
 
-  const gesamtKosten = plan.totalCost;
-  const spielerGeld  = ns.getPlayer().money;
+  const totalCost = plan.totalCost;
+  const playerMoney  = ns.getPlayer().money;
 
-  ns.tprint(`Gefundene Server: ${servers.join(", ")}`);
-  ns.tprint(`Gesamtkosten: ${ns.formatNumber(gesamtKosten)}$  |  Dein Geld: ${ns.formatNumber(spielerGeld)}$`);
+  ns.tprint(`Found servers: ${servers.join(", ")}`);
+  ns.tprint(`Total cost: ${ns.formatNumber(totalCost)}$  |  Your money: ${ns.formatNumber(playerMoney)}$`);
 
   if (!skipPrompt) {
-    const frage = `Alle ${plan.upgradable.length}/${servers.length} MeinServer_ auf ${ram} GB upgraden? Restgeld danach: ${ns.formatNumber(spielerGeld - gesamtKosten)}$`;
-    const antwort = await ns.prompt(frage, { type: "boolean" });
+    const question = `Upgrade all ${plan.upgradable.length}/${servers.length} MyServer_ to ${ram} GB? Remaining money after: ${ns.formatNumber(playerMoney - totalCost)}$`;
+    const answer = await ns.prompt(question, { type: "boolean" });
 
-    if (!antwort) {
-      ns.tprint("Kauf abgebrochen.");
+    if (!answer) {
+      ns.tprint("Upgrade cancelled.");
       return;
     }
   }
 
-  let erfolg = 0;
+  let success = 0;
   for (const entry of plan.upgradable) {
     const serverName = entry.serverName;
-    const kosten = entry.cost;
-    if (kosten > ns.getPlayer().money) {
-      ns.tprint(`[✗] ${serverName}: Nicht genug Geld (${ns.formatNumber(kosten)}$)`);
+    const cost = entry.cost;
+    if (cost > ns.getPlayer().money) {
+      ns.tprint(`[✗] ${serverName}: Not enough money (${ns.formatNumber(cost)}$)`);
       continue;
     }
     ns.upgradePurchasedServer(serverName, ram);
-    ns.tprint(`[✓] ${serverName} auf ${ram} GB upgradet.`);
-    erfolg++;
+    ns.tprint(`[✓] ${serverName} upgraded to ${ram} GB.`);
+    success++;
   }
 
-  ns.tprint(`Fertig: ${erfolg}/${plan.upgradable.length} Server upgradet.`);
+  ns.tprint(`Done: ${success}/${plan.upgradable.length} servers upgraded.`);
 }
 
 function buildUpgradePlan(ns, servers, ram) {
