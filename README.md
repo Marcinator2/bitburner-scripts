@@ -6,31 +6,44 @@ Project overview for the Bitburner scripts in this repository. This README docum
 
 This repository is not a single script but a small script system with three layers:
 
-1. `main_manager.js` as the central supervisor.
-2. Multiple managers for specific domains such as Hacking, Stocks, Gang, Hacknet, or Player Stats.
+1. `main_manager.js` as the central supervisor (or alternatively `manager_gui.js` as an in-game GUI front-end).
+2. Multiple managers for specific domains such as Hacking, Stocks, Gang, Hacknet, IPvGO, Augments, and Player Stats.
 3. Small worker and utility scripts that managers start or that can be executed for one-off tasks.
 
-The primary entry point for daily operation is currently `main_manager.js` together with `main_manager_config.txt`.
+The primary entry point for daily operation is `main_manager.js` together with `main_manager_config.js`.
 
 ## Architecture
 
 ### 1. Supervisor layer
 
 `main_manager.js`
-- reads `main_manager_config.txt`
+- reads `main_manager_config.js`
 - starts and monitors individual services via `ns.exec(...)`
 - separates activation (`enabled`), runtime parameters (`args`) and the start loop (`loopMs`)
+- uses `runtime_file_utils.js` (`ensureJsonFile`) to create or repair the config file on first run
 
 Known services:
 - `hack` -> `auto-hack-manager.js`
 - `hacknet` -> `manager_hacknet.js`
 - `stocks` -> `manager_stocks.js`
 - `gang` -> `manager_gang.js`
+- `negativeKarma` -> `manager_karma.js`
+- `crime` -> `manager_crime.js`
 - `programs` -> `auto-leveler.js`
 - `combatTrainer` -> `combat_stat_trainer.js`
+- `augments` -> `manager_augments.js`
+- `backdoor` -> `manager_backdoor.js`
+- `ipvgo` -> `manager_ipvgo.js`
 - `playerStatsWorker` -> `player_stats_worker.js`
 - `playerStatsView` -> `player_stats.js`
 - `overview` -> `overview.js`
+
+`manager_gui.js`
+- alternative front-end to `main_manager.js`
+- renders a draggable in-game HTML panel with toggle buttons for every service
+- also provides quick-access buttons for buying/upgrading servers and viewing server lists
+- reads and writes `main_manager_config.js`; imports helpers from `runtime_file_utils.js`, `manager_karma.js`, and `training_location_utils.js`
+- can start/stop `main_manager.js` directly from the panel
 
 ### 2. Manager layer
 
@@ -38,51 +51,84 @@ Known services:
 - scans the network via BFS
 - attempts to obtain root access on reachable servers
 - distinguishes between targets and runners
-- deploys `v_hack.js`, `v_grow.js`, `v_weaken.js` in batches to available hosts
+- deploys `v_hack.js`, `v_grow.js`, `v_weaken.js` in HWGW batches to available hosts
 - reserves RAM deliberately on `home` and on purchased `MyServer_*` hosts
-- additionally starts `share-ram.js` on purchased servers
+- starts `share-ram.js` on runners with spare RAM
+- optionally buys port-opener programs via Singularity API (SF4)
 
 `manager_stocks.js`
 - trades stocks using the Stock API
 - uses forecast and volatility for buy/sell decisions
-- starts `v_hack.js`, `v_grow.js`, `v_weaken.js` on `home` as needed
 - is an independent manager (not a subprocess of the hack manager)
 
 `manager_gang.js`
 - manages gang members, tasks, equipment and territory warfare behavior
-- contains domain-specific logic and many tunables inside the script
+- supports a combat-prep mode to train DEX/AGI before regular tasks
+- dynamically adjusts respect threshold for Cyberterrorism
 - functions as an autonomous subsystem rather than a small helper
 
 `manager_hacknet.js`
 - evaluates upgrade options for Hacknet nodes using a simple ROI heuristic
-- purchases or upgrades nodes if the API is available
+- purchases or upgrades nodes if the API is available and funds allow
+
+`manager_karma.js`
+- farms negative karma via the Singularity crime API
+- picks the best crime by karma/s and requires ≥90% crime success chance
+- automatically enables/disables `combat_stat_trainer.js` through the config if combat stats are too low
+- requires Source-File 4 (Singularity)
+
+`manager_crime.js`
+- commits the best crime by $/s based on current player stats
+- rechecks periodically and switches crime type if a better one is available
+- requires Source-File 4 (Singularity)
+
+`manager_augments.js`
+- automatically buys augmentations from joined factions
+- classifies augments into Hacking / Combat / Charisma / Hacknet / Bladeburner categories
+- reads category toggles from `main_manager_config.js`
+- does not install; only purchases
+- requires Source-File 4 (Singularity)
+
+`manager_backdoor.js`
+- installs backdoors on all reachable servers via Singularity API
+- uses BFS to connect-path to each target and installs in the background
+- runs continuously with a 30 s pause between full passes
+- requires Source-File 4 (Singularity)
+
+`manager_ipvgo.js`
+- plays IPvGO Subnet matches in an automated loop against a configurable opponent
+- uses 1-ply board simulation with flood-fill territory counting
+- scoring: territory gain, capture bonus, self-atari penalty, opponent-atari bonus, eye protection, center preference
+- logs win/loss/draw statistics after each game
+- args: `[opponent, boardSize]` (default: `"Slum Snakes"`, `7`)
+
+`combat_stat_trainer.js`
+- trains the stats selected in the config continuously
+- available as a `combatTrainer` service for `main_manager.js`
+- reads stat selection live from `main_manager_config.js`
+- trains STR/DEF/DEX/AGI at gyms and CHARISMA at universities
+- uses `training_location_utils.js` for location/cost data
+
+`auto-leveler.js`
+- buys hacking programs (BruteSSH.exe, FTPCrack.exe, etc.) from the TOR darkweb
+- retries every 30 s if funds are insufficient
+- controlled via the `programs` service
 
 `manager_stats.js`
 - trains combat stats automatically via the Singularity API
-- currently not integrated into `main_manager.js`, but conceptually a separate manager/trainer
-
-`combat_stat_trainer.js`
-- trains the stats selected in the config/GUI continuously
-- is available as a `combatTrainer` service for `main_manager.js`
-- reads its selection live from `main_manager_config.txt` instead of using fixed targets
-- trains STR/DEF/DEX/AGI at gyms and CHARISMA at universities/courses
-
-`auto-leveler.js`
-- intended for automated program purchasing
-- controlled via the `programs` service
+- standalone script; not currently wired into `main_manager.js`
 
 ### 3. Worker and utility layer
 
 `v_hack.js`, `v_grow.js`, `v_weaken.js`
-- generic workers for batch hacking
-- primarily started by the hack manager and occasionally by the stock manager
+- generic workers for HWGW batch hacking
+- accept a delay as the 2nd argument (used by the batch manager for precise timing)
+- started by `auto-hack-manager.js`
 
 `share-ram.js`
 - shares free RAM time with `share()`
-- used by multiple systems and thus a reusable infrastructure worker
-- should only run once on each `MyServer_*` host; the hack manager will not reserve RAM for duplicate instances
-- the auto-hack manager also starts it on remote runners with root access; target size is ~10% of RAM but at least 1 thread
-- if even a single share thread would leave no room for H/G/W on a host, Share is not started there
+- should only run once per host; the hack manager avoids duplicate instances
+- started on `MyServer_*` runners by the hack manager; ~10% of free RAM, minimum 1 thread
 
 `player_stats_worker.js`
 - periodically collects player state
@@ -93,7 +139,7 @@ Known services:
 - renders trend tables and ASCII charts in a tail window
 
 `overview.js`
-- creates a single operational overview of income, processes, RAM and server status
+- creates a one-time operational overview of income, processes, RAM and server status
 
 `find-server.js`
 - computes the connect path to a target server using BFS
@@ -101,14 +147,34 @@ Known services:
 `profit-check.js`
 - monitoring/utility script for profit or income checks on hosts
 
+`runtime_file_utils.js`
+- shared utility module; exports `ensureJsonFile` and `cloneJson`
+- `ensureJsonFile` reads a JSON config file, creates it from a fallback if missing, or repairs it if corrupted
+- imported by `main_manager.js`, `manager_karma.js`, and `manager_gui.js`
+
+`training_location_utils.js`
+- shared utility module; exports gym/university location data and cost constants
+- used by `combat_stat_trainer.js` and `manager_gui.js` to select optimal training locations
+
+`buy-neuroflux.js`
+- one-off script; buys as many NeuroFlux Governor levels as possible from a joined faction
+- accepts an optional preferred faction and a money reserve as arguments
+- requires Source-File 4 (Singularity)
+
+`stock_manager_worker.js`
+- helper that runs H/G/W workers against a fixed target (`joesguns`) on `MyServer_2`
+- supports the stock manager by keeping the target server at optimal conditions
+
 ## Important workflows
 
 ### Main operation
 
 `main_manager.js`
--> reads `main_manager_config.txt`
+-> reads (or creates) `main_manager_config.js`
 -> starts enabled services
 -> continuously monitors whether services are running or need restarting
+
+Alternatively, start `manager_gui.js` directly to get an in-game control panel that can start/stop `main_manager.js` and toggle individual services.
 
 ### Player stats pipeline
 
@@ -117,6 +183,12 @@ Known services:
 -> `player_stats.js` reads the same file and displays trends
 
 The separation ensures the stats display is intentionally decoupled from data collection.
+
+### Karma farming
+
+`manager_karma.js`
+-> checks combat stats; if too low, enables `combatTrainer` in the config
+-> commits best karma crime in a loop until target karma is reached
 
 ### Server purchase and provisioning
 
@@ -136,22 +208,33 @@ The separation ensures the stats display is intentionally decoupled from data co
 
 `money-hack.js`
 - a simpler direct hack/grow/weaken loop for a single target host
-- is an older or alternative path compared to `auto-hack-manager.js`
+- legacy/fallback alternative to `auto-hack-manager.js`
+
+### Legacy hackworm deployment
+
+`launch-hackworm.js`
+-> buys or reuses a dedicated `hackworm-host` server (16 GB)
+-> copies `1st-hackworm.js` + workers there and starts it
 
 ## File groups
 
 ### Core files
 
 - `main_manager.js`
-- `main_manager_config.txt`
+- `main_manager_config.js`
 - `README.md`
+
+### GUI
+
+- `manager_gui.js`
 
 ### Hacking
 
 - `auto-hack-manager.js`
 - `money-hack.js`
-- `hack-worker.js`
-- `1st-hackworm.js`
+- `hack-worker.js` *(legacy)*
+- `1st-hackworm.js` *(legacy)*
+- `launch-hackworm.js` *(legacy helper)*
 - `v_hack.js`
 - `v_grow.js`
 - `v_weaken.js`
@@ -175,6 +258,19 @@ The separation ensures the stats display is intentionally decoupled from data co
 - `manager_gang.js`
 - `manager_hacknet.js`
 
+### Singularity services (SF4)
+
+- `manager_karma.js`
+- `manager_crime.js`
+- `manager_augments.js`
+- `manager_backdoor.js`
+- `buy-neuroflux.js`
+- `auto-leveler.js`
+
+### IPvGO
+
+- `manager_ipvgo.js`
+
 ### Server management & admin
 
 - `new_server_buy.js`
@@ -182,7 +278,12 @@ The separation ensures the stats display is intentionally decoupled from data co
 - `upgrade_Server.js`
 - `umbenennen_server.js`
 
-### Utilities & experiments
+### Shared utilities
+
+- `runtime_file_utils.js`
+- `training_location_utils.js`
+
+### Monitoring & experiments
 
 - `overview.js`
 - `find-server.js`
@@ -190,14 +291,13 @@ The separation ensures the stats display is intentionally decoupled from data co
 - `befehltest.js`
 - `scp_kopieren.js`
 - `test.js`
-- `Merkliste.txt`
 
 ## Configuration and data
 
-Important for the VSCode Bitburner extension:
-- Runtime files such as `main_manager_config.txt` and `player_stats_data.txt` do not need to be pushed from the workspace into Bitburner.
-- Scripts create or repair these files in-game as needed.
-- Treat these files primarily as in-game runtime artifacts, not as regular synced files.
+- `main_manager_config.js` is the active runtime config. `main_manager.js` and `manager_gui.js` both read from and write to this file. It is created automatically on first run if missing.
+- `main_manager_config.txt` is an older copy of the config that may still exist in-game; it is no longer the primary file.
+- `player_stats_data.txt` is written by `player_stats_worker.js` at runtime.
+- Runtime data files do not need to be pushed from the VS Code workspace into Bitburner; scripts create or repair them in-game as needed.
 
 ### `main_manager_config.txt`
 
