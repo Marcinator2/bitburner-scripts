@@ -1,5 +1,6 @@
 # Ignore the stable source folder (local copy)
 bitburner-src-stable/
+.vscode/settings.json
 
 # Personal/working lists
 Merkliste.txt
