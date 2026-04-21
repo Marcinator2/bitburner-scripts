@@ -30,6 +30,7 @@ const SERVICES = [
   { key: "stocks", script: "manager_stocks.js", host: "home", label: "Stocks" },
   { key: "gang", script: "manager_gang.js", host: "home", label: "Gang" },
   { key: "negativeKarma", script: "manager_karma.js", host: "home", label: "Negative Karma" },
+  { key: "crime", script: "manager_crime.js", host: "home", label: "Money Crime" },
   { key: "programs", script: "auto-leveler.js", host: "home", label: "Buy Programs" },
   { key: "combatTrainer", script: "combat_stat_trainer.js", host: "home", label: "Stat Trainer" },
   { key: "playerStatsWorker", script: "player_stats_worker.js", host: "home", label: "Stats Writer" },
@@ -52,7 +53,7 @@ const TABS = [
 const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block" };
 
 function getServiceTab(key) {
-  if (key === "negativeKarma" || key === "combatTrainer") return "training";
+  if (key === "negativeKarma" || key === "combatTrainer" || key === "crime") return "training";
   if (key === "gang") return "gang";
   if (key === "augments") return "augments";
   if (key === "ipvgo") return "services";

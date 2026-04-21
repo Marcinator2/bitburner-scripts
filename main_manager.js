@@ -63,6 +63,16 @@ const SERVICE_DEFINITIONS = [
     shouldRun: ns => Boolean(ns.singularity),
   },
   {
+    key: "crime",
+    script: "manager_crime.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [],
+    description: "Commits best crime by $/s based on current stats",
+    shouldRun: ns => Boolean(ns.singularity),
+  },
+  {
     key: "programs",
     script: "auto-leveler.js",
     host: "home",
