@@ -12,9 +12,9 @@ export async function main(ns) {
   const plan = buildUpgradePlan(ns, servers, ram);
   if (plan.upgradable.length === 0) {
     if (plan.blockedDowngrades > 0) {
-      ns.tprint(`Target RAM ${ns.formatRam(ram)} ist kleiner als bei ${plan.blockedDowngrades} existing servers. Downgrade will not be performed.`);
+      ns.tprint(`Target RAM ${ns.formatRam(ram)} is smaller than ${plan.blockedDowngrades} existing servers. Downgrade will not be performed.`);
     }
-    ns.tprint(`No MyServer_ servers can be upgraded to ${ns.formatRam(ram)} .`);
+    ns.tprint(`No MyServer_ servers can be upgraded to ${ns.formatRam(ram)}.`);
     return;
   }
 
@@ -29,8 +29,8 @@ export async function main(ns) {
   ns.tprint(`Total cost: ${ns.formatNumber(totalCost)}$  |  Your money: ${ns.formatNumber(playerMoney)}$`);
 
   if (!skipPrompt) {
-    const frage = `Upgrade all ${plan.upgradable.length}/${servers.length} MyServer_ to ${ram} GB? Remaining money after: ${ns.formatNumber(playerMoney - totalCost)}$`;
-    const answer = await ns.prompt(frage, { type: "boolean" });
+    const question = `Upgrade all ${plan.upgradable.length}/${servers.length} MyServer_ to ${ram} GB? Remaining money after: ${ns.formatNumber(playerMoney - totalCost)}$`;
+    const answer = await ns.prompt(question, { type: "boolean" });
 
     if (!answer) {
       ns.tprint("Upgrade cancelled.");

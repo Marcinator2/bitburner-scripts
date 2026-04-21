@@ -148,10 +148,10 @@ export async function main(ns) {
     const summary = getStockAccessSummary();
     const statusText = summary.ready
       ? "Stock prerequisites met"
-      : `Aktien-Voraussetzungen offen: ${summary.missing.join(", ")}`;
+      : `Stock prerequisites pending: ${summary.missing.join(", ")}`;
 
     if (purchases.length > 0) {
-      ns.tprint(`Aktien-Voraussetzungen gekauft: ${purchases.join(", ")}`);
+      ns.tprint(`Stock prerequisites purchased: ${purchases.join(", ")}`);
     }
 
     if (statusText !== lastAccessSummary) {
