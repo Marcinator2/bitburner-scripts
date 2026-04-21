@@ -394,7 +394,7 @@ export async function main(ns) {
     let uid = 0;
 
     while (true) {
-        manageProgramAcquisition();
+        // manageProgramAcquisition(); // disabled – no Singularity SF4
 
         const allServers = scanAll();
 
