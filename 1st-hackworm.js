@@ -1,4 +1,4 @@
-// STATUS: Legacy-Hacking-Manager. Aktuell nicht vom main_manager referenziert.
+// STATUSS: Legacy-Hacking-Manager. Aktuell nicht vom main_manager referenziert.
 // Nur behalten fuer Vergleich oder Rueckgriff, neue Hacking-Logik in auto-hack-manager.js pflegen.
 /** @param {NS} ns */
 
@@ -52,6 +52,7 @@ export async function main(ns) {
   }
 
   function getHostSafetyReserve(host) {
+    if (host === "home") return ns.getScriptRam(ns.getScriptName(), "home"); // reserve only the manager's own RAM
     const maxRam = ns.getServerMaxRam(host);
     return maxRam >= 32 ? Math.ceil(maxRam * 0.1) : 0;
   }
