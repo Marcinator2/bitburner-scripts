@@ -152,6 +152,16 @@ const SERVICE_DEFINITIONS = [
     description: "Plays IPvGO Subnet matches automatically",
     shouldRun: () => true,
   },
+  {
+    key: "corporation",
+    script: "manager_corporation.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [DEFAULT_CONFIG_FILE],
+    description: "Fully automated Corporation manager (divisions, products, invest rounds, public)",
+    shouldRun: ns => Boolean(ns.corporation && typeof ns.corporation.hasCorporation === "function" && ns.corporation.hasCorporation()),
+  },
 ];
 
 export async function main(ns) {

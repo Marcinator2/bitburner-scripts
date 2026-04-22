@@ -3,6 +3,7 @@
 import { ensureJsonFile } from "./runtime_file_utils.js";
 import { getBestKarmaCrime } from "./manager_karma.js";
 import { normalizeUniversityCourse } from "./training_location_utils.js";
+import { getCorpStatus } from "./manager_corporation.js";
 
 const CONFIG_FILE = "main_manager_config.js";
 const PANEL_ID = "bitburner-main-manager-gui";
@@ -39,6 +40,7 @@ const SERVICES = [
   { key: "augments", script: "manager_augments.js", host: "home", label: "Augments" },
   { key: "backdoor", script: "manager_backdoor.js", host: "home", label: "Backdoor" },
   { key: "ipvgo", script: "manager_ipvgo.js", host: "home", label: "IPvGO" },
+  { key: "corporation", script: "manager_corporation.js", host: "home", label: "Corporation" },
 ];
 
 const TABS = [
@@ -47,16 +49,18 @@ const TABS = [
   { id: "gang", label: "Gang" },
   { id: "augments", label: "Augments" },
   { id: "server", label: "Server" },
+  { id: "corporation", label: "Corp" },
 ];
 
 // display type used when a tab pane is active1
-const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block" };
+const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block", corporation: "block" };
 
 function getServiceTab(key) {
   if (key === "negativeKarma" || key === "combatTrainer" || key === "crime") return "training";
   if (key === "gang") return "gang";
   if (key === "augments") return "augments";
   if (key === "ipvgo") return "services";
+  if (key === "corporation") return "corporation";
   return "services";
 }
 
@@ -200,9 +204,11 @@ function buildPanel(doc) {
   // Tab bar
   const tabBar = doc.createElement("div");
   tabBar.style.display = "flex";
-  tabBar.style.padding = "0 16px";
+  tabBar.style.padding = "0 8px";
   tabBar.style.marginTop = "8px";
   tabBar.style.borderBottom = "1px solid rgba(120,190,255,0.15)";
+  tabBar.style.overflowX = "auto";
+  tabBar.style.scrollbarWidth = "none";
 
   const tabButtons = new Map();
   for (const tab of TABS) {
@@ -213,10 +219,11 @@ function buildPanel(doc) {
     btn.style.border = "none";
     btn.style.borderBottom = "2px solid transparent";
     btn.style.color = "#8db3d9";
-    btn.style.padding = "8px 16px";
+    btn.style.padding = "7px 10px";
     btn.style.cursor = "pointer";
     btn.style.font = "inherit";
-    btn.style.fontSize = "13px";
+    btn.style.fontSize = "12px";
+    btn.style.whiteSpace = "nowrap";
     tabBar.appendChild(btn);
     tabButtons.set(tab.id, btn);
   }
@@ -245,6 +252,10 @@ function buildPanel(doc) {
   // Augments pane: single block
   const augmentsPane = tabPanes.get("augments");
   augmentsPane.style.padding = "12px";
+
+  // Corporation pane: single block
+  const corpPane = tabPanes.get("corporation");
+  corpPane.style.padding = "12px";
 
   function switchTab(id) {
     for (const [tid, pane] of tabPanes) {
@@ -334,6 +345,7 @@ function buildPanel(doc) {
       let gangControls = null;
       let augmentControls = null;
       let ipvgoControls = null;
+      let corpControls = null;
       if (service.key === "combatTrainer") {
         statControls = buildCombatStatControls(doc);
         row.append(top, details, statControls.wrap);
@@ -346,11 +358,14 @@ function buildPanel(doc) {
       } else if (service.key === "ipvgo") {
         ipvgoControls = buildIpvgoControls(doc);
         row.append(top, details, ipvgoControls.wrap);
+      } else if (service.key === "corporation") {
+        corpControls = buildCorpControls(doc);
+        row.append(top, details, corpControls.wrap);
       } else {
         row.append(top, details);
       }
 
-      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls });
+      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls });
     }
 
     pane.appendChild(row);
@@ -893,6 +908,16 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-corp-auto-invest") {
+      toggleCorpAutoInvest(ns);
+      continue;
+    }
+
+    if (action === "toggle-corp-auto-go-public") {
+      toggleCorpAutoGoPublic(ns);
+      continue;
+    }
+
     if (action.startsWith("toggle:")) {
       const key = action.split(":")[1];
       toggleService(ns, key);
@@ -1090,6 +1115,8 @@ function renderPanel(ns, panel) {
             ? buildAugmentDetails(ns, enabled, running, override, scriptExists, augmentConfig)
           : service.key === "ipvgo"
             ? buildIpvgoDetails(enabled, running, override, scriptExists, ipvgoConfig)
+          : service.key === "corporation"
+            ? buildCorpDetails(ns, enabled, running, override, scriptExists)
         : [
             `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"}`,
             `Threads: ${override.threads ?? 1} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
@@ -1125,6 +1152,12 @@ function renderPanel(ns, panel) {
     if (service.key === "ipvgo" && row.ipvgoControls) {
       row.ipvgoControls.opponentSelect.value = ipvgoConfig.opponent;
       row.ipvgoControls.boardSizeSelect.value = String(ipvgoConfig.boardSize);
+    }
+
+    if (service.key === "corporation" && row.corpControls) {
+      const corpConfig = getCorpConfig(override);
+      row.corpControls.checkboxes.get("autoInvest").checked = corpConfig.autoInvest;
+      row.corpControls.checkboxes.get("autoGoPublic").checked = corpConfig.autoGoPublic;
     }
   }
 }
@@ -1327,6 +1360,98 @@ function buildIpvgoControls(doc) {
 
   wrap.append(opponentWrap, boardWrap);
   return { wrap, opponentSelect, boardSizeSelect };
+}
+
+function buildCorpControls(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.display = "grid";
+  wrap.style.gridTemplateColumns = "minmax(0, 1fr)";
+  wrap.style.gap = "6px";
+  wrap.style.marginTop = "10px";
+  wrap.style.fontSize = "11px";
+  wrap.style.color = "#c6d8eb";
+
+  const checkboxes = new Map();
+  const options = [
+    { key: "autoInvest",   action: "toggle-corp-auto-invest",    label: "Auto-Invest: Investitionsangebote automatisch akzeptieren" },
+    { key: "autoGoPublic", action: "toggle-corp-auto-go-public", label: "Auto-IPO: Automatisch an die Börse gehen" },
+  ];
+
+  for (const option of options) {
+    const label = doc.createElement("label");
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "6px";
+    label.style.cursor = "pointer";
+
+    const checkbox = doc.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.action = option.action;
+    checkbox.style.cursor = "pointer";
+
+    const text = doc.createElement("span");
+    text.textContent = option.label;
+
+    label.append(checkbox, text);
+    wrap.appendChild(label);
+    checkboxes.set(option.key, checkbox);
+  }
+
+  return { wrap, checkboxes };
+}
+
+function buildCorpDetails(ns, enabled, running, override, scriptExists) {
+  const status = getCorpStatus(ns);
+  if (!status) {
+    return [
+      `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+      "Keine Corporation vorhanden.",
+    ].join("\n");
+  }
+
+  const profit = status.profit;
+  const profitStr = profit >= 0 ? `+${ns.formatNumber(profit)}` : ns.formatNumber(profit);
+
+  const lines = [
+    `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
+    `${status.name} | Phase: ${status.phase} | ${status.public ? "PUBLIC" : "PRIVAT"}`,
+    `Funds: ${ns.formatNumber(status.funds)}$ | Wert: ${ns.formatNumber(status.valuation)}$`,
+    `Revenue: ${ns.formatNumber(status.revenue)}$/s | Profit: ${profitStr}$/s`,
+    `Divisions: ${status.divisions}`,
+  ];
+
+  if (!status.public && status.investOffer > 0) {
+    lines.push(`Invest-Runde ${status.investRound}: ${ns.formatNumber(status.investOffer)}$ angeboten`);
+  }
+
+  return lines.join("\n");
+}
+
+function getCorpConfig(service) {
+  return {
+    autoInvest: service.autoInvest ?? false,
+    autoGoPublic: service.autoGoPublic ?? false,
+  };
+}
+
+function toggleCorpAutoInvest(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.corporation || {};
+  config.services.corporation = {
+    ...current,
+    autoInvest: !(current.autoInvest ?? false),
+  };
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleCorpAutoGoPublic(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.corporation || {};
+  config.services.corporation = {
+    ...current,
+    autoGoPublic: !(current.autoGoPublic ?? false),
+  };
+  saveConfig(ns, CONFIG_FILE, config);
 }
 
 function buildIpvgoDetails(enabled, running, override, scriptExists, ipvgoConfig) {
