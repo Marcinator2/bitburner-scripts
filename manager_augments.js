@@ -192,7 +192,37 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
     return;
   }
 
-  if (repPending.length === 0) {
+  let gangFaction = null;
+  try {
+    if (ns.gang) gangFaction = ns.gang.getGangInformation().faction;
+  } catch (_) {}
+
+  const owned = new Set(ns.singularity.getOwnedAugmentations(true));
+
+  // Query each faction directly – independent of augFactionMap's highest-rep logic
+  const factionCount = new Map();
+  for (const faction of ns.getPlayer().factions) {
+    if (gangFaction && faction === gangFaction) continue;
+    let factionRep;
+    try { factionRep = ns.singularity.getFactionRep(faction); } catch { continue; }
+
+    for (const augName of ns.singularity.getAugmentationsFromFaction(faction)) {
+      if (augName === NEUROFLUX) continue;
+      if (owned.has(augName)) continue;
+
+      const repReq = ns.singularity.getAugmentationRepReq(augName);
+      if (factionRep >= repReq) continue; // enough rep already
+
+      const stats = ns.singularity.getAugmentationStats(augName);
+      const cats = classifyAugment(stats);
+      const isWanted = cats.size === 0 || [...cats].some(c => augConfig.categories[c]);
+      if (!isWanted) continue;
+
+      factionCount.set(faction, (factionCount.get(faction) ?? 0) + 1);
+    }
+  }
+
+  if (factionCount.size === 0) {
     // No more rep needed – stop running faction work if active
     try {
       const work = ns.singularity.getCurrentWork();
@@ -204,26 +234,7 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
     return;
   }
 
-  // Select faction with the most rep-blocked augments
-  // Exclude gang faction (no work possible while in a gang)
-  let gangFaction = null;
-  try {
-    if (ns.gang) gangFaction = ns.gang.getGangInformation().faction;
-  } catch (_) {}
-
-  const validPending = gangFaction
-    ? repPending.filter(aug => aug.faction !== gangFaction)
-    : repPending;
-
-  if (validPending.length === 0) {
-    ns.print(`[REP-FARM] All rep-blocked augments belong to the gang faction (${gangFaction}) – skipped.`);
-    return;
-  }
-
-  const factionCount = new Map();
-  for (const aug of validPending) {
-    factionCount.set(aug.faction, (factionCount.get(aug.faction) ?? 0) + 1);
-  }
+  // Pick the faction with the most blocked augments
   const targetFaction = [...factionCount.entries()]
     .sort((a, b) => b[1] - a[1])[0][0];
 
