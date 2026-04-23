@@ -493,16 +493,15 @@ function manageProducts(ns, corpInfo, phase) {
         try {
           const product = corp.getProduct(divName, CITIES[0], productName);
           if (product.developmentProgress >= 100) {
-            // Erst Market-TA2 aktivieren, sonst MP setzen
+            // Immer Basis-Verkaufsauftrag setzen (Market-TA braucht "MAX" als Basis)
+            for (const city of CITIES) {
+              try {
+                corp.sellProduct(divName, city, productName, "MAX", "MP*5", true);
+              } catch { /* */ }
+            }
             if (corp.hasResearched(divName, "Market-TA.II")) {
               corp.setProductMarketTA2(divName, productName, true);
               corp.setProductMarketTA1(divName, productName, true);
-            } else {
-              for (const city of CITIES) {
-                try {
-                  corp.sellProduct(divName, city, productName, "MAX", "MP*2", true);
-                } catch { /* */ }
-              }
             }
           }
         } catch { /* */ }
@@ -566,14 +565,11 @@ function setSellOrders(ns, phase) {
       for (const material of (industryData.producedMaterials ?? [])) {
         for (const city of CITIES) {
           try {
-            const mat = corp.getMaterial(divName, city, material);
-            if (mat.desiredSellPrice !== "MP" || mat.desiredSellAmount !== "MAX") {
-              if (corp.hasResearched(divName, "Market-TA.II")) {
-                corp.setMaterialMarketTA1(divName, city, material, true);
-                corp.setMaterialMarketTA2(divName, city, material, true);
-              } else {
-                corp.sellMaterial(divName, city, material, "MAX", "MP");
-              }
+            // Immer Basis-Verkaufsauftrag setzen (Market-TA braucht "MAX" als Basis)
+            corp.sellMaterial(divName, city, material, "MAX", "MP");
+            if (corp.hasResearched(divName, "Market-TA.II")) {
+              corp.setMaterialMarketTA1(divName, city, material, true);
+              corp.setMaterialMarketTA2(divName, city, material, true);
             }
           } catch { /* */ }
         }
