@@ -46,6 +46,9 @@ export async function main(ns) {
   }
 
   while (true) {
+    // Always return to home at the start of each pass (safety net if script was killed mid-run)
+    try { ns.singularity.connect("home"); } catch (_) {}
+
     const allServers = scanAll();
     const hackLevel = ns.getHackingLevel();
     const purchasedSet = new Set(ns.getPurchasedServers());
