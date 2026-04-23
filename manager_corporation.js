@@ -1,17 +1,17 @@
 /** @param {NS} ns */
 
-// Corporation Manager - vollautomatisch
-// Phasen: Setup → Invest-Runden 1+2 → Public → Endgame (MarketTA.II + Produkte)
+// Corporation Manager - fully automatic
+// Phases: Setup → Investment Rounds 1+2 → Public → Endgame (MarketTA.II + Products)
 //
-// Strategie:
-//   1. Stellt sicher dass Warehouse & Office API freigeschaltet sind
-//   2. Erstellt Tobacco-Division + expandiert in alle 6 Städte (Tobacco ist bester Early-Industry)
-//   3. Baut Offices aus, stellt Mitarbeiter ein, schaltet Smart Supply ein
-//   4. Maximiert Corp-Upgrades bis Invest-Runde 1 (Ziel: ~200b Angebot)
-//   5. Akzeptiert Invest-Runde 1, dann Invest-Runde 2 (~1t Angebot)
-//   6. Geht Public, schaltet Market-TA.II frei
-//   7. Erstellt bis zu 3 Produkte gleichzeitig (je nach maxProducts)
-//   8. Hält Morale/Energy hoch via Tea & Party
+// Strategy:
+//   1. Ensure Warehouse & Office API are unlocked
+//   2. Create Tobacco Division + expand to all 6 cities (Tobacco is best early industry)
+//   3. Upgrade offices, hire employees, enable Smart Supply
+//   4. Maximize corp upgrades until investment round 1 (target: ~200b offer)
+//   5. Accept investment round 1, then round 2 (~1t offer)
+//   6. Go public, unlock Market-TA.II
+//   7. Create up to 3 products at once (depending on maxProducts)
+//   8. Keep morale/energy high via tea & party
 
 const CONFIG_FILE = "main_manager_config.js";
 const LOOP_MS = 5000;
@@ -20,25 +20,25 @@ const CITIES = ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volha
 const TOBACCO_DIV = "Tobacco Division";
 const AGRI_DIV = "Agriculture Division";
 
-// Zieldaten für Invest-Runden
-const INVEST_ROUND1_FUNDS_TARGET = 210e9;   // 210 Mrd
-const INVEST_ROUND2_FUNDS_TARGET = 2e12;    // 2 Bio
+// Target funds for investment rounds
+const INVEST_ROUND1_FUNDS_TARGET = 210e9;   // 210 billion
+const INVEST_ROUND2_FUNDS_TARGET = 2e12;    // 2 trillion
 
-// Office-Ausbau-Stufen pro Investitionsrunde
+// Office size per investment round
 const OFFICE_SIZES = {
-  early:  9,   // Vor Runde 1
-  round1: 30,  // Nach Runde 1
-  round2: 60,  // Nach Runde 2
+  early:  9,   // Before round 1
+  round1: 30,  // After round 1
+  round2: 60,  // After round 2
   late:   60,  // Endgame
 };
 
-// Produkt-Design/Marketing-Investition
-const PRODUCT_DESIGN_BUDGET_RATIO = 0.1;   // 10% der verfügbaren Mittel für Design
-const PRODUCT_MARKETING_BUDGET_RATIO = 0.1; // 10% für Marketing
-const PRODUCT_MIN_INVEST = 1e9;             // Mindestens 1 Mrd
-const PRODUCT_MAX_INVEST = 1e12;            // Maximal 1 Bio
+// Product design/marketing investment
+const PRODUCT_DESIGN_BUDGET_RATIO = 0.1;   // 10% of available funds for design
+const PRODUCT_MARKETING_BUDGET_RATIO = 0.1; // 10% for marketing
+const PRODUCT_MIN_INVEST = 1e9;             // At least 1 billion
+const PRODUCT_MAX_INVEST = 1e12;            // Max 1 trillion
 
-// Corp-Upgrades die dauerhaft hochgehalten werden sollen
+// Corp upgrades to keep high at all times
 const CORP_UPGRADES = [
   "Smart Factories",
   "Smart Storage",
@@ -52,7 +52,7 @@ const CORP_UPGRADES = [
   "DreamSense",
 ];
 
-// Unlock-Liste
+// Unlock list
 const REQUIRED_UNLOCKS = [
   "Warehouse API",
   "Office API",
@@ -61,7 +61,7 @@ const REQUIRED_UNLOCKS = [
   "Market Data - Competition",
 ];
 
-// Forschungen die möglichst früh freigeschaltet werden sollen
+// Research to unlock as early as possible
 const EARLY_RESEARCH = [
   "Hi-Tech R&D Laboratory",
 ];
@@ -82,10 +82,10 @@ const LATE_RESEARCH = [
   "HRBuddy-Training",
 ];
 
-// Alle Materialien die Agriculture für Boost kauft
+// All materials Agriculture buys for boost
 const AGRI_INPUT_MATERIALS = ["Hardware", "Robots", "AI Cores", "Real Estate"];
 
-// Boost-Mengen für Agriculture (Boost für Multiplikatoren)
+// Boost amounts for Agriculture (for multipliers)
 const AGRI_BOOST = {
   "Hardware":    12500,
   "Robots":      2500,
@@ -93,7 +93,7 @@ const AGRI_BOOST = {
   "Real Estate": 3e6,
 };
 
-// Boost-Mengen für Tobacco
+// Boost amounts for Tobacco
 const TOBACCO_BOOST = {
   "Hardware":    2800,
   "Robots":      96,
@@ -205,7 +205,7 @@ function ensureUnlocks(ns) {
         const info = corp.getCorporation();
         if (info.funds >= cost) {
           corp.purchaseUnlock(unlock);
-          ns.print(`Unlock gekauft: ${unlock}`);
+          ns.print(`Unlock purchased: ${unlock}`);
         }
       }
     } catch {
@@ -227,10 +227,10 @@ function ensureDivisions(ns) {
       const cost = 40e9; // Agriculture kostet 40b
       if (info.funds >= cost) {
         corp.expandIndustry("Agriculture", AGRI_DIV);
-        ns.print(`Division erstellt: ${AGRI_DIV}`);
+        ns.print(`Division created: ${AGRI_DIV}`);
       }
     } catch (e) {
-      ns.print(`WARN: Konnte ${AGRI_DIV} nicht erstellen: ${e}`);
+      ns.print(`WARN: Could not create ${AGRI_DIV}: ${e}`);
     }
   }
 
@@ -240,10 +240,10 @@ function ensureDivisions(ns) {
       // Tobacco kostet 20b
       if (info.funds >= 20e9) {
         corp.expandIndustry("Tobacco", TOBACCO_DIV);
-        ns.print(`Division erstellt: ${TOBACCO_DIV}`);
+        ns.print(`Division created: ${TOBACCO_DIV}`);
       }
     } catch (e) {
-      ns.print(`WARN: Konnte ${TOBACCO_DIV} nicht erstellen: ${e}`);
+      ns.print(`WARN: Could not create ${TOBACCO_DIV}: ${e}`);
     }
   }
 }
@@ -406,7 +406,7 @@ function buyResearch(ns, phase) {
           const divInfo = corp.getDivision(div);
           if (divInfo.researchPoints >= cost) {
             corp.research(div, research);
-            ns.print(`${div}: Forschung freigeschaltet: ${research}`);
+            ns.print(`${div}: Research unlocked: ${research}`);
           }
         }
       } catch { /* nicht verfügbar */ }
@@ -451,14 +451,14 @@ function handleInvestment(ns, corpInfo, phase, configFile) {
     if (phase === "early" && offer.round === 1) {
       if (offer.funds >= INVEST_ROUND1_FUNDS_TARGET && config.corp.autoInvest) {
         corp.acceptInvestmentOffer();
-        ns.print(`Investitions-Runde 1 akzeptiert: ${ns.formatNumber(offer.funds)}$`);
+        ns.print(`Investment round 1 accepted: ${ns.formatNumber(offer.funds)}$`);
       }
     }
 
     if (phase === "round2" && offer.round === 2) {
       if (offer.funds >= INVEST_ROUND2_FUNDS_TARGET && config.corp.autoInvest) {
         corp.acceptInvestmentOffer();
-        ns.print(`Investitions-Runde 2 akzeptiert: ${ns.formatNumber(offer.funds)}$`);
+        ns.print(`Investment round 2 accepted: ${ns.formatNumber(offer.funds)}$`);
       }
     }
 
@@ -466,7 +466,7 @@ function handleInvestment(ns, corpInfo, phase, configFile) {
     if (phase === "round2" && offer.round > 2 && corpInfo.funds >= 1e12 && config.corp.autoGoPublic) {
       corp.goPublic(0);
       corp.issueDividends(0.1);
-      ns.print("Corporation ist jetzt öffentlich!");
+      ns.print("Corporation is now public!");
     }
   } catch { /* */ }
 }
@@ -523,7 +523,7 @@ function manageProducts(ns, corpInfo, phase) {
         const productName = `${divName.split(" ")[0]}-v${Date.now() % 10000}`;
         try {
           corp.makeProduct(divName, CITIES[0], productName, budget, budget);
-          ns.print(`Neues Produkt gestartet: ${productName} | Invest: ${ns.formatNumber(budget)}$`);
+          ns.print(`New product started: ${productName} | Investment: ${ns.formatNumber(budget)}$`);
         } catch { /* */ }
       }
 
@@ -543,7 +543,7 @@ function manageProducts(ns, corpInfo, phase) {
         }
         if (worstProduct) {
           corp.discontinueProduct(divName, worstProduct);
-          ns.print(`Produkt eingestellt (schlechtestes Rating): ${worstProduct}`);
+          ns.print(`Product discontinued (worst rating): ${worstProduct}`);
         }
       }
     } catch { /* */ }
@@ -592,7 +592,7 @@ function buyAdVerts(ns, phase) {
       // Max 5% der Mittel für AdVerts
       if (info.funds >= cost && cost <= info.funds * 0.05) {
         corp.hireAdVert(divName);
-        ns.print(`${divName}: AdVert gekauft (Kosten: ${ns.formatNumber(cost)}$)`);
+        ns.print(`${divName}: AdVert purchased (Cost: ${ns.formatNumber(cost)}$)`);
       }
     } catch { /* */ }
   }
