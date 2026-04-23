@@ -1052,6 +1052,7 @@ function renderPanel(ns, panel) {
   const playerMoney = ns.getPlayer().money;
   const buyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, buyRam);
   const upgradePlan = getUpgradePlan(ns, purchasedServers, upgradeRam);
+  const stepUpgradePlan = getStepUpgradePlan(ns, purchasedServers, upgradeRam);
   const combatTrainerConfig = getCombatTrainerConfig(config.services.combatTrainer || {});
   const gangConfig = getGangConfig(config.services.gang || {});
   const negativeKarmaConfig = getNegativeKarmaConfig(config.services.negativeKarma || {});
@@ -1065,12 +1066,14 @@ function renderPanel(ns, panel) {
   styleActionButton(panel.startButton, managerRunning ? "disabled" : "start");
   styleActionButton(panel.stopButton, managerRunning ? "stop" : "disabled");
 
-  // Auto-Upgrade: automatically upgrade when enabled and enough money is available
+  // Auto-Upgrade: step each server up one power-of-2 at a time when affordable.
+  // Triggers new_server_buy.js (which does one step per server) as soon as
+  // we can afford at least one server's next step.
   const autoUpgradeEnabled = panel.admin.autoUpgradeCheckbox.checked;
-  if (autoUpgradeEnabled && upgradeScriptExists && !upgradeRunning
-      && upgradePlan.upgradableCount > 0 && upgradePlan.totalCost > 0
-      && playerMoney >= upgradePlan.totalCost) {
-    startScriptIfIdle(ns, UPGRADE_SERVER_SCRIPT, upgradeRam, true);
+  if (autoUpgradeEnabled && buyScriptExists && !buyRunning
+      && stepUpgradePlan.upgradableCount > 0 && stepUpgradePlan.minStepCost > 0
+      && playerMoney >= stepUpgradePlan.minStepCost) {
+    startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, upgradeRam, true);
   }
 
   // Auto-Buy: automatically buy a new server (always smallest RAM = 8 GB, to fill slots)
@@ -1827,6 +1830,27 @@ function getBuyPlan(ns, purchasedServers, purchasedLimit, ram) {
   }
 
   return { targetName, cost, blocked: false, status: "READY" };
+}
+
+function getStepUpgradePlan(ns, purchasedServers, targetRam) {
+  let minStepCost = Infinity;
+  let upgradableCount = 0;
+
+  for (const server of purchasedServers) {
+    const currentRam = ns.getServerMaxRam(server);
+    if (currentRam >= targetRam) continue;
+    const nextRam = currentRam * 2;
+    if (nextRam > targetRam) continue;
+    const cost = ns.getPurchasedServerUpgradeCost(server, nextRam);
+    if (!Number.isFinite(cost) || cost <= 0) continue;
+    upgradableCount++;
+    if (cost < minStepCost) minStepCost = cost;
+  }
+
+  return {
+    upgradableCount,
+    minStepCost: upgradableCount > 0 ? minStepCost : 0,
+  };
 }
 
 function getUpgradePlan(ns, purchasedServers, targetRam) {
