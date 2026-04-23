@@ -215,6 +215,10 @@ function supervise(ns, configFile, runOnce) {
       continue;
     }
 
+    // Kill any stale instance running with different args (e.g. after an opponent/config change).
+    // scriptKill is safe to call even if nothing is running — it just returns false.
+    ns.scriptKill(state.script, state.host);
+
     const pid = ns.exec(state.script, state.host, state.threads, ...state.args);
     state.startedPid = pid;
     state.running = pid > 0;

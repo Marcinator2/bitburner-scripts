@@ -50,16 +50,17 @@ const TABS = [
   { id: "augments", label: "Augments" },
   { id: "server", label: "Server" },
   { id: "corporation", label: "Corp" },
+  { id: "ipvgo", label: "IPvGO" },
 ];
 
 // display type used when a tab pane is active1
-const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block", corporation: "block" };
+const TAB_DISPLAY_TYPE = { services: "grid", training: "grid", gang: "grid", augments: "block", server: "block", corporation: "block", ipvgo: "block" };
 
 function getServiceTab(key) {
   if (key === "negativeKarma" || key === "combatTrainer" || key === "crime") return "training";
   if (key === "gang") return "gang";
   if (key === "augments") return "augments";
-  if (key === "ipvgo") return "services";
+  if (key === "ipvgo") return "ipvgo";
   if (key === "corporation") return "corporation";
   return "services";
 }
@@ -769,7 +770,10 @@ function wireActions(panel, actionQueue) {
     if (!input) {
       const selectAction = event.target.closest("select[data-action]");
       if (selectAction) {
-        actionQueue.push(selectAction.dataset.action || "");
+        // Build action: if data-action is just a prefix (no colon), append the select's current value
+        const base = selectAction.dataset.action || "";
+        const action = base.includes(":") ? base : (base ? `${base}:${selectAction.value}` : "");
+        actionQueue.push(action);
         return;
       }
 
@@ -796,6 +800,17 @@ function wireActions(panel, actionQueue) {
 
     actionQueue.push(button.dataset.action || "");
   });
+
+  // Wire IPvGO selects directly — bypasses the event.target.closest() chain
+  const ipvgoRow = panel.rows.get("ipvgo");
+  if (ipvgoRow?.ipvgoControls) {
+    ipvgoRow.ipvgoControls.opponentSelect.addEventListener("change", e => {
+      actionQueue.push(`set-ipvgo-opponent:${e.target.value}`);
+    });
+    ipvgoRow.ipvgoControls.boardSizeSelect.addEventListener("change", e => {
+      actionQueue.push(`set-ipvgo-boardsize:${e.target.value}`);
+    });
+  }
 }
 
 function processQueuedActions(ns, panel, actionQueue) {
@@ -1167,8 +1182,11 @@ function renderPanel(ns, panel) {
     }
 
     if (service.key === "ipvgo" && row.ipvgoControls) {
-      row.ipvgoControls.opponentSelect.value = ipvgoConfig.opponent;
-      row.ipvgoControls.boardSizeSelect.value = String(ipvgoConfig.boardSize);
+      const opSel  = row.ipvgoControls.opponentSelect;
+      const szSel  = row.ipvgoControls.boardSizeSelect;
+      const active = opSel.ownerDocument.activeElement;
+      if (active !== opSel)  opSel.value  = ipvgoConfig.opponent;
+      if (active !== szSel)  szSel.value  = String(ipvgoConfig.boardSize);
     }
 
     if (service.key === "corporation" && row.corpControls) {
@@ -1297,7 +1315,7 @@ function toggleAugmentRepFarming(ns) {
 }
 
 function getIpvgoConfig(service) {
-  const OPPONENTS = ["Slum Snakes", "The Black Hand", "NiteSec", "CyberSec", "Daedalus", "Illuminati", "§"];
+  const OPPONENTS = ["Slum Snakes", "Netburners", "The Black Hand", "NiteSec", "CyberSec", "Daedalus", "Illuminati", "§"];
   const BOARD_SIZES = [5, 7, 9, 13];
   const opponent = OPPONENTS.includes(service.opponent) ? service.opponent : "Slum Snakes";
   const boardSize = BOARD_SIZES.includes(Number(service.boardSize)) ? Number(service.boardSize) : 7;
@@ -1305,23 +1323,25 @@ function getIpvgoConfig(service) {
 }
 
 function setIpvgoOpponent(ns, opponent) {
-  const config = loadConfig(ns, CONFIG_FILE);
+  const config  = loadConfig(ns, CONFIG_FILE);
   const current = config.services.ipvgo || {};
-  const ipvgo = getIpvgoConfig(current);
+  const ipvgo   = getIpvgoConfig(current);
   config.services.ipvgo = { ...current, opponent, args: [opponent, ipvgo.boardSize] };
   saveConfig(ns, CONFIG_FILE, config);
+  ns.print(`[IPvGO] Opponent set to: ${opponent}`);
 }
 
 function setIpvgoBoardSize(ns, boardSize) {
-  const config = loadConfig(ns, CONFIG_FILE);
+  const config  = loadConfig(ns, CONFIG_FILE);
   const current = config.services.ipvgo || {};
-  const ipvgo = getIpvgoConfig(current);
+  const ipvgo   = getIpvgoConfig(current);
   config.services.ipvgo = { ...current, boardSize, args: [ipvgo.opponent, boardSize] };
   saveConfig(ns, CONFIG_FILE, config);
+  ns.print(`[IPvGO] Board size set to: ${boardSize}`);
 }
 
 function buildIpvgoControls(doc) {
-  const OPPONENTS  = ["Slum Snakes", "The Black Hand", "NiteSec", "CyberSec", "Daedalus", "Illuminati", "§"];
+  const OPPONENTS  = ["Slum Snakes", "Netburners", "The Black Hand", "NiteSec", "CyberSec", "Daedalus", "Illuminati", "§"];
   const BOARD_SIZES = [5, 7, 9, 13];
 
   const wrap = doc.createElement("div");
@@ -1359,16 +1379,9 @@ function buildIpvgoControls(doc) {
   };
 
   const opponentLabel = makeLabel("Opponent");
-  const opponentSelect = makeSelect(OPPONENTS, `set-ipvgo-opponent:placeholder`);
-  opponentSelect.addEventListener("change", () => {
-    opponentSelect.dataset.action = `set-ipvgo-opponent:${opponentSelect.value}`;
-  });
-
+  const opponentSelect = makeSelect(OPPONENTS, `set-ipvgo-opponent`);
   const boardLabel = makeLabel("Board Size");
-  const boardSizeSelect = makeSelect(BOARD_SIZES, `set-ipvgo-boardsize:placeholder`);
-  boardSizeSelect.addEventListener("change", () => {
-    boardSizeSelect.dataset.action = `set-ipvgo-boardsize:${boardSizeSelect.value}`;
-  });
+  const boardSizeSelect = makeSelect(BOARD_SIZES, `set-ipvgo-boardsize`);
 
   const opponentWrap = doc.createElement("div");
   opponentWrap.append(opponentLabel, opponentSelect);
