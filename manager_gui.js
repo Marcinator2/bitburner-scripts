@@ -499,6 +499,7 @@ function buildGangControls(doc) {
     { key: "autoEquipment",         action: "toggle-gang-auto-equipment",   label: "Auto-buy equipment" },
     { key: "autoTerritoryWarfare",  action: "toggle-gang-auto-territory",   label: "Auto-manage Territory Warfare" },
     { key: "prepCombatMode",        action: "toggle-gang-prep-combat",      label: "Train combat stats (prep mode)" },
+    { key: "powerFarmMode",         action: "toggle-gang-power-farm",       label: "Power Farm Mode (Territory Power, no Clashes)" },
   ];
 
   for (const option of options) {
@@ -887,6 +888,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-gang-power-farm") {
+      toggleGangPowerFarm(ns);
+      continue;
+    }
+
     if (action.startsWith("toggle-augment-cat:")) {
       const cat = action.split(":")[1];
       toggleAugmentCategory(ns, cat);
@@ -1138,6 +1144,7 @@ function renderPanel(ns, panel) {
       row.gangControls.checkboxes.get("autoEquipment").checked = gangConfig.autoEquipment;
       row.gangControls.checkboxes.get("autoTerritoryWarfare").checked = gangConfig.autoTerritoryWarfare;
       row.gangControls.checkboxes.get("prepCombatMode").checked = gangConfig.prepCombatMode;
+      row.gangControls.checkboxes.get("powerFarmMode").checked = gangConfig.powerFarmMode;
     }
 
     if (service.key === "augments" && row.augmentControls) {
@@ -1617,6 +1624,22 @@ function toggleGangPrepCombat(ns) {
   saveConfig(ns, CONFIG_FILE, config);
 }
 
+function toggleGangPowerFarm(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.gang || {};
+  const gangConfig = getGangConfig(current);
+
+  config.services.gang = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args: Array.isArray(current.args) ? current.args : [],
+    powerFarmMode: !gangConfig.powerFarmMode,
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
 function startScriptIfIdle(ns, script, ...args) {
   if (!ns.fileExists(script, "home")) {
     return;
@@ -1651,6 +1674,7 @@ function getGangConfig(service) {
     autoEquipment: service.autoEquipment ?? true,
     autoTerritoryWarfare: service.autoTerritoryWarfare ?? true,
     prepCombatMode: service.prepCombatMode ?? false,
+    powerFarmMode: service.powerFarmMode ?? false,
   };
 }
 

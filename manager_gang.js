@@ -7,7 +7,7 @@ export async function main(ns) {
   const combatAscendFactor = 1.35; // Combat ascension threshold for war team
   const minHackForCrime = 200;    // Hack stat threshold: below this → train instead of Crime
   const minHackShare = 0.2;       // Minimum 50% of gang stays on hacking tasks
-  const powerFarmMode = false;      // true = farm Power via Territory Warfare, but without Clashes
+  // powerFarmMode is now read from config (loadGangConfig)
   const powerFarmShare = 0.8;     // Fraction of gang for Power farming, additionally limited by minHackShare
   const prepDexFocus = false;       // true = swap based on DEX progress, false = based on combat sum
   const dexFloorRatio = 0.6;       // With DEX focus: dex must be at least X% of the highest other combat stat
@@ -30,7 +30,7 @@ export async function main(ns) {
     try {
       const raw = ns.read(configFile);
       if (!raw || !raw.trim()) {
-        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false };
+        return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false, powerFarmMode: false };
       }
 
       const parsed = JSON.parse(raw);
@@ -40,9 +40,10 @@ export async function main(ns) {
         autoEquipment: gang?.autoEquipment ?? true,
         autoTerritoryWarfare: gang?.autoTerritoryWarfare ?? true,
         prepCombatMode: gang?.prepCombatMode ?? false,
+        powerFarmMode: gang?.powerFarmMode ?? false,
       };
     } catch {
-      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false };
+      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false, powerFarmMode: false };
     }
   }
 
@@ -151,6 +152,7 @@ export async function main(ns) {
     loopCount++;
     const gangConfig = loadGangConfig();
     const prepCombatMode = gangConfig.prepCombatMode;
+    const powerFarmMode = gangConfig.powerFarmMode;
 
     // Recruit new members (while: sometimes multiple are available at once)
     while (ns.gang.canRecruitMember()) {
