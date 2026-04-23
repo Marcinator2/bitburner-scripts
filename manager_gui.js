@@ -500,6 +500,7 @@ function buildGangControls(doc) {
     { key: "autoTerritoryWarfare",  action: "toggle-gang-auto-territory",   label: "Auto-manage Territory Warfare" },
     { key: "prepCombatMode",        action: "toggle-gang-prep-combat",      label: "Train combat stats (prep mode)" },
     { key: "powerFarmMode",         action: "toggle-gang-power-farm",       label: "Power Farm Mode (Territory Power, no Clashes)" },
+    { key: "respectFarmMode",       action: "toggle-gang-respect-farm",     label: "Respect Farm Mode (always Cyberterrorism)" },
   ];
 
   for (const option of options) {
@@ -893,6 +894,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-gang-respect-farm") {
+      toggleGangRespectFarm(ns);
+      continue;
+    }
+
     if (action.startsWith("toggle-augment-cat:")) {
       const cat = action.split(":")[1];
       toggleAugmentCategory(ns, cat);
@@ -1145,6 +1151,7 @@ function renderPanel(ns, panel) {
       row.gangControls.checkboxes.get("autoTerritoryWarfare").checked = gangConfig.autoTerritoryWarfare;
       row.gangControls.checkboxes.get("prepCombatMode").checked = gangConfig.prepCombatMode;
       row.gangControls.checkboxes.get("powerFarmMode").checked = gangConfig.powerFarmMode;
+      row.gangControls.checkboxes.get("respectFarmMode").checked = gangConfig.respectFarmMode;
     }
 
     if (service.key === "augments" && row.augmentControls) {
@@ -1640,6 +1647,22 @@ function toggleGangPowerFarm(ns) {
   saveConfig(ns, CONFIG_FILE, config);
 }
 
+function toggleGangRespectFarm(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.gang || {};
+  const gangConfig = getGangConfig(current);
+
+  config.services.gang = {
+    ...current,
+    enabled: current.enabled ?? false,
+    threads: current.threads ?? 1,
+    args: Array.isArray(current.args) ? current.args : [],
+    respectFarmMode: !gangConfig.respectFarmMode,
+  };
+
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
 function startScriptIfIdle(ns, script, ...args) {
   if (!ns.fileExists(script, "home")) {
     return;
@@ -1675,6 +1698,7 @@ function getGangConfig(service) {
     autoTerritoryWarfare: service.autoTerritoryWarfare ?? true,
     prepCombatMode: service.prepCombatMode ?? false,
     powerFarmMode: service.powerFarmMode ?? false,
+    respectFarmMode: service.respectFarmMode ?? false,
   };
 }
 

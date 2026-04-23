@@ -41,9 +41,10 @@ export async function main(ns) {
         autoTerritoryWarfare: gang?.autoTerritoryWarfare ?? true,
         prepCombatMode: gang?.prepCombatMode ?? false,
         powerFarmMode: gang?.powerFarmMode ?? false,
+        respectFarmMode: gang?.respectFarmMode ?? false,
       };
     } catch {
-      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false, powerFarmMode: false };
+      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false, powerFarmMode: false, respectFarmMode: false };
     }
   }
 
@@ -395,8 +396,8 @@ export async function main(ns) {
         const cleanerCount = Math.ceil(trainedMemberNames.length * threshold);
         ns.gang.setMemberTask(name, idx < cleanerCount ? "Ethical Hacking" : "Money Laundering");
       }
-      // PRIORITY 3: Farm respect
-      else if (info.respect < minRespectForCyberterrorism) {
+      // PRIORITY 3: Farm respect (always if respectFarmMode, otherwise until threshold)
+      else if (gangConfig.respectFarmMode || info.respect < minRespectForCyberterrorism) {
         ns.gang.setMemberTask(name, "Cyberterrorism");
       }
       // PRIORITY 4: Make money
