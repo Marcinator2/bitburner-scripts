@@ -338,31 +338,44 @@ function hireAndAssign(ns, phase) {
 
   const targetSize = OFFICE_SIZES[phase] ?? OFFICE_SIZES.early;
 
-  // Job-Verteilung je nach Phase
+  // Job distribution by phase.
+  // Late ratio {6,8,8,4,10} sums to 36 — chosen so that with only 3 employees
+  // the Largest Remainder Method yields Engineer=1, Business=1, R&D=1 (not all Operations).
   const jobRatio = phase === "early"
     ? { "Operations": 1, "Engineer": 2, "Business": 1, "Management": 1, "Research & Development": 4 }
     : phase === "round1"
       ? { "Operations": 6, "Engineer": 6, "Business": 6, "Management": 6, "Research & Development": 6 }
-      : { "Operations": 10, "Engineer": 12, "Business": 10, "Management": 12, "Research & Development": 16 };
+      : { "Operations": 6, "Engineer": 8, "Business": 8, "Management": 4, "Research & Development": 10 };
 
   for (const div of corpInfo.divisions) {
     for (const city of CITIES) {
       try {
         const office = corp.getOffice(div, city);
-        // Freie Stellen auffüllen
-        let hired = false;
+        // Fill open positions (one per tick to save RAM)
         while (office.numEmployees < office.size) {
           const result = corp.hireEmployee(div, city);
           if (!result) break;
-          hired = true;
-          // Office neu lesen
-          break; // Nur 1 pro Tick um RAM zu sparen
+          break;
         }
 
-        // Jobs neu zuweisen
+        // Largest Remainder Method: most accurate proportional assignment at any office size
         const totalRatio = Object.values(jobRatio).reduce((a, b) => a + b, 0);
+        const n = office.numEmployees;
+        const jobTargets = {};
+        let assigned = 0;
         for (const [job, ratio] of Object.entries(jobRatio)) {
-          const target = Math.max(0, Math.floor(office.numEmployees * ratio / totalRatio));
+          jobTargets[job] = Math.floor(n * ratio / totalRatio);
+          assigned += jobTargets[job];
+        }
+        // Distribute remainder slots to the roles with the largest fractional parts
+        const remainder = n - assigned;
+        const byFraction = Object.entries(jobRatio)
+          .map(([job, ratio]) => ({ job, frac: (n * ratio / totalRatio) % 1 }))
+          .sort((a, b) => b.frac - a.frac);
+        for (let i = 0; i < remainder; i++) {
+          jobTargets[byFraction[i].job]++;
+        }
+        for (const [job, target] of Object.entries(jobTargets)) {
           try {
             corp.setAutoJobAssignment(div, city, job, target);
           } catch { /* */ }
@@ -375,7 +388,9 @@ function hireAndAssign(ns, phase) {
 // ─── Corp-Upgrades ────────────────────────────────────────────────────────────
 
 function buyCorpUpgrades(ns, corpInfo, phase) {
-  // Budget: nicht mehr als 10% der Mittel pro Runde für Upgrades ausgeben
+  // Don't buy upgrades when funds are negative
+  if (corpInfo.funds < 0) return;
+  // Budget: spend no more than 10% of funds per round on upgrades
   const budget = corpInfo.funds * 0.10;
   let spent = 0;
 
@@ -419,6 +434,9 @@ function buyResearch(ns, phase) {
 function maintainEmployeeStats(ns) {
   const corp = ns.corporation;
   const corpInfo = corp.getCorporation();
+
+  // Don't spend on tea/party when funds are negative
+  if (corpInfo.funds < 0) return;
 
   for (const div of corpInfo.divisions) {
     for (const city of CITIES) {
@@ -493,10 +511,12 @@ function manageProducts(ns, corpInfo, phase) {
         try {
           const product = corp.getProduct(divName, CITIES[0], productName);
           if (product.developmentProgress >= 100) {
-            // Immer Basis-Verkaufsauftrag setzen (Market-TA braucht "MAX" als Basis)
+            // Always set a base sell order first (Market-TA needs "MAX" qty as base)
+            // Use "MP" as safe default price so products always sell;
+            // Market-TA.II will override to find the optimal price once researched.
             for (const city of CITIES) {
               try {
-                corp.sellProduct(divName, city, productName, "MAX", "MP*5", true);
+                corp.sellProduct(divName, city, productName, "MAX", "MP", true);
               } catch { /* */ }
             }
             if (corp.hasResearched(divName, "Market-TA.II")) {
@@ -516,6 +536,8 @@ function manageProducts(ns, corpInfo, phase) {
 
       if (inDev.length === 0 && products.length < maxProducts) {
         const info = corp.getCorporation();
+        // Don't invest in new products when funds are negative
+        if (info.funds < 0) continue;
         const budget = Math.min(
           Math.max(info.funds * PRODUCT_DESIGN_BUDGET_RATIO, PRODUCT_MIN_INVEST),
           PRODUCT_MAX_INVEST,
@@ -603,6 +625,9 @@ function buyAdVerts(ns, phase) {
 function buyBoostMaterials(ns, phase) {
   const corp = ns.corporation;
   const corpInfo = corp.getCorporation();
+
+  // Don't buy boost materials when funds are negative
+  if (corpInfo.funds < 0) return;
 
   for (const divName of corpInfo.divisions) {
     try {
