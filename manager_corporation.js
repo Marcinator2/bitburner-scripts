@@ -424,7 +424,7 @@ function buyResearch(ns, phase) {
             ns.print(`${div}: Research unlocked: ${research}`);
           }
         }
-      } catch { /* nicht verfügbar */ }
+      } catch { /* not available */ }
     }
   }
 }
@@ -435,20 +435,21 @@ function maintainEmployeeStats(ns) {
   const corp = ns.corporation;
   const corpInfo = corp.getCorporation();
 
-  // Don't spend on tea/party when funds are negative
-  if (corpInfo.funds < 0) return;
+  // Always maintain morale/energy — low morale/energy collapses production far more
+  // than the tea/party cost. Only skip parties (not tea) when deeply in debt.
+  const deepInDebt = corpInfo.funds < -5e9;
 
   for (const div of corpInfo.divisions) {
     for (const city of CITIES) {
       try {
         const office = corp.getOffice(div, city);
         if (office.avgEnergy < 98) {
-          corp.buyTea(div, city);
-        }
-        if (office.avgMorale < 98) {
-          // Party: ~500k pro Mitarbeiter
-          corp.throwParty(div, city, 500_000);
-        }
+            corp.buyTea(div, city);
+          }
+          if (!deepInDebt && office.avgMorale < 98) {
+            // Party: ~500k per employee
+            corp.throwParty(div, city, 500_000);
+          }
       } catch { /* */ }
     }
   }
