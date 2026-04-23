@@ -20,8 +20,7 @@ export async function main(ns) {
   const maxAmortizationHours = 4; // Equipment is only bought if it pays off within X game hours
   const loopDelayMs = 2000;         // Loop time in ms (must match ns.sleep)
   const prepStatusEveryLoops = 5;   // Status output only every X loops
-  const minRespectForCyberterrorismMin = 12_500_000; // Lower bound for dynamic Cyberterrorism threshold
-  const minRespectForCyberterrorismMax = 20_000_000; // Upper bound for dynamic Cyberterrorism threshold
+  let minRespectForCyberterrorismMin = 12_500_000; // Floor for dynamic Cyberterrorism threshold
   const respectRaiseFactor = 1.2;   // Threshold rises with stable wanted situation
   const respectLowerFactor = 0.9;   // Threshold drops with unstable wanted situation
   const respectAdjustEveryLoops = 30; // Adjustment every X loops (at 2s loop = 60s)
@@ -67,6 +66,7 @@ export async function main(ns) {
   let prepRound = 1;
   let loopCount = 0;
   let minRespectForCyberterrorism = 2_000_000;
+  let prevRespectFarmMode = false;
 
   // Pre-calculate equipment lists sorted by price
   const hackEquipments = ns.gang.getEquipmentNames()
@@ -155,6 +155,16 @@ export async function main(ns) {
     const prepCombatMode = gangConfig.prepCombatMode;
     const powerFarmMode = gangConfig.powerFarmMode;
 
+    // When respectFarmMode turns off, sync the threshold to current respect so
+    // the dynamic system picks up from where farming left off (clamped to bounds).
+    if (prevRespectFarmMode && !gangConfig.respectFarmMode) {
+      const currentRespect = Math.floor(ns.gang.getGangInformation().respect);
+      minRespectForCyberterrorismMin = Math.max(minRespectForCyberterrorismMin, currentRespect);
+      minRespectForCyberterrorism = Math.max(minRespectForCyberterrorismMin, currentRespect);
+      ns.print(`[RESPECT-TARGET] Respect Farm OFF → threshold set to ${ns.formatNumber(minRespectForCyberterrorism)}`);
+    }
+    prevRespectFarmMode = gangConfig.respectFarmMode;
+
     // Recruit new members (while: sometimes multiple are available at once)
     while (ns.gang.canRecruitMember()) {
       const newName = "GangMember_" + ns.gang.getMemberNames().length;
@@ -176,10 +186,7 @@ export async function main(ns) {
         minRespectForCyberterrorism = Math.floor(minRespectForCyberterrorism * respectLowerFactor);
       }
 
-      minRespectForCyberterrorism = Math.max(
-        minRespectForCyberterrorismMin,
-        Math.min(minRespectForCyberterrorismMax, minRespectForCyberterrorism)
-      );
+      minRespectForCyberterrorism = Math.max(minRespectForCyberterrorismMin, minRespectForCyberterrorism);
 
       if (minRespectForCyberterrorism !== oldTarget) {
         ns.print(
