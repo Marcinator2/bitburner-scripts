@@ -20,11 +20,11 @@ const CHARISMA_FIELDS = new Set([
 function classifyAugment(stats) {
   const cats = new Set();
   for (const key of Object.keys(stats)) {
-    if (HACKING_FIELDS.has(key))          cats.add("hacking");
-    else if (COMBAT_FIELDS.has(key))      cats.add("combat");
-    else if (CHARISMA_FIELDS.has(key))    cats.add("charisma");
-    else if (key.startsWith("hacknet_"))  cats.add("hacknet");
-    else if (key.startsWith("bladeburner_")) cats.add("bladeburner");
+    if (key.startsWith("hacknet_"))           cats.add("hacknet");
+    else if (key.startsWith("bladeburner_"))  cats.add("bladeburner");
+    else if (HACKING_FIELDS.has(key))         cats.add("hacking");
+    else if (COMBAT_FIELDS.has(key))          cats.add("combat");
+    else if (CHARISMA_FIELDS.has(key))        cats.add("charisma");
   }
   return cats;
 }
@@ -71,8 +71,8 @@ export async function main(ns) {
     // Already owned + queued augments
     const owned = new Set(ns.singularity.getOwnedAugmentations(true));
 
-    // Per augment: find faction with highest rep
-    const augFactionMap = new Map(); // augName → { faction, rep }
+    // Per augment: find faction where the rep gap (repReq - currentRep) is smallest
+    const augFactionMap = new Map(); // augName → { faction, rep, gap }
     for (const faction of ns.getPlayer().factions) {
       let factionRep;
       try {
@@ -85,9 +85,12 @@ export async function main(ns) {
         if (aug === NEUROFLUX) continue;
         if (owned.has(aug)) continue;
 
+        const repReq = ns.singularity.getAugmentationRepReq(aug);
+        const gap = Math.max(0, repReq - factionRep);
+
         const existing = augFactionMap.get(aug);
-        if (!existing || factionRep > existing.rep) {
-          augFactionMap.set(aug, { faction, rep: factionRep });
+        if (!existing || gap < existing.gap || (gap === existing.gap && factionRep > existing.rep)) {
+          augFactionMap.set(aug, { faction, rep: factionRep, gap });
         }
       }
     }
