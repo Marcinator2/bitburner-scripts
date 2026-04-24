@@ -1,4 +1,7 @@
 /** @param {NS} ns */
+
+const CONFIG_FILE = "main_manager_config.js";
+
 export async function main(ns) {
   ns.disableLog("sleep");
 
@@ -13,6 +16,12 @@ export async function main(ns) {
   while (true) {
     ns.clearLog();
     ns.print(`Starting cycle at ${new Date().toLocaleString()}`);
+
+    let build = false;
+    try {
+      const raw = ns.read(CONFIG_FILE);
+      if (raw) build = JSON.parse(raw)?.services?.programs?.build ?? false;
+    } catch { /* use false */ }
 
     try { ns.singularity.purchaseTor(); } catch (_) {}
 
@@ -30,28 +39,29 @@ export async function main(ns) {
             break;
           }
 
-          // Not enough money – try to create/code the program instead
-          ns.print(`Not enough money for ${program}, trying to create it...`);
-          if (ns.singularity.createProgram(program, false)) {
-            ns.tprint(`Creating: ${program} – waiting for completion...`);
-            // Wait until the program appears or the player is no longer working on it
-            while (!ns.fileExists(program, host)) {
-              const work = ns.singularity.getCurrentWork();
-              if (!work || work.type !== "CREATE_PROGRAM" || work.programName !== program) {
-                ns.print(`Creation of ${program} interrupted or finished.`);
+          if (build) {
+            ns.print(`Not enough money for ${program}, trying to build it...`);
+            if (ns.singularity.createProgram(program, false)) {
+              ns.tprint(`Building: ${program} – waiting for completion...`);
+              while (!ns.fileExists(program, host)) {
+                const work = ns.singularity.getCurrentWork();
+                if (!work || work.type !== "CREATE_PROGRAM" || work.programName !== program) {
+                  ns.print(`Building of ${program} interrupted or finished.`);
+                  break;
+                }
+                await ns.sleep(5000);
+              }
+              if (ns.fileExists(program, host)) {
+                ns.tprint(`Built: ${program}`);
                 break;
               }
-              await ns.sleep(5000);
-            }
-            if (ns.fileExists(program, host)) {
-              ns.tprint(`Created: ${program}`);
-              break;
+            } else {
+              ns.print(`Cannot build ${program} yet (hacking level too low?). Retrying in ${retryDelay / 1000}s...`);
             }
           } else {
-            ns.print(`Cannot create ${program} yet (hacking level too low?). Retrying in ${retryDelay / 1000}s...`);
+            ns.print(`Not enough money for ${program}. Retrying in ${retryDelay / 1000}s...`);
           }
         } catch (_) {
-          // Singularity API not available (no SF4) – skip
           ns.print(`${program}: Singularity API not available, skipping.`);
           break;
         }
