@@ -7,72 +7,73 @@ Scripts use the `ns` (NetscriptJS) API. All files are deployed into the game via
 
 ## Architecture
 
-- `main_manager.js` ist der zentrale Supervisor und liest `main_manager_config.js` (JSON-Datei trotz .js-Endung; enthaelt loopMs, tail und den services-Block)
+- `main_manager.js` is the central supervisor; reads `main_manager_config.js` (pure JSON despite `.js` extension; contains loopMs, tail, and the services block)
 - Services in `main_manager.js`: hack, hacknet, stocks, gang, negativeKarma, programs, combatTrainer, playerStatsWorker, playerStatsView, overview
-- `auto-hack-manager.js` ist der zentrale Hacking-Manager; startet v_hack.js, v_grow.js, v_weaken.js und share-ram.js
-- `auto-hack-manager.js` begrenzt Batch-Starts pro Scheduler-Runde und gibt regelmaessig per sleep(0) an die Engine zurueck (verhindert Endlosschleifen-Erkennung und Save-Explosionen)
-- `auto-hack-manager.js` skaliert laufende share-ram.js-Instanzen auf die Ziel-Quote hoch
-- Server-Provisioning: `new_server_buy.js` → `new_server_setup.js` → kopiert Skripte, startet `profit-check.js` + `manager_share-ram.js`
-- Player-Stats-Pipeline: `player_stats_worker.js` schreibt `player_stats_data.txt`; `player_stats.js` liest und visualisiert sie; Dateiformat: `{ version, sampleMs, maxSamples, samples[] }`
-- combatTrainer ist config-gesteuert: GUI-Checkboxen fuer STR/DEF/DEX/AGI/Charisma schreiben nach `services.combatTrainer.stats`; `combat_stat_trainer.js` liest diese Auswahl live
-- `combat_stat_trainer.js`: STR/DEF/DEX/AGI laufen ueber Gym, Charisma ueber universityCourse; normalisiert Charisma-Kurs via normalizeUniversityCourse
-- `manager_gui.js` hat Server-Admin-Bereich mit RAM-Auswahl fuer Kauf/Upgrade, Live-Kostenanzeige; `new_server_buy.js` und `upgrade_Server.js` akzeptieren RAM-Args; `upgrade_Server.js` hat skipPrompt=true
-- `manager_karma.js`: eigener Service fuer negatives Karma; waehlt bestes Crime nach Karma/s, fordert mind. 90% Chance, trainiert bei Bedarf via `combat_stat_trainer.js`; `manager_gang.js` greift nur auf Gang-APIs zu wenn Gang bereits existiert
-- `manager_crime.js` und `manager_karma.js` sind unabhaengig: crime = $/s, karma = Karma/s mit Mindest-Chance-Pruefung
-- `runtime_file_utils.js`: reine Library, kein Standalone-Script; exportiert `cloneJson()` und `ensureJsonFile()`
-- `training_location_utils.js`: reine Konstanten-Library fuer Gym/Uni-Standorte, Kursnamen, Kosten, Stat-Mappings
-- `bitburner-src-stable/` spiegelt den stabilen Bitburner-Quellstand; kann lokal fuer API-, Konstanten- und Implementierungsrecherche genutzt werden
-- `README.md` enthaelt die aktuelle Projektuebersicht, Ablaufketten und Aenderungsvorgaben
+- `auto-hack-manager.js` is the central hacking manager; starts v_hack.js, v_grow.js, v_weaken.js and share-ram.js
+- `auto-hack-manager.js` limits batch starts per scheduler round and yields via sleep(0) regularly (prevents infinite-loop detection and save bloat)
+- `auto-hack-manager.js` scales running share-ram.js instances up to the target quota
+- Server provisioning: `new_server_buy.js` → `new_server_setup.js` → copies scripts, starts `profit-check.js` + `manager_share-ram.js`
+- `new_server_buy.js` is also called by `main_manager.js` headlessly for autoBuy/autoUpgrade (settings from `config.gui.managerGui`)
+- Player stats pipeline: `player_stats_worker.js` writes `player_stats_data.txt`; `player_stats.js` reads and visualizes it; format: `{ version, sampleMs, maxSamples, samples[] }`
+- combatTrainer is config-driven: GUI checkboxes for STR/DEF/DEX/AGI/Charisma write to `services.combatTrainer.stats`; `combat_stat_trainer.js` reads this selection live
+- `combat_stat_trainer.js`: STR/DEF/DEX/AGI train at gym, Charisma via universityCourse; normalizes charisma course via normalizeUniversityCourse
+- `manager_gui.js` has a Server Admin panel with RAM selector for buy/upgrade, live cost display; `new_server_buy.js` and `upgrade_Server.js` accept RAM args; `upgrade_Server.js` has skipPrompt=true
+- `manager_karma.js`: dedicated service for negative karma; picks best crime by Karma/s, requires at least 90% chance, trains via `combat_stat_trainer.js` if needed; `manager_gang.js` only accesses gang APIs when already in a gang
+- `manager_crime.js` and `manager_karma.js` are independent: crime = $/s, karma = Karma/s with minimum chance check
+- `runtime_file_utils.js`: pure library, no standalone entry; exports `cloneJson()` and `ensureJsonFile()`
+- `training_location_utils.js`: pure constants library for gym/uni locations, course names, costs, stat mappings
+- `bitburner-src-stable/` mirrors the stable Bitburner source; can be used locally for API, constant, and implementation research
+- `README.md` contains the current project overview, pipelines, and change guidelines
 
 ---
 
 ## Script Inventory
 
 ### Hacking
-- `auto-hack-manager.js` – zentraler Hacking-Manager
-- `v_hack.js`, `v_grow.js`, `v_weaken.js` – Worker-Scripts
-- `money-hack.js` – einfaches Hack-Script
+- `auto-hack-manager.js` – central hacking manager
+- `v_hack.js`, `v_grow.js`, `v_weaken.js` – worker scripts
+- `money-hack.js` – simple hack script
 - `1st-hackworm.js`, `hack-worker.js` – legacy
-- `launch-hackworm.js` – kauft Server "hackworm-host" (16 GB), deployt 1st-hackworm.js + v_*.js
+- `launch-hackworm.js` – buys server "hackworm-host" (16 GB), deploys 1st-hackworm.js + v_*.js
 
-### Manager-Services
-- `main_manager.js` – zentraler Supervisor
-- `manager_gui.js` – GUI fuer alle Services
-- `manager_hacknet.js` – Hacknet-Automatisierung
-- `manager_stocks.js` + `stock_manager_worker.js` – Stock-Trading
-- `manager_gang.js` – Gang-Management (nur wenn Gang existiert)
-- `manager_karma.js` – negatives Karma via Crime (Karma/s)
-- `manager_crime.js` – Geld via Crime ($/s), kein Karma-Fokus
-- `manager_augments.js` – kauft Augments kategorie-gefiltert (hacking/combat/hacknet/bladeburner/charisma); braucht SF4
-- `manager_backdoor.js` – installiert Backdoors per BFS alle 30s; braucht SF4
-- `manager_corporation.js` – vollautomatischer Corp-Manager (Divisions, Produkte, Invest-Runden, IPO); exportiert `getCorpStatus(ns)`
-- `manager_ipvgo.js` – IPvGO-Matches in Endlosschleife mit opponent-spezifischen KI-Strategien; Args: [opponent?, boardSize?]
-- `manager_stats.js` – trainiert Combat-Stats automatisch
-- `manager_share-ram.js` – startet share-ram.js
+### Manager Services
+- `main_manager.js` – central supervisor
+- `manager_gui.js` – GUI for all services
+- `manager_hacknet.js` – Hacknet automation
+- `manager_stocks.js` + `stock_manager_worker.js` – stock trading
+- `manager_gang.js` – gang management (only when already in a gang)
+- `manager_karma.js` – negative karma via crime (Karma/s)
+- `manager_crime.js` – money via crime ($/s), no karma focus
+- `manager_augments.js` – buys augments filtered by category (hacking/combat/hacknet/bladeburner/charisma); requires SF4; picks faction with smallest rep gap per augment
+- `manager_backdoor.js` – installs backdoors via BFS every 30s; requires SF4
+- `manager_corporation.js` – fully automated corp manager (divisions, products, investment rounds, IPO); exports `getCorpStatus(ns)`
+- `manager_ipvgo.js` – plays IPvGO subnet matches in a loop with opponent-specific AI strategies; args: [opponent?, boardSize?]
+- `manager_stats.js` – trains combat stats automatically
+- `manager_share-ram.js` – starts share-ram.js
 
 ### Player Stats
-- `player_stats_worker.js` – schreibt JSON-Historie nach `player_stats_data.txt`
-- `player_stats.js` – liest und visualisiert Trends im Tail-Fenster
-- `combat_stat_trainer.js` – trainiert STR/DEF/DEX/AGI (Gym) und Charisma (Uni) auf Zielwerte
+- `player_stats_worker.js` – writes JSON history to `player_stats_data.txt`
+- `player_stats.js` – reads and visualizes trends in the tail window
+- `combat_stat_trainer.js` – trains STR/DEF/DEX/AGI (gym) and Charisma (university) to target values
 
-### Infrastruktur
-- `new_server_buy.js` – kauft Server und startet new_server_setup.js
-- `new_server_setup.js` – kopiert Skripte, startet profit-check.js + manager_share-ram.js
-- `upgrade_Server.js` – upgradet RAM eines Servers; Args: [server, ram, skipPrompt?]
-- `share-ram.js` – teilt RAM mit Factions
-- `buy-neuroflux.js` – kauft NeuroFlux Governor endlos; Args: [faction?, reserveMoney?]; braucht SF4
-- `auto-leveler.js` – automatisches Leveln
-- `overview.js` – beobachtet money-hack.js
-- `profit-check.js` – Hilfsskript
-- `find-server.js` – Hilfsskript
+### Infrastructure
+- `new_server_buy.js` – buys a server and starts new_server_setup.js; also used by main_manager.js for headless autoBuy/autoUpgrade
+- `new_server_setup.js` – copies scripts, starts profit-check.js + manager_share-ram.js
+- `upgrade_Server.js` – upgrades RAM of a server; args: [server, ram, skipPrompt?]
+- `share-ram.js` – shares RAM with factions
+- `buy-neuroflux.js` – buys NeuroFlux Governor endlessly; args: [faction?, reserveMoney?]; requires SF4
+- `auto-leveler.js` – buys programs automatically (BruteSSH etc.); builds them via createProgram() if `services.programs.build = true`
+- `overview.js` – monitors money-hack.js
+- `profit-check.js` – helper script
+- `find-server.js` – helper script
 
-### Libraries (kein Standalone-Start)
+### Libraries (no standalone entry)
 - `runtime_file_utils.js` – `cloneJson()`, `ensureJsonFile()`
-- `training_location_utils.js` – Gym/Uni-Konstanten und Mappings
-- `main_manager_config.js` – JSON-Konfigdatei (kein echtes JS-Script)
+- `training_location_utils.js` – gym/uni constants and mappings
+- `main_manager_config.js` – JSON config file (not a real JS script)
 
-### Legacy / Experimentell
-- `1st-hackworm.js`, `hack-worker.js` – legacy Hacking
-- `befehltest.js`, `scp_kopieren.js`, `test.js` – experimentell/duplikat
-- `umbenennen_server.js` – einmaliges Legacy-Umbenennen-Script
-- `manager_infiltrate.js` – Datei geloescht, existiert nicht mehr
+### Legacy / Experimental
+- `1st-hackworm.js`, `hack-worker.js` – legacy hacking
+- `befehltest.js`, `scp_kopieren.js`, `test.js` – experimental/duplicate
+- `umbenennen_server.js` – one-time legacy rename script
+- `manager_infiltrate.js` – file deleted, no longer exists

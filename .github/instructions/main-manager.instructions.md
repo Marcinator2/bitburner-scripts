@@ -43,3 +43,20 @@ Each entry:
 ## Loop
 - `loopMs` from config, fallback `DEFAULT_LOOP_MS = 5000`.
 - Opens `ns.tail()` if `config.tail === true`.
+
+## Server Admin (headless)
+- `handleServerAdmin(ns, config)` is called every loop after `supervise()`.
+- Reads `config.gui.managerGui.autoBuy`, `.autoUpgrade`, `.upgradeRam` (saved by GUI).
+- `autoBuy`: buys 8 GB servers until the slot limit is reached.
+- `autoUpgrade`: steps each server one power-of-2 toward `upgradeRam` when affordable.
+- `loadConfig()` passes `gui` through so `handleServerAdmin` works without the GUI being open.
+
+## Status Output
+- `printStatus()` shows each service line via `formatServiceLine()`.
+- For enabled services, `formatServiceOptions()` prints a `└` detail line with active options:
+  - `combatTrainer`: active stats
+  - `gang`: active mode flags
+  - `augments`: active categories + repFarming
+  - `programs`: Build ON/OFF
+  - `ipvgo`: opponent + board size
+- A `SERVER ADMIN` block is appended if `config.gui.managerGui` exists.

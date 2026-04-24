@@ -30,7 +30,20 @@ React-based overlay GUI for controlling all services, training settings, server 
 ## Service Assignment to Tabs
 `getServiceTab(key)` maps service keys to tab IDs. New services must be added here.
 
-## Imports from Other Scripts
+## Controls per Service (non-compact rows)
+| Service key | Controls builder | Config written |
+|-------------|-----------------|----------------|
+| `combatTrainer` | `buildCombatStatControls()` | `services.combatTrainer.stats`, `.focus` |
+| `gang` | `buildGangControls()` | `services.gang.*` flags |
+| `augments` | `buildAugmentControls()` | `services.augments.categories.*`, `.repFarming` |
+| `ipvgo` | `buildIpvgoControls()` | `services.ipvgo.opponent`, `.boardSize` |
+| `corporation` | `buildCorpControls()` | `services.corporation.autoInvest`, `.autoGoPublic` |
+
+## Controls in Compact Rows (services tab)
+- `programs` (Buy Programs): `buildProgramsControls()` — checkbox `services.programs.build`.
+- Compact rows normally have no extra controls. `programs` is the exception; add its controls inside the `isCompact` branch.
+
+## Config Writes
 - `getCorpStatus(ns)` from `manager_corporation.js` — displayed in Corp tab.
 - `getBestKarmaCrime(ns)` from `manager_karma.js` — displayed in Training tab.
 - `normalizeUniversityCourse(...)` from `training_location_utils.js` — for charisma course display.
@@ -44,3 +57,4 @@ React-based overlay GUI for controlling all services, training settings, server 
 - Separate RAM selectors for **buy** (`buyRam`) and **upgrade** (`upgradeRam`).
 - Live cost preview before confirming an action.
 - Upgrade calls `upgrade_Server.js` with `skipPrompt=true` to avoid an interactive dialog.
+- `autoBuy` and `autoUpgrade` checkboxes — settings saved under `config.gui.managerGui` and also acted on by `main_manager.js` without the GUI.

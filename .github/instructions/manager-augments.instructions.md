@@ -24,17 +24,19 @@ services.augments.repFarming             – focus on rep gain instead of buying
 ```
 
 ## Augment Classification
-`classifyAugment(stats)` maps augment stat fields to categories:
+`classifyAugment(stats)` maps augment stat fields to categories via `else if` per key — a key can only land in one category:
+- `hacknet_*` → `"hacknet"` (checked first to prevent overlap with hacking)
+- `bladeburner_*` → `"bladeburner"`
 - `HACKING_FIELDS` → `"hacking"`
 - `COMBAT_FIELDS` → `"combat"` (includes crime_money and crime_success)
 - `CHARISMA_FIELDS` → `"charisma"` (includes faction_rep and work_money)
-- `hacknet_*` → `"hacknet"`
-- `bladeburner_*` → `"bladeburner"`
 
-An augment can belong to multiple categories. It is purchased if **any** of its categories is enabled.
+An augment as a whole can belong to multiple categories (e.g. hacking + combat) if it has keys from both sets. It is purchased if **any** of its categories is enabled.
+Hacknet augments are never counted as hacking augments.
 
 ## Faction Selection per Augment
-- For each affordable, unowned augment: find the faction among player's current factions with the highest rep.
+- For each unowned augment: find the faction where the rep gap (`repReq - factionRep`, min 0) is **smallest** — i.e. the faction where the augment unlocks soonest.
+- Tiebreaker when gap is equal: prefer the faction with the higher current rep.
 - Only buy if the player has enough rep in at least one faction.
 
 ## NeuroFlux Governor
