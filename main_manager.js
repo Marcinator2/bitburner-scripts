@@ -194,7 +194,44 @@ export async function main(ns) {
   while (true) {
     ns.clearLog();
     const config = supervise(ns, configFile, false);
+    handleServerAdmin(ns, config);
     await ns.sleep(config.loopMs);
+  }
+}
+
+function handleServerAdmin(ns, config) {
+  const guiState = config?.gui?.managerGui;
+  if (!guiState) return;
+
+  const SCRIPT = "new_server_buy.js";
+  if (!ns.fileExists(SCRIPT, "home")) return;
+  if (ns.scriptRunning(SCRIPT, "home")) return;
+
+  const purchased = ns.getPurchasedServers();
+  const money = ns.getPlayer().money;
+
+  // Auto-Upgrade: step each server toward upgradeRam one power-of-2 at a time
+  if (guiState.autoUpgrade && guiState.upgradeRam) {
+    const targetRam = Number(guiState.upgradeRam);
+    let minCost = Infinity;
+    for (const s of purchased) {
+      const nextRam = ns.getServerMaxRam(s) * 2;
+      if (nextRam > targetRam) continue;
+      const cost = ns.getPurchasedServerUpgradeCost(s, nextRam);
+      if (Number.isFinite(cost) && cost > 0) minCost = Math.min(minCost, cost);
+    }
+    if (minCost < Infinity && money >= minCost) {
+      ns.exec(SCRIPT, "home", 1, targetRam, true);
+      return;
+    }
+  }
+
+  // Auto-Buy: fill server slots with 8 GB servers
+  if (guiState.autoBuy && purchased.length < ns.getPurchasedServerLimit()) {
+    const cost = ns.getPurchasedServerCost(8);
+    if (cost > 0 && money >= cost) {
+      ns.exec(SCRIPT, "home", 1, 8);
+    }
   }
 }
 
@@ -278,6 +315,19 @@ function printStatus(ns, serviceStates, config, configFile) {
 
   for (const state of serviceStates) {
     ns.print(formatServiceLine(state));
+    if (state.enabled) {
+      const opts = formatServiceOptions(state.key, config.services[state.key] || {});
+      if (opts) ns.print(`  └ ${opts}`);
+    }
+  }
+
+  const guiState = config?.gui?.managerGui;
+  if (guiState) {
+    ns.print("");
+    ns.print("SERVER ADMIN");
+    ns.print(`  AutoBuy:    ${guiState.autoBuy    ? "ON" : "OFF"} (8 GB)`);
+    ns.print(`  AutoUpgrade: ${guiState.autoUpgrade ? "ON" : "OFF"} (target: ${ns.formatRam(Number(guiState.upgradeRam) || 0)})`);
+    ns.print(`  BuyRam:     ${ns.formatRam(Number(guiState.buyRam) || 0)}`);
   }
 }
 
@@ -319,6 +369,40 @@ function padRight(value, width) {
   return String(value).padEnd(width, " ");
 }
 
+function formatServiceOptions(key, cfg) {
+  if (key === "combatTrainer") {
+    const stats = cfg.stats || {};
+    const LABELS = { strength: "STR", defense: "DEF", dexterity: "DEX", agility: "AGI", charisma: "CHA" };
+    const active = Object.entries(stats).filter(([, v]) => v).map(([k]) => LABELS[k] || k).join("/");
+    return active ? `Stats: ${active}` : "Stats: none";
+  }
+  if (key === "gang") {
+    const flags = [];
+    if (cfg.autoAscend)            flags.push("AutoAscend");
+    if (cfg.autoEquipment)         flags.push("AutoEquip");
+    if (cfg.autoTerritoryWarfare)  flags.push("Territory");
+    if (cfg.prepCombatMode)        flags.push("PrepCombat");
+    if (cfg.powerFarmMode)         flags.push("PowerFarm");
+    if (cfg.respectFarmMode)       flags.push("RespectFarm");
+    return flags.length ? flags.join(" | ") : "No flags set";
+  }
+  if (key === "augments") {
+    const cats = cfg.categories || {};
+    const CAT_LABELS = { hacking: "Hack", combat: "Combat", hacknet: "HN", bladeburner: "BB", charisma: "CHA" };
+    const active = Object.entries(cats).filter(([, v]) => v).map(([k]) => CAT_LABELS[k] || k).join("/");
+    const parts = [`Cats: ${active || "none"}`];
+    if (cfg.repFarming) parts.push("RepFarm");
+    return parts.join(" | ");
+  }
+  if (key === "programs") {
+    return `Build: ${cfg.build ? "ON" : "OFF"}`;
+  }
+  if (key === "ipvgo") {
+    return `Opponent: ${cfg.opponent ?? "Slum Snakes"} | Board: ${cfg.boardSize ?? 7}`;
+  }
+  return null;
+}
+
 function loadConfig(ns, configFile) {
   const fallback = {
     loopMs: DEFAULT_LOOP_MS,
@@ -335,6 +419,7 @@ function loadConfig(ns, configFile) {
       loopMs: sanitizeLoopMs(parsed.loopMs),
       tail: parsed.tail !== false,
       services: parsed.services && typeof parsed.services === "object" ? parsed.services : {},
+      gui: parsed.gui && typeof parsed.gui === "object" ? parsed.gui : {},
       parseError: fileState.repaired,
     };
   } catch {
