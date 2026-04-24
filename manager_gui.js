@@ -1,5 +1,5 @@
 /** @param {NS} ns */
-
+//10.6.0+
 import { ensureJsonFile } from "./runtime_file_utils.js";
 import { getBestKarmaCrime } from "./manager_karma.js";
 import { normalizeUniversityCourse } from "./training_location_utils.js";
@@ -316,8 +316,14 @@ function buildPanel(doc) {
       details.style.color = "#b9d1e7";
       details.style.whiteSpace = "pre-line";
 
-      row.append(top, details);
-      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null });
+      let programsControls = null;
+      if (service.key === "programs") {
+        programsControls = buildProgramsControls(doc);
+        row.append(top, details, programsControls.wrap);
+      } else {
+        row.append(top, details);
+      }
+      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls });
     } else {
       row.style.padding = "10px 12px";
 
@@ -347,6 +353,7 @@ function buildPanel(doc) {
       let augmentControls = null;
       let ipvgoControls = null;
       let corpControls = null;
+      let programsControls = null;
       if (service.key === "combatTrainer") {
         statControls = buildCombatStatControls(doc);
         row.append(top, details, statControls.wrap);
@@ -356,6 +363,9 @@ function buildPanel(doc) {
       } else if (service.key === "augments") {
         augmentControls = buildAugmentControls(doc);
         row.append(top, details, augmentControls.wrap);
+      } else if (service.key === "programs") {
+        programsControls = buildProgramsControls(doc);
+        row.append(top, details, programsControls.wrap);
       } else if (service.key === "ipvgo") {
         ipvgoControls = buildIpvgoControls(doc);
         row.append(top, details, ipvgoControls.wrap);
@@ -366,7 +376,7 @@ function buildPanel(doc) {
         row.append(top, details);
       }
 
-      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls });
+      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls, programsControls });
     }
 
     pane.appendChild(row);
@@ -591,6 +601,32 @@ function buildAugmentControls(doc) {
   wrap.appendChild(repLabel);
 
   return { wrap, checkboxes, repCheckbox };
+}
+
+function buildProgramsControls(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.marginTop = "8px";
+  wrap.style.fontSize = "11px";
+  wrap.style.color = "#c6d8eb";
+
+  const studyLabel = doc.createElement("label");
+  studyLabel.style.display = "flex";
+  studyLabel.style.alignItems = "center";
+  studyLabel.style.gap = "6px";
+  studyLabel.style.cursor = "pointer";
+
+  const studyCheckbox = doc.createElement("input");
+  studyCheckbox.type = "checkbox";
+  studyCheckbox.dataset.action = "toggle-programs-build";
+  studyCheckbox.style.cursor = "pointer";
+
+  const studyText = doc.createElement("span");
+  studyText.textContent = "Build program when can't buy";
+
+  studyLabel.append(studyCheckbox, studyText);
+  wrap.appendChild(studyLabel);
+
+  return { wrap, studyCheckbox };
 }
 
 function buildServerAdminSection(doc) {
@@ -925,6 +961,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-programs-build") {
+      toggleProgramsBuild(ns);
+      continue;
+    }
+
     if (action.startsWith("set-ipvgo-opponent:")) {
       setIpvgoOpponent(ns, action.split(":")[1]);
       continue;
@@ -1181,6 +1222,13 @@ function renderPanel(ns, panel) {
       }
     }
 
+    if (service.key === "programs" && row.programsControls) {
+      const programsConfig = getProgramsConfig(config.services.programs || {});
+      if (row.programsControls.studyCheckbox) {
+        row.programsControls.studyCheckbox.checked = programsConfig.build;
+      }
+    }
+
     if (service.key === "ipvgo" && row.ipvgoControls) {
       const opSel  = row.ipvgoControls.opponentSelect;
       const szSel  = row.ipvgoControls.boardSizeSelect;
@@ -1287,6 +1335,12 @@ function getAugmentConfig(service) {
   };
 }
 
+function getProgramsConfig(service) {
+  return {
+    build: service.build ?? false,
+  };
+}
+
 function toggleAugmentCategory(ns, cat) {
   const VALID = ["hacking", "combat", "hacknet", "bladeburner", "charisma"];
   if (!VALID.includes(cat)) return;
@@ -1310,6 +1364,16 @@ function toggleAugmentRepFarming(ns) {
   config.services.augments = {
     ...current,
     repFarming: !(current.repFarming ?? false),
+  };
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleProgramsBuild(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.programs || {};
+  config.services.programs = {
+    ...current,
+    build: !(current.build ?? false),
   };
   saveConfig(ns, CONFIG_FILE, config);
 }
