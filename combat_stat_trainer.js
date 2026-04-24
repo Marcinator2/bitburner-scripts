@@ -67,7 +67,7 @@ export async function main(ns) {
     }
 
     ns.print("");
-    ns.print(`Trainiere jetzt: ${currentStat.toUpperCase()}`);
+    ns.print(`Training now: ${currentStat.toUpperCase()}`);
     await ns.sleep(CHECK_INTERVAL_MS);
   }
 }

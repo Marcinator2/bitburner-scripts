@@ -3,7 +3,7 @@
 const CONFIG_FILE = "main_manager_config.js";
 const NEUROFLUX = "NeuroFlux Governor";
 
-// Stat-Felder pro Kategorie (aus ns.singularity.getAugmentationStats)
+// Stat fields per category (from ns.singularity.getAugmentationStats)
 const HACKING_FIELDS = new Set([
   "hacking", "hacking_speed", "hacking_money", "hacking_grow",
   "hacking_chance", "hacking_exp",
