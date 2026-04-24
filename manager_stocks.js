@@ -7,7 +7,7 @@ export async function main(ns) {
     typeof ns.stock.purchaseTixApi !== "function" &&
     typeof ns.stock.hasTixApiAccess !== "function"
   )) {
-    ns.tprint("Stock API not available. Requires WSE/TIX API.");//test
+    ns.tprint("Stock API not available. Requires WSE/TIX API.");
     return;
   }
 
@@ -73,6 +73,12 @@ export async function main(ns) {
   const stockTickMs = Number(stockConstants.msPerStockUpdate) || 6_000;
   const minHoldMs = stockTickMs * 2;
   const trailingStopPct = 0.10;  // Trailing Stop: sell if price drops X% below peak
+  const DEFAULT_LOOP_MS = 2000;
+  let loopMs = DEFAULT_LOOP_MS;
+  try {
+    const cfgRaw = ns.read("main_manager_config.js");
+    if (cfgRaw) loopMs = Number(JSON.parse(cfgRaw)?.services?.stocks?.loopMs) || DEFAULT_LOOP_MS;
+  } catch { /* use fallback */ }
   const rebuyBlockedUntil = {};
   const positionPeak = {};       // Highest bid price since purchase per symbol
   const positionEntryForecast = {};
@@ -479,7 +485,7 @@ export async function main(ns) {
         );
         lastStatusTs = now;
       }
-      await ns.sleep(2000);
+      await ns.sleep(loopMs);
       continue;
     }
 

@@ -1,7 +1,6 @@
 /** @param {NS} ns */
 export async function main(ns) {
   const configFile = String(ns.args[0] || "main_manager_config.js");
-  //ns.disableLog("ALL");
 
   const ascensionFactor = 1.8; // Ascension multiplier threshold (hack mult must increase by this factor)
   const combatAscendFactor = 1.35; // Combat ascension threshold for war team
@@ -18,7 +17,8 @@ export async function main(ns) {
   const stopWarChance = 0.52;      // Disable Territory Warfare below this average chance
   const moneyBuffer = 10_000_000;   // Minimum money on account after equipment purchase
   const maxAmortizationHours = 4; // Equipment is only bought if it pays off within X game hours
-  const loopDelayMs = 2000;         // Loop time in ms (must match ns.sleep)
+  const DEFAULT_LOOP_DELAY_MS = 2000;
+  let loopDelayMs = DEFAULT_LOOP_DELAY_MS;
   const prepStatusEveryLoops = 5;   // Status output only every X loops
   let minRespectForCyberterrorismMin = 12_500_000; // Floor for dynamic Cyberterrorism threshold
   const respectRaiseFactor = 1.2;   // Threshold rises with stable wanted situation
@@ -41,9 +41,10 @@ export async function main(ns) {
         prepCombatMode: gang?.prepCombatMode ?? false,
         powerFarmMode: gang?.powerFarmMode ?? false,
         respectFarmMode: gang?.respectFarmMode ?? false,
+        loopMs: Number(gang?.loopMs) || DEFAULT_LOOP_DELAY_MS,
       };
     } catch {
-      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false, powerFarmMode: false, respectFarmMode: false };
+      return { autoAscend: true, autoEquipment: true, autoTerritoryWarfare: true, prepCombatMode: false, powerFarmMode: false, respectFarmMode: false, loopMs: DEFAULT_LOOP_DELAY_MS };
     }
   }
 
@@ -152,6 +153,7 @@ export async function main(ns) {
   while (true) {
     loopCount++;
     const gangConfig = loadGangConfig();
+    loopDelayMs = gangConfig.loopMs;
     const prepCombatMode = gangConfig.prepCombatMode;
     const powerFarmMode = gangConfig.powerFarmMode;
 

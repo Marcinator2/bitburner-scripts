@@ -3,15 +3,18 @@ export async function main(ns) {
   ns.disableLog("sleep");
   ns.clearLog();
 
-  // Configuration
-  const reserveCash = 0//500_000_000; // keep a fixed amount in $ (instead of a percentage)
+  const DEFAULT_LOOP_DELAY_MS = 30;
+  const reserveCash = 0; // keep a fixed amount in $
   const minAffordableMargin = 0; // minimum reserve in $, in addition to reserveCash
-  const maxShownOptions = 0//8; // how many options to show in the summary
-  const loopDelayMs = 30; // pause between passes (30 seconds)
+  let loopDelayMs = DEFAULT_LOOP_DELAY_MS;
+  try {
+    const cfgRaw = ns.read("main_manager_config.js");
+    if (cfgRaw) loopDelayMs = Number(JSON.parse(cfgRaw)?.services?.hacknet?.loopMs) || DEFAULT_LOOP_DELAY_MS;
+  } catch { /* use fallback */ }
 
   // Check if hacknet API is present (early exit)
   if (!ns.hacknet || typeof ns.hacknet.numNodes !== "function") {
-   // ns.tprint("❌ ns.hacknet API not available. Script terminated.");
+    ns.tprint("Error: Hacknet API not available. Script terminated.");
     return;
   }
 
@@ -34,7 +37,6 @@ export async function main(ns) {
       }
     }
     const availableCash = Math.max(0, playerMoney - reserveCash - minAffordableMargin);
-   // ns.tprint(`ℹ️ Available money (after reserve ${reserveCash.toLocaleString()}): ${Math.floor(availableCash).toLocaleString()}`);
 
     // Read nodes
     const numNodes = ns.hacknet.numNodes();
@@ -43,7 +45,7 @@ export async function main(ns) {
       try {
         nodes.push(ns.hacknet.getNodeStats(i));
       } catch (e) {
-       // ns.tprint("❌ ns.hacknet.getNodeStats not available or error reading node " + i);
+        ns.tprint(`Error: hacknet.getNodeStats failed for node ${i}.`);
         return;
       }
     }
@@ -118,7 +120,6 @@ export async function main(ns) {
     }
 
     if (actions.length === 0) {
-    //  ns.tprint("ℹ️ No hacknet actions found (API functions missing or no nodes/options).");
       return;
     }
 
@@ -127,18 +128,9 @@ export async function main(ns) {
       .map(a => ({ ...a, roi: a.cost > 0 ? (a.delta / a.cost) : 0 }))
       .sort((a, b) => b.roi - a.roi);
 
-    // Output top options
-   // ns.tprint("🔎 Top hacknet options (estimated Δprod / $):");
-    for (let i = 0; i < Math.min(maxShownOptions, actions.length); i++) {
-      const a = actions[i];
-     // ns.tprint(`${i + 1}. ${a.desc} — cost: ${Math.floor(a.cost).toLocaleString()} | est Δprod: ${a.delta.toFixed(6)} | ROI: ${a.roi.toExponential(6)}`);
-    }
-
     const best = actions[0];
-   // ns.tprint(`➡️ Best action: ${best.desc} | cost ${Math.floor(best.cost).toLocaleString()} | est Δprod ${best.delta.toFixed(6)} | ROI ${best.roi.toExponential(6)}`);
 
     if (best.cost > availableCash) {
-    //  ns.tprint(`❌ Not enough money for the best action. Required ${Math.floor(best.cost).toLocaleString()}, available ${Math.floor(availableCash).toLocaleString()}.`);
       // Wait and retry later
       await ns.sleep(loopDelayMs);
       continue;
@@ -187,7 +179,6 @@ export async function main(ns) {
     }
 
     if (success) ns.tprint("ℹ️ Action executed successfully.");
-   // else ns.tprint("ℹ️ Action could not be executed (probably race condition or insufficient funds).");
 
     // Wait before the next pass
     await ns.sleep(loopDelayMs);
