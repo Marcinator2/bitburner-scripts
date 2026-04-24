@@ -3,9 +3,6 @@
 // Automatically commits the best crime by $/s based on current player stats.
 // Rechecks every CHECK_INTERVAL_MS and switches crime if a better one is found.
 
-const CHECK_INTERVAL_MS = 10000;
-const FOCUS = false;
-
 const CRIME_TYPES = [
   "Shoplift",
   "Rob Store",
@@ -29,6 +26,14 @@ export async function main(ns) {
 
   ns.disableLog("ALL");
 
+  const DEFAULT_LOOP_MS = 10000;
+  const FOCUS = false;
+  let loopMs = DEFAULT_LOOP_MS;
+  try {
+    const cfgRaw = ns.read("main_manager_config.js");
+    if (cfgRaw) loopMs = Number(JSON.parse(cfgRaw)?.services?.crime?.loopMs) || DEFAULT_LOOP_MS;
+  } catch { /* use fallback */ }
+
   while (true) {
     ns.clearLog();
 
@@ -36,7 +41,7 @@ export async function main(ns) {
 
     if (!best) {
       ns.print("[Crime] No suitable crime found.");
-      await ns.sleep(CHECK_INTERVAL_MS);
+      await ns.sleep(loopMs);
       continue;
     }
 
@@ -60,7 +65,7 @@ export async function main(ns) {
       ns.print(`  ${c.type.padEnd(22)} ${ns.formatNumber(c.effectiveMoneyPerSec).padStart(8)}$/s  ${(c.chance * 100).toFixed(0).padStart(3)}%`);
     }
 
-    await ns.sleep(CHECK_INTERVAL_MS);
+    await ns.sleep(loopMs);
   }
 }
 

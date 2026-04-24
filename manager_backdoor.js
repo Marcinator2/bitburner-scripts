@@ -12,7 +12,12 @@ export async function main(ns) {
     return;
   }
 
-  const LOOP_DELAY_MS = 30_000; // Pause between full passes
+  const DEFAULT_LOOP_DELAY_MS = 30_000;
+  let loopDelayMs = DEFAULT_LOOP_DELAY_MS;
+  try {
+    const cfgRaw = ns.read("main_manager_config.js");
+    if (cfgRaw) loopDelayMs = Number(JSON.parse(cfgRaw)?.services?.backdoor?.loopMs) || DEFAULT_LOOP_DELAY_MS;
+  } catch { /* use fallback */ }
 
   /** BFS path from 'home' to 'target' */
   function findPath(target) {
@@ -89,8 +94,8 @@ export async function main(ns) {
     ).length;
     ns.clearLog();
     ns.print(`[Backdoor] Done. Installed: ${done} | Open: ${candidates.length}`);
-    ns.print(`[Backdoor] Next pass in ${LOOP_DELAY_MS / 1000}s`);
+    ns.print(`[Backdoor] Next pass in ${loopDelayMs / 1000}s`);
 
-    await ns.sleep(LOOP_DELAY_MS);
+    await ns.sleep(loopDelayMs);
   }
 }

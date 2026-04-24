@@ -2,10 +2,6 @@
 
 import { ensureJsonFile } from "./runtime_file_utils.js";
 
-const DEFAULT_CONFIG_FILE = "main_manager_config.js";
-const CHECK_INTERVAL_MS = 15000;
-const CRIME_CHANCE_TARGET = 0.9;
-const CRIME_FOCUS = false;
 const CRIME_TYPES = [
   "Shoplift",
   "Rob Store",
@@ -35,7 +31,16 @@ export async function main(ns) {
     return;
   }
 
+  const DEFAULT_CONFIG_FILE = "main_manager_config.js";
   const configFile = String(ns.args[0] || DEFAULT_CONFIG_FILE);
+  const CRIME_CHANCE_TARGET = 0.9;
+  const CRIME_FOCUS = false;
+  const DEFAULT_LOOP_MS = 15000;
+  let loopMs = DEFAULT_LOOP_MS;
+  try {
+    const cfgRaw = ns.read(configFile);
+    if (cfgRaw) loopMs = Number(JSON.parse(cfgRaw)?.services?.negativeKarma?.loopMs) || DEFAULT_LOOP_MS;
+  } catch { /* use fallback */ }
 
   ns.disableLog("sleep");
 
@@ -53,7 +58,7 @@ export async function main(ns) {
       ns.print("NEGATIVE KARMA");
       ns.print("");
       ns.print("No suitable crime with karma found.");
-      await ns.sleep(CHECK_INTERVAL_MS);
+      await ns.sleep(loopMs);
       continue;
     }
 
@@ -75,7 +80,7 @@ export async function main(ns) {
       printStatus(ns, bestCrime, false);
     }
 
-    await ns.sleep(CHECK_INTERVAL_MS);
+    await ns.sleep(loopMs);
   }
 }
 
