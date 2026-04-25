@@ -21,38 +21,42 @@ const STRATEGIES = {
     // Weak at IPvGO — hunt isolated stones, assume they won't find best reply
     captureW: 10, connW: 2.0, atariW: 14, preAtariW: 6, cutW: 8,  bridgeW: 2,
     selfAtari1: 22, selfAtari2: 4,  eyeFill: 15, cornerW: 1.5, passThresh: -2,
-    opponentSkillW: 0.35,
+    saveAtariW: 18, savePreAtariW: 5, opponentSkillW: 0.35,
   },
   "Slum Snakes": {
-    // Long snake chains — cutting through them and threatening atari is key
-    captureW: 8,  connW: 2.0, atariW: 16, preAtariW: 4, cutW: 14, bridgeW: 2,
-    selfAtari1: 30, selfAtari2: 6,  eyeFill: 20, cornerW: 1.5, passThresh: -2,
-    opponentSkillW: 0.75,
+    // Long snake chains have few liberties — cut aggressively and hunt atari.
+    // Low opponentSkillW: snakes don't pivot well, so play offensively.
+    // Reduced self-atari penalties to allow tactical sacrifices when cutting.
+    captureW: 15, connW: 2.0, atariW: 24, preAtariW: 14, cutW: 26, bridgeW: 4,
+    selfAtari1: 22, selfAtari2: 5,  eyeFill: 22, cornerW: 1.5, passThresh: -2,
+    saveAtariW: 22, savePreAtariW: 6, opponentSkillW: 0.5,
   },
   "The Black Hand": {
-    // Very aggressive surrounder — connect everything, build 2-eye groups, never self-atari
-    captureW: 5,  connW: 5.0, atariW: 8,  preAtariW: 3, cutW: 4,  bridgeW: 10,
-    selfAtari1: 50, selfAtari2: 15, eyeFill: 35, cornerW: 2.0, passThresh: -2,
-    opponentSkillW: 1.0,
+    // Surrounds and strangles — escape encirclement early, cut their forming lines,
+    // bridge isolated groups, protect eyes. saveAtariW/savePreAtariW are high
+    // because they constantly threaten our chains with atari.
+    captureW: 14, connW: 2.0, atariW: 20, preAtariW: 12, cutW: 20, bridgeW: 14,
+    selfAtari1: 25, selfAtari2: 7,  eyeFill: 38, cornerW: 2.0, passThresh: -2,
+    saveAtariW: 40, savePreAtariW: 18, opponentSkillW: 0.65,
   },
   "Tetrads": {
     // Cutters — bridge own groups to avoid being cut, also cut them back
     captureW: 5,  connW: 5.0, atariW: 8,  preAtariW: 3, cutW: 10, bridgeW: 12,
     selfAtari1: 35, selfAtari2: 8,  eyeFill: 20, cornerW: 1.5, passThresh: -2,
-    opponentSkillW: 0.9,
+    saveAtariW: 28, savePreAtariW: 10, opponentSkillW: 0.9,
   },
   "Illuminati": {
     // Heavily prepared defenses — careful, avoid traps, high atari awareness
     captureW: 5,  connW: 3.5, atariW: 10, preAtariW: 3, cutW: 6,  bridgeW: 5,
     selfAtari1: 45, selfAtari2: 12, eyeFill: 28, cornerW: 1.2, passThresh: -2,
-    opponentSkillW: 1.0,
+    saveAtariW: 32, savePreAtariW: 12, opponentSkillW: 1.0,
   },
 };
 
 const DEFAULT_STRATEGY = {
   captureW: 5,  connW: 2.5, atariW: 8,  preAtariW: 3, cutW: 4,  bridgeW: 2,
   selfAtari1: 30, selfAtari2: 6,  eyeFill: 20, cornerW: 1.5, passThresh: -2,
-  opponentSkillW: 0.8,
+  saveAtariW: 20, savePreAtariW: 8, opponentSkillW: 0.8,
 };
 
 export async function main(ns) {
@@ -144,6 +148,9 @@ function pickMove(board, validMoves, liberties, size, strategy) {
     for (let y = 0; y < size; y++)
       if (cur[x]?.[y] !== '.' && cur[x]?.[y] !== '#') totalStones++;
 
+  // Pre-compute global threat counts on the current board (used as baseline inside the loop)
+  const baseThreat = analyzeThreats(cur, size);
+
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       if (!validMoves[x]?.[y]) continue;
@@ -164,10 +171,12 @@ function pickMove(board, validMoves, liberties, size, strategy) {
       // Main score: territory advantage after opponent replies + capture bonus
       let score = (xT - oT - baseline) * 2 + caps * strategy.captureW;
 
-      // Bonus: saves own chain in atari
-      for (const [ax, ay] of neighbors(x, y, size)) {
-        if (cur[ax]?.[ay] === 'X' && (liberties[ax]?.[ay] ?? 4) === 1) score += 15;
-      }
+      // Global threat analysis on the simulated board
+      const t = analyzeThreats(sim1, size);
+
+      // Bonus: saves own chains in atari or pre-atari (escape encirclement)
+      score += (baseThreat.ownAtari    - t.ownAtari)    * strategy.saveAtariW;
+      score += Math.max(0, baseThreat.ownPreAtari - t.ownPreAtari) * strategy.savePreAtariW;
 
       // Position preference: corners in early game, center later
       const edgeDist = Math.min(x, y, size - 1 - x, size - 1 - y);
@@ -179,11 +188,9 @@ function pickMove(board, validMoves, liberties, size, strategy) {
       for (const [nx, ny] of neighbors(x, y, size))
         if (cur[nx]?.[ny] === 'X') score += strategy.connW;
 
-      // Bonus: puts opponent chain in atari after our move
-      score += opponentChainsInAtariAfterMove(sim1, x, y, size) * strategy.atariW;
-
-      // Bonus: reduces opponent chain to 2 libs (pre-atari pressure, will capture next move)
-      score += opponentChainsToTwoLibsAfterMove(sim1, x, y, size) * strategy.preAtariW;
+      // Bonus: puts opponent chains in atari or pre-atari (global, not just adjacent)
+      score += (t.oppAtari    - baseThreat.oppAtari)    * strategy.atariW;
+      score += (t.oppPreAtari - baseThreat.oppPreAtari) * strategy.preAtariW;
 
       // Cut bonus: move separates two or more opponent groups
       const oppGroups = countAdjacentGroups(cur, x, y, 'O', size);
@@ -378,31 +385,31 @@ function isEye(b, x, y, color, size) {
   return true;
 }
 
-function opponentChainsInAtariAfterMove(after, mx, my, size) {
-  let count = 0;
-  const seen = new Set();
-  for (const [nx, ny] of neighbors(mx, my, size)) {
-    if (after[nx]?.[ny] !== 'O') continue;
-    const k = nx * size + ny;
-    if (seen.has(k)) continue;
-    const chain = traceChain(after, nx, ny, 'O', size);
-    for (const [cx, cy] of chain) seen.add(cx * size + cy);
-    if (chainLiberties(after, chain, size) === 1) count++;
-  }
-  return count;
-}
+// ── Threat analysis (global pass over all chains) ────────────────────────────
 
-function opponentChainsToTwoLibsAfterMove(after, mx, my, size) {
-  let count = 0;
+// Counts chains of each color at exactly 1 or 2 liberties in a single board pass.
+// Used to detect atari/pre-atari threats for both players simultaneously.
+function analyzeThreats(b, size) {
   const seen = new Set();
-  for (const [nx, ny] of neighbors(mx, my, size)) {
-    if (after[nx]?.[ny] !== 'O') continue;
-    const k = nx * size + ny;
-    if (seen.has(k)) continue;
-    const chain = traceChain(after, nx, ny, 'O', size);
-    for (const [cx, cy] of chain) seen.add(cx * size + cy);
-    if (chainLiberties(after, chain, size) === 2) count++;
+  let oppAtari = 0, oppPreAtari = 0, ownAtari = 0, ownPreAtari = 0;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      const cell = b[x]?.[y];
+      if (cell !== 'X' && cell !== 'O') continue;
+      const k = x * size + y;
+      if (seen.has(k)) continue;
+      const chain = traceChain(b, x, y, cell, size);
+      for (const [cx, cy] of chain) seen.add(cx * size + cy);
+      const libs = chainLiberties(b, chain, size);
+      if (cell === 'O') {
+        if (libs === 1) oppAtari++;
+        else if (libs === 2) oppPreAtari++;
+      } else {
+        if (libs === 1) ownAtari++;
+        else if (libs === 2) ownPreAtari++;
+      }
+    }
   }
-  return count;
+  return { oppAtari, oppPreAtari, ownAtari, ownPreAtari };
 }
 
