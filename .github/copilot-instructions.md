@@ -3,6 +3,10 @@
 This is a Bitburner automation project. All scripts run inside the Bitburner game engine (NS2/JS).
 Scripts use the `ns` (NetscriptJS) API. All files are deployed into the game via the Bitburner VS Code extension.
 
+## General Rules
+- All code comments, `ns.print`/`ns.tprint` messages, and **git commit messages** must be written in **English**.
+- Commit messages follow the format: `type: short description` (e.g. `feat: add build checkbox`).
+
 ---
 
 ## Architecture
