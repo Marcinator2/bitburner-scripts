@@ -600,7 +600,25 @@ function buildAugmentControls(doc) {
   repLabel.append(repCheckbox, repText);
   wrap.appendChild(repLabel);
 
-  return { wrap, checkboxes, repCheckbox };
+  const focusLabel = doc.createElement("label");
+  focusLabel.style.display = "flex";
+  focusLabel.style.alignItems = "center";
+  focusLabel.style.gap = "6px";
+  focusLabel.style.cursor = "pointer";
+  focusLabel.style.gridColumn = "1 / -1";
+
+  const focusCheckbox = doc.createElement("input");
+  focusCheckbox.type = "checkbox";
+  focusCheckbox.dataset.action = "toggle-augment-focus";
+  focusCheckbox.style.cursor = "pointer";
+
+  const focusText = doc.createElement("span");
+  focusText.textContent = "Focus while rep-farming";
+
+  focusLabel.append(focusCheckbox, focusText);
+  wrap.appendChild(focusLabel);
+
+  return { wrap, checkboxes, repCheckbox, focusCheckbox };
 }
 
 function buildProgramsControls(doc) {
@@ -961,6 +979,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-augment-focus") {
+      toggleAugmentFocus(ns);
+      continue;
+    }
+
     if (action === "toggle-programs-build") {
       toggleProgramsBuild(ns);
       continue;
@@ -1220,6 +1243,9 @@ function renderPanel(ns, panel) {
       if (row.augmentControls.repCheckbox) {
         row.augmentControls.repCheckbox.checked = augmentConfig.repFarming;
       }
+      if (row.augmentControls.focusCheckbox) {
+        row.augmentControls.focusCheckbox.checked = augmentConfig.focus;
+      }
     }
 
     if (service.key === "programs" && row.programsControls) {
@@ -1317,7 +1343,7 @@ function buildAugmentDetails(ns, enabled, running, override, scriptExists, augCo
   return [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
     `Categories: ${activeCats || "none"}`,
-    `Rep-Farming: ${augConfig.repFarming ? "ON" : "OFF"} | ${bufferText}`,
+    `Rep-Farming: ${augConfig.repFarming ? "ON" : "OFF"} | Focus: ${augConfig.focus ? "ON" : "OFF"} | ${bufferText}`,
   ].join("\n");
 }
 
@@ -1332,6 +1358,7 @@ function getAugmentConfig(service) {
     },
     minMoneyBuffer: service.minMoneyBuffer ?? 0,
     repFarming: service.repFarming ?? false,
+    focus: service.focus ?? false,
   };
 }
 
@@ -1364,6 +1391,16 @@ function toggleAugmentRepFarming(ns) {
   config.services.augments = {
     ...current,
     repFarming: !(current.repFarming ?? false),
+  };
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleAugmentFocus(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.augments || {};
+  config.services.augments = {
+    ...current,
+    focus: !(current.focus ?? false),
   };
   saveConfig(ns, CONFIG_FILE, config);
 }

@@ -50,6 +50,7 @@ function getAugConfig(config) {
     },
     minMoneyBuffer: typeof s.minMoneyBuffer === "number" ? s.minMoneyBuffer : 0,
     repFarming: s.repFarming ?? false,
+    focus: s.focus ?? false,
   };
 }
 
@@ -252,9 +253,9 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
 
   // Determine best available work type (Hacking > Field > Security)
   const started =
-    tryFactionWork(ns, targetFaction, "hacking") ||
-    tryFactionWork(ns, targetFaction, "field") ||
-    tryFactionWork(ns, targetFaction, "security");
+    tryFactionWork(ns, targetFaction, "hacking", augConfig.focus) ||
+    tryFactionWork(ns, targetFaction, "field", augConfig.focus) ||
+    tryFactionWork(ns, targetFaction, "security", augConfig.focus);
 
   if (started) {
     ns.print(`[REP-FARM] Started: ${targetFaction} (${factionCount.get(targetFaction)} augments open)`);
@@ -263,9 +264,9 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
   }
 }
 
-function tryFactionWork(ns, faction, type) {
+function tryFactionWork(ns, faction, type, focus = false) {
   try {
-    return ns.singularity.workForFaction(faction, type, false);
+    return ns.singularity.workForFaction(faction, type, focus);
   } catch (_) {
     return false;
   }

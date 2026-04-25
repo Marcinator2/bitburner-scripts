@@ -392,6 +392,7 @@ function formatServiceOptions(key, cfg) {
     const active = Object.entries(cats).filter(([, v]) => v).map(([k]) => CAT_LABELS[k] || k).join("/");
     const parts = [`Cats: ${active || "none"}`];
     if (cfg.repFarming) parts.push("RepFarm");
+    if (cfg.repFarming && cfg.focus) parts.push("Focus");
     return parts.join(" | ");
   }
   if (key === "programs") {
