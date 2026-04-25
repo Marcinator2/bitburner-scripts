@@ -477,12 +477,13 @@ export async function main(ns) {
       }
       const now = Date.now();
       if (status && now - lastStatusTs > 30_000) {
-        ns.tprint(
+       /* ns.tprint(
           `4S Status | regime=${status.regime} open=${status.openPositions} cash=${ns.formatNumber(status.tradableCash)} ` +
           `buyF=${status.adaptiveBuyF.toFixed(3)} minVol=${status.adaptiveMinVol.toFixed(3)} ` +
           `buys=${status.buys} sells=${status.sells} rot=${status.rotations} stop=${status.stoppedLoss} drop=${status.droppedForecast} ` +
           `block(forecast=${status.blockedForecast},vol=${status.blockedVolatility},cd=${status.blockedCooldown},budget=${status.blockedBudget})`
         );
+        */
         lastStatusTs = now;
       }
       await ns.sleep(loopMs);
