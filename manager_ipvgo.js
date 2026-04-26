@@ -40,21 +40,30 @@ const STRATEGIES = {
     saveAtariW: 40, savePreAtariW: 18, opponentSkillW: 0.65,
   },
   "Tetrads": {
-    // Martial AI — aggressive cutters that split groups and fight close combat.
-    // High bridgeW + connW: stay connected at all costs; isolated groups die fast.
-    // High cutW: cut their forming lines back before they split us.
-    // Elevated selfAtari1/2: never leave a cutting handle for them to exploit.
-    // High savePreAtariW: react early (2 libs) before they complete the cut.
-    // opponentSkillW 0.9: they find good cuts reliably, respect their replies.
-    captureW: 6,  connW: 6.0, atariW: 12, preAtariW: 5, cutW: 16, bridgeW: 18,
-    selfAtari1: 40, selfAtari2: 14, eyeFill: 20, cornerW: 1.5, passThresh: -2,
-    saveAtariW: 30, savePreAtariW: 16, opponentSkillW: 0.9,
+    // Martial AI — encircles edge chains. Counter: play interior, spread out, escape fast.
+    // cornerW NEGATIVE: stop clustering at edges/corners — Tetrads excels at edge encirclement.
+    //   (2-edgeDist)*cornerW with cornerW=-1.5: corner=-3, edge=-1.5, 2-in=0, center=+1.5)
+    // connW 1.0 (was 2.0): early clustering moves score 0.4 and pull us into tight groups;
+    //   lower value lets territory and atari moves win the comparison on an open board.
+    // passThresh 0.0: logs show -1.3/-1.4 moves being played and losing territory; pass instead.
+    captureW: 12, connW: 1.0, atariW: 16, preAtariW: 8, cutW: 22, bridgeW: 14,
+    selfAtari1: 40, selfAtari2: 12, eyeFill: 32, cornerW: -1.5, passThresh: 0.0,
+    saveAtariW: 45, savePreAtariW: 24, opponentSkillW: 0.9,
   },
   "Illuminati": {
-    // Heavily prepared defenses — careful, avoid traps, high atari awareness
-    captureW: 5,  connW: 3.5, atariW: 10, preAtariW: 3, cutW: 6,  bridgeW: 5,
-    selfAtari1: 45, selfAtari2: 12, eyeFill: 28, cornerW: 1.2, passThresh: -2,
-    saveAtariW: 32, savePreAtariW: 12, opponentSkillW: 1.0,
+    // Hard AI — defensive, prepares well, punishes tactical mistakes.
+    // cornerW NEGATIVE: log showed every game opening at an edge (score 72–88!) due to cornerW=1.2;
+    //   edge chains were then encircled. Same fix as Tetrads: play interior.
+    // connW 1.5 (was 3.5): high connW produced low-score clustering moves.
+    // passThresh -2 (restored from 0.0): passThresh=0.0 caused passing after 1-3 moves because
+    //   the second move scores ~1-9 on a mostly-empty board; Illuminati then claimed all territory.
+    //   The -1.6/-1.8 moves are less harmful than surrendering the entire board by passing early.
+    // captureW/atariW/cutW raised: Illuminati's defensive formation can be pressed more aggressively.
+    // selfAtari1/2 stay high: they will find and exploit any self-atari immediately.
+    // opponentSkillW 1.0: always simulate their perfect reply.
+    captureW: 8,  connW: 1.5, atariW: 14, preAtariW: 5, cutW: 10, bridgeW: 6,
+    selfAtari1: 45, selfAtari2: 12, eyeFill: 32, cornerW: -1.0, passThresh: -2,
+    saveAtariW: 38, savePreAtariW: 14, opponentSkillW: 1.0,
   },
 };
 
@@ -85,6 +94,7 @@ export async function main(ns) {
 
     totalGames++;
     let consecutivePasses = 0;
+    let gameMoves = [];
     ns.print(`[IPvGO] Game ${totalGames} started.`);
 
     while (true) {
@@ -104,6 +114,7 @@ export async function main(ns) {
       let result;
       try {
         if (move) {
+          gameMoves.push({ x: move.x, y: move.y, score: +(move.score?.toFixed(2) ?? 0) });
           result = await ns.go.makeMove(move.x, move.y);
           consecutivePasses = 0;
         } else {
@@ -123,9 +134,15 @@ export async function main(ns) {
     try {
       const state = ns.go.getGameState();
       if (state?.blackScore !== undefined) {
-        if (state.blackScore > state.whiteScore)      wins++;
-        else if (state.blackScore < state.whiteScore) losses++;
-        else                                           draws++;
+        let gameResult;
+        if (state.blackScore > state.whiteScore)      { wins++;   gameResult = "win"; }
+        else if (state.blackScore < state.whiteScore) { losses++; gameResult = "loss"; }
+        else                                          { draws++;  gameResult = "draw"; }
+        saveGameLog(ns, OPPONENT, {
+          gameNum: totalGames, boardSize: BOARD_SIZE, result: gameResult,
+          blackScore: state.blackScore, whiteScore: state.whiteScore,
+          moves: gameMoves,
+        });
       }
     } catch (_) {}
 
@@ -214,7 +231,7 @@ function pickMove(board, validMoves, liberties, size, strategy) {
       // Penalty: filling own eye
       if (isEye(cur, x, y, 'X', size)) score -= strategy.eyeFill;
 
-      if (score > bestScore) { bestScore = score; bestMove = { x, y }; }
+      if (score > bestScore) { bestScore = score; bestMove = { x, y, score }; }
     }
   }
 
@@ -416,5 +433,23 @@ function analyzeThreats(b, size) {
     }
   }
   return { oppAtari, oppPreAtari, ownAtari, ownPreAtari };
+}
+
+// ── Game log (last 10 games per opponent) ────────────────────────────────────
+
+const IPVGO_LOG_FILE = "ipvgo_gamelog.js";
+const IPVGO_LOG_MAX  = 20;
+
+function saveGameLog(ns, opponent, entry) {
+  let log = {};
+  try {
+    const raw = ns.read(IPVGO_LOG_FILE);
+    if (raw) log = JSON.parse(raw);
+  } catch { /* start fresh */ }
+  if (!Array.isArray(log[opponent])) log[opponent] = [];
+  log[opponent].push(entry);
+  if (log[opponent].length > IPVGO_LOG_MAX)
+    log[opponent] = log[opponent].slice(-IPVGO_LOG_MAX);
+  ns.write(IPVGO_LOG_FILE, JSON.stringify(log, null, 2), "w");
 }
 
