@@ -321,13 +321,17 @@ function buildPanel(doc) {
       details.style.whiteSpace = "pre-line";
 
       let programsControls = null;
+      let hacknetControls = null;
       if (service.key === "programs") {
         programsControls = buildProgramsControls(doc);
         row.append(top, details, programsControls.wrap);
+      } else if (service.key === "hacknet") {
+        hacknetControls = buildHacknetControls(doc);
+        row.append(top, details, hacknetControls.wrap);
       } else {
         row.append(top, details);
       }
-      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls });
+      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls, hacknetControls });
     } else {
       row.style.padding = "10px 12px";
 
@@ -358,6 +362,7 @@ function buildPanel(doc) {
       let ipvgoControls = null;
       let corpControls = null;
       let programsControls = null;
+      let hacknetControls = null;
       if (service.key === "combatTrainer") {
         statControls = buildCombatStatControls(doc);
         row.append(top, details, statControls.wrap);
@@ -370,6 +375,9 @@ function buildPanel(doc) {
       } else if (service.key === "programs") {
         programsControls = buildProgramsControls(doc);
         row.append(top, details, programsControls.wrap);
+      } else if (service.key === "hacknet") {
+        hacknetControls = buildHacknetControls(doc);
+        row.append(top, details, hacknetControls.wrap);
       } else if (service.key === "ipvgo") {
         ipvgoControls = buildIpvgoControls(doc);
         row.append(top, details, ipvgoControls.wrap);
@@ -380,7 +388,7 @@ function buildPanel(doc) {
         row.append(top, details);
       }
 
-      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls, programsControls });
+      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls, programsControls, hacknetControls });
     }
 
     pane.appendChild(row);
@@ -628,6 +636,32 @@ function buildAugmentControls(doc) {
   wrap.appendChild(focusLabel);
 
   return { wrap, checkboxes, repCheckbox, focusCheckbox };
+}
+
+function buildHacknetControls(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.marginTop = "8px";
+  wrap.style.fontSize = "11px";
+  wrap.style.color = "#c6d8eb";
+
+  const roiLabel = doc.createElement("label");
+  roiLabel.style.display = "flex";
+  roiLabel.style.alignItems = "center";
+  roiLabel.style.gap = "6px";
+  roiLabel.style.cursor = "pointer";
+
+  const roiCheckbox = doc.createElement("input");
+  roiCheckbox.type = "checkbox";
+  roiCheckbox.dataset.action = "toggle-hacknet-roi";
+  roiCheckbox.style.cursor = "pointer";
+
+  const roiText = doc.createElement("span");
+  roiText.textContent = "Wait for ROI before upgrading";
+
+  roiLabel.append(roiCheckbox, roiText);
+  wrap.appendChild(roiLabel);
+
+  return { wrap, roiCheckbox };
 }
 
 function buildProgramsControls(doc) {
@@ -998,6 +1032,11 @@ function processQueuedActions(ns, panel, actionQueue) {
       continue;
     }
 
+    if (action === "toggle-hacknet-roi") {
+      toggleHacknetRoi(ns);
+      continue;
+    }
+
     if (action.startsWith("set-ipvgo-opponent:")) {
       setIpvgoOpponent(ns, action.split(":")[1]);
       continue;
@@ -1289,6 +1328,11 @@ function renderPanel(ns, panel) {
       if (row.programsControls.studyCheckbox) {
         row.programsControls.studyCheckbox.checked = programsConfig.build;
       }
+    }
+
+    if (service.key === "hacknet" && row.hacknetControls) {
+      const hacknetCfg = config.services.hacknet || {};
+      row.hacknetControls.roiCheckbox.checked = !!(hacknetCfg.requireRoi);
     }
 
     if (service.key === "ipvgo" && row.ipvgoControls) {
@@ -1592,6 +1636,16 @@ function toggleAugmentFocus(ns) {
   saveConfig(ns, CONFIG_FILE, config);
 }
 
+function toggleHacknetRoi(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.hacknet || {};
+  config.services.hacknet = {
+    ...current,
+    requireRoi: !(current.requireRoi ?? false),
+  };
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
 function toggleProgramsBuild(ns) {
   const config = loadConfig(ns, CONFIG_FILE);
   const current = config.services.programs || {};
@@ -1603,7 +1657,7 @@ function toggleProgramsBuild(ns) {
 }
 
 function getIpvgoConfig(service) {
-  const OPPONENTS = ["Slum Snakes", "Netburners", "The Black Hand", "NiteSec", "CyberSec", "Daedalus", "Illuminati", "§"];
+  const OPPONENTS = ["Slum Snakes", "Netburners", "The Black Hand", "Tetrads", "Illuminati"];
   const BOARD_SIZES = [5, 7, 9, 13];
   const opponent = OPPONENTS.includes(service.opponent) ? service.opponent : "Slum Snakes";
   const boardSize = BOARD_SIZES.includes(Number(service.boardSize)) ? Number(service.boardSize) : 7;
@@ -1629,7 +1683,7 @@ function setIpvgoBoardSize(ns, boardSize) {
 }
 
 function buildIpvgoControls(doc) {
-  const OPPONENTS  = ["Slum Snakes", "Netburners", "The Black Hand", "NiteSec", "CyberSec", "Daedalus", "Illuminati", "§"];
+  const OPPONENTS  = ["Slum Snakes", "Netburners", "The Black Hand", "Tetrads", "Illuminati"];
   const BOARD_SIZES = [5, 7, 9, 13];
 
   const wrap = doc.createElement("div");

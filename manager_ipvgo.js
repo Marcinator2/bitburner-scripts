@@ -40,10 +40,15 @@ const STRATEGIES = {
     saveAtariW: 40, savePreAtariW: 18, opponentSkillW: 0.65,
   },
   "Tetrads": {
-    // Cutters — bridge own groups to avoid being cut, also cut them back
-    captureW: 5,  connW: 5.0, atariW: 8,  preAtariW: 3, cutW: 10, bridgeW: 12,
-    selfAtari1: 35, selfAtari2: 8,  eyeFill: 20, cornerW: 1.5, passThresh: -2,
-    saveAtariW: 28, savePreAtariW: 10, opponentSkillW: 0.9,
+    // Martial AI — aggressive cutters that split groups and fight close combat.
+    // High bridgeW + connW: stay connected at all costs; isolated groups die fast.
+    // High cutW: cut their forming lines back before they split us.
+    // Elevated selfAtari1/2: never leave a cutting handle for them to exploit.
+    // High savePreAtariW: react early (2 libs) before they complete the cut.
+    // opponentSkillW 0.9: they find good cuts reliably, respect their replies.
+    captureW: 6,  connW: 6.0, atariW: 12, preAtariW: 5, cutW: 16, bridgeW: 18,
+    selfAtari1: 40, selfAtari2: 14, eyeFill: 20, cornerW: 1.5, passThresh: -2,
+    saveAtariW: 30, savePreAtariW: 16, opponentSkillW: 0.9,
   },
   "Illuminati": {
     // Heavily prepared defenses — careful, avoid traps, high atari awareness

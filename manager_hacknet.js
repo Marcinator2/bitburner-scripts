@@ -7,10 +7,19 @@ export async function main(ns) {
   const reserveCash = 0; // keep a fixed amount in $
   const minAffordableMargin = 0; // minimum reserve in $, in addition to reserveCash
   let loopDelayMs = DEFAULT_LOOP_DELAY_MS;
+  let requireRoi = false;
   try {
     const cfgRaw = ns.read("main_manager_config.js");
-    if (cfgRaw) loopDelayMs = Number(JSON.parse(cfgRaw)?.services?.hacknet?.loopMs) || DEFAULT_LOOP_DELAY_MS;
+    if (cfgRaw) {
+      const cfg = JSON.parse(cfgRaw);
+      loopDelayMs = Number(cfg?.services?.hacknet?.loopMs) || DEFAULT_LOOP_DELAY_MS;
+      requireRoi = !!(cfg?.services?.hacknet?.requireRoi);
+    }
   } catch { /* use fallback */ }
+
+  // ROI tracking: after an upgrade, roiTarget holds the totalMoneyGained threshold
+  // that all nodes together must reach before the next upgrade is allowed.
+  let roiTarget = 0;
 
   // Check if hacknet API is present (early exit)
   if (!ns.hacknet || typeof ns.hacknet.numNodes !== "function") {
@@ -19,6 +28,12 @@ export async function main(ns) {
   }
 
   while (true) {
+    // Re-read requireRoi from config so GUI changes take effect without restart
+    try {
+      const cfgRaw = ns.read("main_manager_config.js");
+      if (cfgRaw) requireRoi = !!(JSON.parse(cfgRaw)?.services?.hacknet?.requireRoi);
+    } catch { /* keep last value */ }
+
     // Get available money (prefer ns.getPlayer())
     let playerMoney = 0;
     try {
@@ -123,6 +138,15 @@ export async function main(ns) {
       return;
     }
 
+    // ROI gate: wait until previous upgrade has paid for itself
+    if (requireRoi) {
+      const totalGained = nodes.reduce((s, n) => s + (n.totalMoneyGained || 0), 0);
+      if (totalGained < roiTarget) {
+        await ns.sleep(loopDelayMs);
+        continue;
+      }
+    }
+
     // Calculate ROI and sort (deltaProd / cost), higher ROI first
     actions = actions
       .map(a => ({ ...a, roi: a.cost > 0 ? (a.delta / a.cost) : 0 }))
@@ -178,7 +202,13 @@ export async function main(ns) {
       success = false;
     }
 
-    if (success) ns.tprint("ℹ️ Action executed successfully.");
+    if (success) {
+      if (requireRoi) {
+        const totalGained = nodes.reduce((s, n) => s + (n.totalMoneyGained || 0), 0);
+        roiTarget = totalGained + best.cost;
+      }
+      ns.tprint("ℹ️ Action executed successfully.");
+    }
 
     // Wait before the next pass
     await ns.sleep(loopDelayMs);
