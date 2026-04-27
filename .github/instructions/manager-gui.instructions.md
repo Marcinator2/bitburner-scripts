@@ -1,12 +1,31 @@
 ---
-description: "Use when working on manager_gui.js. Contains React GUI structure, tab layout, service toggle logic, and corp/karma imports."
-applyTo: "manager_gui.js"
+description: "Use when working on manager_gui.js or any manager_gui_tab_*.js / manager_gui_utils.js file. Contains React GUI structure, tab layout, service toggle logic, and corp/karma imports."
+applyTo: "manager_gui.js, manager_gui_tab_*.js, manager_gui_utils.js"
 ---
 
 # manager_gui.js — Main GUI
 
 ## Purpose
 React-based overlay GUI for controlling all services, training settings, server admin, gang, augments, corp, and IPvGO. Refreshes every `REFRESH_MS` (1000 ms).
+
+## Architecture — Tab File Split
+`manager_gui.js` is the thin coordinator. All tab content is implemented in separate modules:
+| File | Tab |
+|------|-----|
+| `manager_gui_tab_services.js` | Services (toggle rows, hacknet/programs controls) |
+| `manager_gui_tab_training.js` | Training (combatTrainer, karma/crime display) |
+| `manager_gui_tab_gang.js` | Gang (mode flags) |
+| `manager_gui_tab_augments.js` | Augments (category filter, repFarming) |
+| `manager_gui_tab_server.js` | Server Admin (buy/upgrade RAM, autoBuy/autoUpgrade) |
+| `manager_gui_tab_corp.js` | Corporation (status, autoInvest/autoGoPublic) |
+| `manager_gui_tab_ipvgo.js` | IPvGO (opponent/board config) |
+| `manager_gui_tab_bladeburner.js` | Bladeburner (status display) |
+| `manager_gui_tab_infiltrate.js` | Infiltrate (difficulty selector, launches manager_infiltrate.js) |
+
+Shared helpers and constants are exported from `manager_gui_utils.js`:
+- `CONFIG_FILE`, `RAM_OPTIONS`, `BUY_RAM_DEFAULT`, `UPGRADE_RAM_DEFAULT`
+- `makeButton(doc, text, action)`, `styleActionButton(button, mode)`
+- `loadConfig(ns)`, `saveConfig(ns, config)`
 
 ## Key Constants (module-level — exception, shared by many helpers)
 | Constant | Value | Purpose |
@@ -25,8 +44,8 @@ React-based overlay GUI for controlling all services, training settings, server 
 | `augments` | Augment category filter |
 | `server` | Buy / upgrade purchased servers |
 | `corporation` | Corp status from `getCorpStatus()` |
-| `ipvgo` | IPvGO opponent/board config |
-
+| `ipvgo` | IPvGO opponent/board config || `bladeburner` | Bladeburner status display |
+| `infiltrate` | Difficulty selector, launches manager_infiltrate.js |
 ## Service Assignment to Tabs
 `getServiceTab(key)` maps service keys to tab IDs. New services must be added here.
 

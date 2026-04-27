@@ -37,12 +37,15 @@ Known services:
 - `playerStatsWorker` -> `player_stats_worker.js`
 - `playerStatsView` -> `player_stats.js`
 - `overview` -> `overview.js`
+- `corporation` -> `manager_corporation.js`
+- `serverAdmin` -> `manager_server.js`
 
 `manager_gui.js`
 - alternative front-end to `main_manager.js`
 - renders a draggable in-game HTML panel with toggle buttons for every service
 - also provides quick-access buttons for buying/upgrading servers and viewing server lists
-- reads and writes `main_manager_config.js`; imports helpers from `runtime_file_utils.js`, `manager_karma.js`, and `training_location_utils.js`
+- reads and writes `main_manager_config.js`; imports helpers from `manager_gui_utils.js`
+- tab content is split into `manager_gui_tab_*.js` modules
 - can start/stop `main_manager.js` directly from the panel
 
 ### 2. Manager layer
@@ -117,6 +120,16 @@ Known services:
 `manager_stats.js`
 - trains combat stats automatically via the Singularity API
 - standalone script; not currently wired into `main_manager.js`
+
+`manager_server.js`
+- standalone server admin manager
+- reads autoBuy/autoUpgrade settings from `main_manager_config.js`
+- used as the `serverAdmin` service by `main_manager.js`
+
+`manager_infiltrate.js`
+- finds the best infiltration targets by difficulty
+- args: `[difficulty]` (number or "easy"/"medium"/"hard")
+- with Source-File 4 navigates to the best match automatically
 
 ### 3. Worker and utility layer
 
@@ -227,6 +240,16 @@ The separation ensures the stats display is intentionally decoupled from data co
 ### GUI
 
 - `manager_gui.js`
+- `manager_gui_utils.js` *(shared helpers)*
+- `manager_gui_tab_services.js`
+- `manager_gui_tab_training.js`
+- `manager_gui_tab_gang.js`
+- `manager_gui_tab_augments.js`
+- `manager_gui_tab_server.js`
+- `manager_gui_tab_corp.js`
+- `manager_gui_tab_ipvgo.js`
+- `manager_gui_tab_bladeburner.js`
+- `manager_gui_tab_infiltrate.js`
 
 ### Hacking
 
@@ -264,18 +287,21 @@ The separation ensures the stats display is intentionally decoupled from data co
 - `manager_crime.js`
 - `manager_augments.js`
 - `manager_backdoor.js`
+- `manager_infiltrate.js`
 - `buy-neuroflux.js`
 - `auto-leveler.js`
 
 ### IPvGO
 
 - `manager_ipvgo.js`
+- `ipvgo_gamelog.js` *(runtime game log)*
 
 ### Server management & admin
 
 - `new_server_buy.js`
 - `new_server_setup.js`
 - `upgrade_Server.js`
+- `manager_server.js`
 - `umbenennen_server.js`
 
 ### Shared utilities
