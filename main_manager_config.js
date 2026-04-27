@@ -1,5 +1,5 @@
 {
-//asd
+//a220: main_manager_cosnfig.js<y
   "loopMs": 5000,
   "tail": true,
   "services": {
@@ -60,6 +60,11 @@
     },
     "overview": {
       "enabled": true,
+      "threads": 1,
+      "args": []
+    },
+    "serverAdmin": {
+      "enabled": false,
       "threads": 1,
       "args": []
     }

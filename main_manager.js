@@ -162,6 +162,16 @@ const SERVICE_DEFINITIONS = [
     description: "Fully automated Corporation manager (divisions, products, invest rounds, public)",
     shouldRun: ns => Boolean(ns.corporation && typeof ns.corporation.hasCorporation === "function" && ns.corporation.hasCorporation()),
   },
+  {
+    key: "serverAdmin",
+    script: "manager_server.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [],
+    description: "Automated server buy/upgrade (reads autoBuy/autoUpgrade from config)",
+    shouldRun: () => true,
+  },
 ];
 
 export async function main(ns) {
@@ -194,46 +204,10 @@ export async function main(ns) {
   while (true) {
     ns.clearLog();
     const config = supervise(ns, configFile, false);
-    handleServerAdmin(ns, config);
     await ns.sleep(config.loopMs);
   }
 }
 
-function handleServerAdmin(ns, config) {
-  const guiState = config?.gui?.managerGui;
-  if (!guiState) return;
-
-  const SCRIPT = "new_server_buy.js";
-  if (!ns.fileExists(SCRIPT, "home")) return;
-  if (ns.scriptRunning(SCRIPT, "home")) return;
-
-  const purchased = ns.getPurchasedServers();
-  const money = ns.getPlayer().money;
-
-  // Auto-Upgrade: step each server toward upgradeRam one power-of-2 at a time
-  if (guiState.autoUpgrade && guiState.upgradeRam) {
-    const targetRam = Number(guiState.upgradeRam);
-    let minCost = Infinity;
-    for (const s of purchased) {
-      const nextRam = ns.getServerMaxRam(s) * 2;
-      if (nextRam > targetRam) continue;
-      const cost = ns.getPurchasedServerUpgradeCost(s, nextRam);
-      if (Number.isFinite(cost) && cost > 0) minCost = Math.min(minCost, cost);
-    }
-    if (minCost < Infinity && money >= minCost) {
-      ns.exec(SCRIPT, "home", 1, targetRam, true);
-      return;
-    }
-  }
-
-  // Auto-Buy: fill server slots with 8 GB servers
-  if (guiState.autoBuy && purchased.length < ns.getPurchasedServerLimit()) {
-    const cost = ns.getPurchasedServerCost(8);
-    if (cost > 0 && money >= cost) {
-      ns.exec(SCRIPT, "home", 1, 8);
-    }
-  }
-}
 
 function supervise(ns, configFile, runOnce) {
   const config = loadConfig(ns, configFile);
