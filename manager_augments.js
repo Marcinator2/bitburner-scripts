@@ -178,27 +178,24 @@ export async function main(ns) {
       ns.print(`[REP] ${nearest.name} – still ${ns.formatNumber(missing)} Rep needed (${nearest.faction})`);
     }
 
-  // Rep-Farming
-  manageRepFarming(ns, augConfig, repPending, candidates);
+    // Rep-Farming
+    const repFarmStatus = manageRepFarming(ns, augConfig);
+    if (repFarmStatus) ns.print(repFarmStatus);
 
     await ns.sleep(loopMs);
   }
 }
 
 /**
- * Selects the faction with the most pending (rep-blocked) augments
- * and starts faction work for it. Stops when all augments of that
- * faction are purchasable.
+ * Selects the faction with the most pending (rep-blocked) wanted augments
+ * and starts faction work for it. Returns a status string for the main loop.
  */
-function manageRepFarming(ns, augConfig, repPending, allCandidates) {
-  if (!augConfig.repFarming) {
-    // Farming disabled – do nothing
-    return;
-  }
+function manageRepFarming(ns, augConfig) {
+  if (!augConfig.repFarming) return null;
 
   const owned = new Set(ns.singularity.getOwnedAugmentations(true));
 
-  // Query each faction directly – independent of augFactionMap's highest-rep logic
+  // Build map: faction → count of rep-blocked wanted augments
   const factionCount = new Map();
   for (const faction of ns.getPlayer().factions) {
     let factionRep;
@@ -209,7 +206,7 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
       if (owned.has(augName)) continue;
 
       const repReq = ns.singularity.getAugmentationRepReq(augName);
-      if (factionRep >= repReq) continue; // enough rep already
+      if (factionRep >= repReq) continue;
 
       const stats = ns.singularity.getAugmentationStats(augName);
       const cats = classifyAugment(stats);
@@ -221,32 +218,33 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
   }
 
   if (factionCount.size === 0) {
-    // No more rep needed – stop running faction work if active
     try {
       const work = ns.singularity.getCurrentWork();
-      if (work && work.type === "FACTION") {
+      if (work?.type === "FACTION") {
         ns.singularity.stopAction();
-        ns.print("[REP-FARM] All augments purchasable – work stopped.");
+        return "[REP-FARM] All reps met – stopped faction work.";
       }
     } catch (_) {}
-    return;
+    return "[REP-FARM] No rep-blocked wanted augments found.";
   }
 
   // Pick the faction with the most blocked augments
-  const targetFaction = [...factionCount.entries()]
-    .sort((a, b) => b[1] - a[1])[0][0];
+  const targetFaction = [...factionCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const count = factionCount.get(targetFaction);
 
-  // Check if already working for this faction
+  // If already working for this faction, just report status
+  let currentWorkType = "none";
+  let currentWorkFaction = null;
   try {
     const work = ns.singularity.getCurrentWork();
-    if (work && work.type === "FACTION" && work.factionName === targetFaction) {
-      ns.print(`[REP-FARM] Working for ${targetFaction} (${factionCount.get(targetFaction)} augments)`);
-      return;
+    currentWorkType = work?.type ?? "none";
+    currentWorkFaction = work?.factionName ?? null;
+    if (work?.type === "FACTION" && work?.factionName === targetFaction) {
+      return `[REP-FARM] Working: ${targetFaction} (${count} augments left)`;
     }
   } catch (_) {}
 
-  // Determine best available work type (Hacking > Field > Security)
-  // If focus=true fails (e.g. Bladeburner is the current focus), retry with focus=false
+  // Start faction work – try focus=true first, fall back to focus=false
   const started =
     tryFactionWork(ns, targetFaction, "hacking", augConfig.focus) ||
     tryFactionWork(ns, targetFaction, "field", augConfig.focus) ||
@@ -258,10 +256,9 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
     ));
 
   if (started) {
-    ns.print(`[REP-FARM] Started: ${targetFaction} (${factionCount.get(targetFaction)} augments open)`);
-  } else {
-    ns.print(`[REP-FARM] Could not start work for ${targetFaction}.`);
+    return `[REP-FARM] Started: ${targetFaction} (${count} augments, was: ${currentWorkType}${currentWorkFaction ? ":" + currentWorkFaction : ""})`;
   }
+  return `[REP-FARM] FAILED to start work for ${targetFaction} (current: ${currentWorkType}${currentWorkFaction ? ":" + currentWorkFaction : ""})`;
 }
 
 function tryFactionWork(ns, faction, type, focus = false) {
