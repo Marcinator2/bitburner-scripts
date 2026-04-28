@@ -172,6 +172,16 @@ const SERVICE_DEFINITIONS = [
     description: "Automated server buy/upgrade (reads autoBuy/autoUpgrade from config)",
     shouldRun: () => true,
   },
+  {
+    key: "bladeburner",
+    script: "manager_bladeburner.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [],
+    description: "Automated Bladeburner manager (stamina, chaos, actions, skills, Black Ops)",
+    shouldRun: ns => Boolean(ns.bladeburner && typeof ns.bladeburner.inBladeburner === "function" && ns.bladeburner.inBladeburner()),
+  },
 ];
 
 export async function main(ns) {
