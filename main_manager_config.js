@@ -67,6 +67,11 @@
       "enabled": false,
       "threads": 1,
       "args": []
+    },
+    "bladeburner": {
+      "enabled": false,
+      "threads": 1,
+      "args": []
     }
   }
 }

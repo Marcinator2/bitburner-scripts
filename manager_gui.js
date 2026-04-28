@@ -41,6 +41,7 @@ const SERVICES = [
   { key: "ipvgo", script: "manager_ipvgo.js", host: "home", label: "IPvGO" },
   { key: "corporation", script: "manager_corporation.js", host: "home", label: "Corporation" },
   { key: "serverAdmin", script: "manager_server.js", host: "home", label: "Server Admin" },
+  { key: "bladeburner", script: "manager_bladeburner.js", host: "home", label: "Bladeburner" },
 ];
 
 const TABS = [
@@ -65,6 +66,7 @@ function getServiceTab(key) {
   if (key === "ipvgo") return "ipvgo";
   if (key === "corporation") return "corporation";
   if (key === "serverAdmin") return "server";
+  if (key === "bladeburner") return "bladeburner";
   return "services";
 }
 
