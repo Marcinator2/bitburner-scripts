@@ -195,9 +195,13 @@ function manageRepFarming(ns, augConfig) {
 
   const owned = new Set(ns.singularity.getOwnedAugmentations(true));
 
+  // Factions where workForFaction is not applicable (rep only via in-game mechanics)
+  const WORK_EXEMPT_FACTIONS = new Set(["Bladeburners", "Church of the Machine God"]);
+
   // Build map: faction → count of rep-blocked wanted augments
   const factionCount = new Map();
   for (const faction of ns.getPlayer().factions) {
+    if (WORK_EXEMPT_FACTIONS.has(faction)) continue;
     let factionRep;
     try { factionRep = ns.singularity.getFactionRep(faction); } catch { continue; }
 
