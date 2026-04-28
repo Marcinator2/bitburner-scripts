@@ -196,17 +196,11 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
     return;
   }
 
-  let gangFaction = null;
-  try {
-    if (ns.gang) gangFaction = ns.gang.getGangInformation().faction;
-  } catch (_) {}
-
   const owned = new Set(ns.singularity.getOwnedAugmentations(true));
 
   // Query each faction directly – independent of augFactionMap's highest-rep logic
   const factionCount = new Map();
   for (const faction of ns.getPlayer().factions) {
-    if (gangFaction && faction === gangFaction) continue;
     let factionRep;
     try { factionRep = ns.singularity.getFactionRep(faction); } catch { continue; }
 
@@ -252,10 +246,16 @@ function manageRepFarming(ns, augConfig, repPending, allCandidates) {
   } catch (_) {}
 
   // Determine best available work type (Hacking > Field > Security)
+  // If focus=true fails (e.g. Bladeburner is the current focus), retry with focus=false
   const started =
     tryFactionWork(ns, targetFaction, "hacking", augConfig.focus) ||
     tryFactionWork(ns, targetFaction, "field", augConfig.focus) ||
-    tryFactionWork(ns, targetFaction, "security", augConfig.focus);
+    tryFactionWork(ns, targetFaction, "security", augConfig.focus) ||
+    (augConfig.focus && (
+      tryFactionWork(ns, targetFaction, "hacking", false) ||
+      tryFactionWork(ns, targetFaction, "field", false) ||
+      tryFactionWork(ns, targetFaction, "security", false)
+    ));
 
   if (started) {
     ns.print(`[REP-FARM] Started: ${targetFaction} (${factionCount.get(targetFaction)} augments open)`);
