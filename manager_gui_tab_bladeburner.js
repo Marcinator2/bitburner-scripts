@@ -67,8 +67,8 @@ export function renderBladeburnerPane(ns, panel) {
   let actionText = "Action: Idle";
   if (currentAction && currentAction.type !== "Idle") {
     let successText = "";
-    if (typeof ns.bladeburner.getActionSuccessChance === "function") {
-      const chance = ns.bladeburner.getActionSuccessChance(currentAction.type, currentAction.name);
+    if (typeof ns.bladeburner.getActionEstimatedSuccessChance === "function") {
+      const chance = ns.bladeburner.getActionEstimatedSuccessChance(currentAction.type, currentAction.name);
       if (Array.isArray(chance)) {
         successText = ` | ${(chance[0] * 100).toFixed(1)}%-${(chance[1] * 100).toFixed(1)}%`;
       } else if (typeof chance === "number") {

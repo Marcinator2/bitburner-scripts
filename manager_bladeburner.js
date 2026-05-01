@@ -102,8 +102,7 @@ export async function main(ns) {
         nextAction = { type: "General", name: "Training" };
         const bestAvailOp = getBestOperation(ns, 0) ?? getBestContract(ns, 0);
         if (bestAvailOp) {
-          const ch = getChanceMin(ns, bestAvailOp.type, bestAvailOp.name);
-          trainingReason = `best chance: ${(ch * 100).toFixed(0)}%`;
+          trainingReason = `best chance: ${getChanceStr(ns, bestAvailOp.type, bestAvailOp.name)}`;
         }
       } else if (allDepleted && chaos < CHAOS_INCITE_BELOW) {
         nextAction = { type: "General", name: "Incite Violence" };
@@ -187,19 +186,23 @@ function getCityScore(ns, city) {
 }
 
 function getChanceMin(ns, type, name) {
-  if (typeof ns.bladeburner.getActionSuccessChance !== "function") return 0;
-  const ch = ns.bladeburner.getActionSuccessChance(type, name);
-  if (Array.isArray(ch)) return ch[0];
-  if (typeof ch === "number") return ch;
+  if (typeof ns.bladeburner.getActionEstimatedSuccessChance !== "function") return 0;
+  try {
+    const ch = ns.bladeburner.getActionEstimatedSuccessChance(type, name);
+    if (Array.isArray(ch)) return ch[0];
+    if (typeof ch === "number") return ch;
+  } catch { /* ignore */ }
   return 0;
 }
 
 function getChanceStr(ns, type, name) {
-  if (typeof ns.bladeburner.getActionSuccessChance !== "function") return "";
-  const ch = ns.bladeburner.getActionSuccessChance(type, name);
-  if (Array.isArray(ch)) return `[${(ch[0] * 100).toFixed(0)}-${(ch[1] * 100).toFixed(0)}%]`;
-  if (typeof ch === "number") return `[${(ch * 100).toFixed(0)}%]`;
-  return "";
+  if (typeof ns.bladeburner.getActionEstimatedSuccessChance !== "function") return "[?%]";
+  try {
+    const ch = ns.bladeburner.getActionEstimatedSuccessChance(type, name);
+    if (Array.isArray(ch)) return `[${(ch[0] * 100).toFixed(0)}-${(ch[1] * 100).toFixed(0)}%]`;
+    if (typeof ch === "number") return `[${(ch * 100).toFixed(0)}%]`;
+  } catch { /* fall through */ }
+  return "[?%]";
 }
 
 function getBestBlackOp(ns, rank, minChance) {
