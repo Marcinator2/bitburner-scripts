@@ -32,7 +32,7 @@
 
     },
     "programs": {
-      "enabled": true,
+      "enabled": false,
       "threads": 1,
       "args": []
     },

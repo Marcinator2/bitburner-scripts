@@ -9,17 +9,21 @@ export async function main(ns) {
   // Auto-upgrade: step each server up one power-of-2 at a time toward the target.
   // If a server can't afford its next step, skip it and try the next server.
   if (autoUpgrade) {
-    const upgradable = purchased.filter(s => ns.getServerMaxRam(s) < ram);
+    const upgradable = purchased
+      .filter(s => ns.getServerMaxRam(s) < ram)
+      .map(s => {
+        const currentRam = ns.getServerMaxRam(s);
+        const nextRam = currentRam * 2;
+        const cost = nextRam <= ram ? ns.getPurchasedServerUpgradeCost(s, nextRam) : Infinity;
+        return { server: s, currentRam, nextRam, cost };
+      })
+      .filter(e => e.nextRam <= ram && Number.isFinite(e.cost) && e.cost > 0)
+      .sort((a, b) => a.cost - b.cost); // cheapest first
     if (upgradable.length === 0) {
       ns.tprint(`Auto-upgrade: all ${purchased.length} servers already at or above ${ns.formatRam(ram)}.`);
     } else {
       let upgraded = 0;
-      for (const server of upgradable) {
-        const currentRam = ns.getServerMaxRam(server);
-        const nextRam = currentRam * 2; // next power-of-2 step
-        if (nextRam > ram) continue;    // already at or above target (shouldn't happen, but guard)
-        const cost = ns.getPurchasedServerUpgradeCost(server, nextRam);
-        if (!Number.isFinite(cost) || cost <= 0) continue;
+      for (const { server, currentRam, nextRam, cost } of upgradable) {
         if (ns.getPlayer().money < cost) {
           ns.tprint(`Auto-upgrade: skipping ${server} (${ns.formatRam(currentRam)} → ${ns.formatRam(nextRam)}) — need ${ns.formatNumber(cost)}$`);
           continue;
