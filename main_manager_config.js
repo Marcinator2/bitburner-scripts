@@ -73,5 +73,12 @@
       "threads": 1,
       "args": []
     }
+  },
+  "gui": {
+    "managerGui": {
+      "autoBuy": true,
+      "autoUpgrade": true,
+      "upgradeRam": 65536
+    }
   }
 }
