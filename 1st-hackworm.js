@@ -157,7 +157,8 @@ export async function main(ns) {
       continue;
     }
 
-    for (const runner of runners) {
+    for (let i = 0; i < runners.length; i++) {
+      const runner = runners[i];
       if (!await ensureWorkerScripts(runner)) {
         print(`❌ Worker scripts could not be copied to ${runner}.`);
         continue;
@@ -166,9 +167,7 @@ export async function main(ns) {
       const free = availableRam(runner);
       if (free < Math.min(RAM_COST.hack, RAM_COST.grow, RAM_COST.weaken)) continue;
 
-      const target = targets.find(t => needWeaken(t) && free >= RAM_COST.weaken)
-        || targets.find(t => needGrow(t) && free >= RAM_COST.grow)
-        || targets[0];
+      const target = targets[i % targets.length];
 
       let script = "v_hack.js";
       let cost = RAM_COST.hack;
