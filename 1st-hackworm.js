@@ -8,9 +8,12 @@ export async function main(ns) {
   ns.disableLog("ALL");
 
   const WORKERS = ["v_hack.js", "v_grow.js", "v_weaken.js"];
+  const SHARE_SCRIPT = "share-ram.js";
+  const SHARE_QUOTA = 0.01;      // fraction of runner RAM to dedicate to share-ram
+  const ENABLE_SHARE_RAM = false; // set to false to disable share-ram on all runners
   const LOOP_DELAY = 10000;
   const SECURITY_MARGIN = 3;
-  const MONEY_RATIO = 0.2; // grow below this threshold
+  const MONEY_RATIO = 0.5; // grow below this threshold
   const MIN_RAM_TO_RUN = 1;
 
   if (!WORKERS.every(script => ns.fileExists(script, "home"))) {
@@ -130,7 +133,54 @@ export async function main(ns) {
 
   async function ensureWorkerScripts(host) {
     if (host === "home") return true;
-    return await ns.scp(WORKERS, host);
+    const toCopy = ENABLE_SHARE_RAM ? [...WORKERS, SHARE_SCRIPT] : WORKERS;
+    return await ns.scp(toCopy, host);
+  }
+
+  function getRunningShareThreads(host) {
+    return ns.ps(host)
+      .filter(proc => proc.filename === SHARE_SCRIPT)
+      .reduce((sum, proc) => sum + proc.threads, 0);
+  }
+
+  function shareThreadsForRunner(host) {
+    if (host === "home") return 0;
+    const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
+    if (shareRam <= 0) return 0;
+    const maxRam = ns.getServerMaxRam(host);
+    if (maxRam < shareRam) return 0;
+    return Math.max(1, Math.floor((maxRam * SHARE_QUOTA) / shareRam));
+  }
+
+  function canSpareRamForShare(host, shareThreads, currentShareThreads) {
+    if (shareThreads < 1) return false;
+    const shareRam = ns.getScriptRam(SHARE_SCRIPT, "home");
+    const minWorkerRam = Math.min(RAM_COST.hack, RAM_COST.grow, RAM_COST.weaken);
+    const freeRam = ns.getServerMaxRam(host) - ns.getServerUsedRam(host);
+    const reclaimable = currentShareThreads * shareRam;
+    return freeRam + reclaimable - (shareThreads * shareRam) >= minWorkerRam;
+  }
+
+  function ensureShareOnRunners(runners) {
+    for (const host of runners) {
+      if (host === "home") continue;
+      const running = getRunningShareThreads(host);
+      const target = shareThreadsForRunner(host);
+      if (target < 1) {
+        if (running > 0) ns.scriptKill(SHARE_SCRIPT, host);
+        continue;
+      }
+      if (running === target) continue;
+      if (!canSpareRamForShare(host, target, running)) continue;
+      if (running > 0) ns.scriptKill(SHARE_SCRIPT, host);
+      ns.exec(SHARE_SCRIPT, host, target);
+    }
+  }
+
+  function killAllShareRam(runners) {
+    for (const host of runners) {
+      if (getRunningShareThreads(host) > 0) ns.scriptKill(SHARE_SCRIPT, host);
+    }
   }
 
   while (true) {
@@ -155,6 +205,12 @@ export async function main(ns) {
       print("⚠️ No free runners with available RAM found.");
       await ns.sleep(LOOP_DELAY);
       continue;
+    }
+
+    if (ENABLE_SHARE_RAM) {
+      ensureShareOnRunners(runners);
+    } else {
+      killAllShareRam(runners);
     }
 
     for (let i = 0; i < runners.length; i++) {

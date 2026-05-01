@@ -3,7 +3,7 @@ import { makeButton, styleActionButton, loadConfig, saveConfig, CONFIG_FILE, RAM
 import { buildCombatStatControls, getCombatTrainerConfig, getNegativeKarmaConfig, buildCombatTrainerDetails, buildNegativeKarmaDetails, syncCombatTrainerControls, handleTrainingAction } from "./manager_gui_tab_training.js";
 import { buildGangControls, getGangConfig, buildGangDetails, syncGangControls, handleGangAction } from "./manager_gui_tab_gang.js";
 import { buildAugmentControls, getAugmentConfig, buildAugmentDetails, syncAugmentControls, handleAugmentAction } from "./manager_gui_tab_augments.js";
-import { buildHacknetControls, buildProgramsControls, syncHacknetControls, syncProgramsControls, handleServicesAction } from "./manager_gui_tab_services.js";
+import { buildHackControls, buildHacknetControls, buildProgramsControls, syncHackControls, syncHacknetControls, syncProgramsControls, handleServicesAction } from "./manager_gui_tab_services.js";
 import { buildServerAdminSection, renderServerTab, handleServerAction, getSelectedRam } from "./manager_gui_tab_server.js";
 import { buildCorpControls, buildCorpDetails, syncCorpControls, handleCorpAction } from "./manager_gui_tab_corp.js";
 import { buildIpvgoControls, getIpvgoConfig, buildIpvgoDetails, syncIpvgoControls, handleIpvgoAction } from "./manager_gui_tab_ipvgo.js";
@@ -322,7 +322,11 @@ function buildPanel(doc) {
 
       let programsControls = null;
       let hacknetControls = null;
-      if (service.key === "programs") {
+      let hackControls = null;
+      if (service.key === "hack") {
+        hackControls = buildHackControls(doc);
+        row.append(top, details, hackControls.wrap);
+      } else if (service.key === "programs") {
         programsControls = buildProgramsControls(doc);
         row.append(top, details, programsControls.wrap);
       } else if (service.key === "hacknet") {
@@ -331,7 +335,7 @@ function buildPanel(doc) {
       } else {
         row.append(top, details);
       }
-      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls, hacknetControls });
+      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls, hacknetControls, hackControls });
     } else {
       row.style.padding = "10px 12px";
 
@@ -363,7 +367,11 @@ function buildPanel(doc) {
       let corpControls = null;
       let programsControls = null;
       let hacknetControls = null;
-      if (service.key === "combatTrainer") {
+      let hackControls = null;
+      if (service.key === "hack") {
+        hackControls = buildHackControls(doc);
+        row.append(top, details, hackControls.wrap);
+      } else if (service.key === "combatTrainer") {
         statControls = buildCombatStatControls(doc);
         row.append(top, details, statControls.wrap);
       } else if (service.key === "gang") {
@@ -388,7 +396,7 @@ function buildPanel(doc) {
         row.append(top, details);
       }
 
-      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls, programsControls, hacknetControls });
+      rows.set(service.key, { toggle, details, row, statControls, gangControls, augmentControls, ipvgoControls, corpControls, programsControls, hacknetControls, hackControls });
     }
 
     pane.appendChild(row);
@@ -681,6 +689,7 @@ function renderPanel(ns, panel) {
     if (service.key === "augments") syncAugmentControls(row, augmentConfig);
     if (service.key === "programs") syncProgramsControls(row, config.services.programs || {});
     if (service.key === "hacknet") syncHacknetControls(row, config.services.hacknet || {});
+    if (service.key === "hack") syncHackControls(row, config.services.hack || {});
     if (service.key === "ipvgo") syncIpvgoControls(row, ipvgoConfig);
     if (service.key === "corporation") syncCorpControls(row, override);
   }

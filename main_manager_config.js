@@ -1,12 +1,12 @@
 {
-//a220: main_manager_cosnfig.js<y
   "loopMs": 5000,
   "tail": true,
   "services": {
     "hack": {
       "enabled": true,
       "threads": 1,
-      "args": []
+      "args": [],
+      "shareRam": false
     },
     "hacknet": {
       "enabled": false,
@@ -32,7 +32,7 @@
 
     },
     "programs": {
-      "enabled": false,
+      "enabled": true,
       "threads": 1,
       "args": []
     },
@@ -54,17 +54,17 @@
       "args": ["player_stats_data.txt", 10000, 360]
     },
     "playerStatsView": {
-      "enabled": true,
+      "enabled": false,
       "threads": 1,
       "args": ["player_stats_data.txt"]
     },
     "overview": {
-      "enabled": true,
+      "enabled": false,
       "threads": 1,
       "args": []
     },
     "serverAdmin": {
-      "enabled": false,
+      "enabled": true,
       "threads": 1,
       "args": []
     },

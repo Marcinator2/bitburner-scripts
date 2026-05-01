@@ -13,6 +13,7 @@ export async function main(ns) {
     const W_SCRIPT      = "v_weaken.js";
     const SHARE_SCRIPT  = "share-ram.js";
     const SHARE_QUOTA   = 0.01;   // Target share fraction per runner for share-ram.js; running instances are adjusted to this size
+    const CONFIG_FILE   = "main_manager_config.js";
     const HACK_FRACTION = 0.99;  // Maximum fraction of max money per batch (as much as RAM allows)
     const SPACING       = 200;   // ms spacing between finish timestamps in a batch
     const HOME_RESERVE  = 45;    // GB reserved on home
@@ -383,12 +384,32 @@ export async function main(ns) {
         ensureShareOnRunners(runners);
     }
 
+    function isShareRamEnabled() {
+        try {
+            const raw = ns.read(CONFIG_FILE);
+            if (!raw) return true;
+            const cfg = JSON.parse(raw);
+            return cfg?.services?.hack?.shareRam !== false;
+        } catch (_) {
+            return true;
+        }
+    }
+
+    function killAllShareRam(runners) {
+        for (const host of runners) {
+            if (getRunningShareThreads(host) > 0) {
+                ns.scriptKill(SHARE_SCRIPT, host);
+            }
+        }
+    }
+
     ns.tprint("Auto-Hack Manager started.");
 
     // One-time at startup: clear MyServer_
     {
         const initServers = scanAll().filter(isRunner);
         await initRunners(initServers);
+        if (!isShareRamEnabled()) killAllShareRam(initServers);
     }
 
     let uid = 0;
@@ -408,7 +429,11 @@ export async function main(ns) {
 
         // Copy worker scripts to new runners (already running ones stay)
         await scpToRunners(runners);
-        ensureShareOnRunners(runners);
+        if (isShareRamEnabled()) {
+            ensureShareOnRunners(runners);
+        } else {
+            killAllShareRam(runners);
+        }
 
         const ramList = runnerRamList(runners);
         let batched = 0;
