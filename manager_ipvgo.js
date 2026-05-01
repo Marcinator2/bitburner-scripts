@@ -52,18 +52,17 @@ const STRATEGIES = {
   },
   "Illuminati": {
     // Hard AI — defensive, prepares well, punishes tactical mistakes.
-    // cornerW NEGATIVE: log showed every game opening at an edge (score 72–88!) due to cornerW=1.2;
-    //   edge chains were then encircled. Same fix as Tetrads: play interior.
-    // connW 1.5 (was 3.5): high connW produced low-score clustering moves.
-    // passThresh -2 (restored from 0.0): passThresh=0.0 caused passing after 1-3 moves because
-    //   the second move scores ~1-9 on a mostly-empty board; Illuminati then claimed all territory.
-    //   The -1.6/-1.8 moves are less harmful than surrendering the entire board by passing early.
-    // captureW/atariW/cutW raised: Illuminati's defensive formation can be pressed more aggressively.
-    // selfAtari1/2 stay high: they will find and exploit any self-atari immediately.
-    // opponentSkillW 1.0: always simulate their perfect reply.
+    // opponentSkillW 1.0: always simulate their best reply.
+    // cornerW -4.0 (was -1.0): with -1.0 the center-vs-corner spread was only 2 pts,
+    //   causing corner opens (1,1) even with cornerW negative (games 33, 35). At -4.0
+    //   the spread is 12 pts: center +4, 1-in -4, corner -8. Reliably forces interior play.
+    // passThresh -1.5 (was -4): -4 allowed moves scoring -3.3, -3.8 which destroy own
+    //   groups (games 30, 43, 44). The winning game 36's second move scored -1.0 — that
+    //   must still be playable. -1.5 blocks clearly harmful moves (≤-2) but tolerates
+    //   marginal negative moves that may be necessary to keep the group alive.
     captureW: 8,  connW: 1.5, atariW: 14, preAtariW: 5, cutW: 10, bridgeW: 6,
-    selfAtari1: 45, selfAtari2: 12, eyeFill: 32, cornerW: -1.0, passThresh: -2,
-    saveAtariW: 38, savePreAtariW: 14, opponentSkillW: 1.0,
+    selfAtari1: 50, selfAtari2: 14, eyeFill: 32, cornerW: -4.0, passThresh: -1.5,
+    saveAtariW: 45, savePreAtariW: 16, opponentSkillW: 1.0,
   },
 };
 
@@ -239,7 +238,9 @@ function pickMove(board, validMoves, liberties, size, strategy) {
   return bestScore > strategy.passThresh ? bestMove : null;
 }
 
-// Find the opponent's best single reply on the given board (used for 2-ply)
+// Find the opponent's best single reply on the given board (used for 2-ply).
+// Models Illuminati's actual playstyle: encirclement via atari/pre-atari threats
+// and cutting our groups — not just pure territory.
 function opponentBestResponse(board, size) {
   let bestScore = -Infinity;
   let bestBoard = board;
@@ -261,11 +262,30 @@ function opponentBestResponse(board, size) {
       if (libs === 0 && xCaps === 0) continue;
 
       const { xT, oT } = countTerritory(sim, size);
-      let score = (oT - xT) * 2 + xCaps * 5;
+      let score = (oT - xT) * 2 + xCaps * 8;
 
-      // Opponent also avoids self-atari and filling their own eyes
-      if (libs === 1 && xCaps === 0) score -= 15;
-      if (isEye(board, x, y, 'O', size)) score -= 10;
+      // Encirclement: reward reducing liberties of adjacent X chains (local, fast)
+      // Illuminati's core tactic is to slowly reduce our chains' liberty counts.
+      const seenChains = new Set();
+      for (const [nx, ny] of neighbors(x, y, size)) {
+        if (sim[nx]?.[ny] !== 'X') continue;
+        const ck = nx * size + ny;
+        if (seenChains.has(ck)) continue;
+        const xChain = traceChain(sim, nx, ny, 'X', size);
+        for (const [cx, cy] of xChain) seenChains.add(cx * size + cy);
+        const xLibs = chainLiberties(sim, xChain, size);
+        if (xLibs === 1) score += 14;      // puts our chain in atari
+        else if (xLibs === 2) score += 6;  // pre-atari pressure
+      }
+
+      // Cut bonus: O stone separates two or more of our (X) groups
+      const xGroups = countAdjacentGroups(board, x, y, 'X', size);
+      if (xGroups >= 2) score += 10 * (xGroups - 1);
+
+      // Opponent avoids self-atari and filling their own eyes
+      if (libs === 1 && xCaps === 0) score -= 20;
+      if (libs === 2 && xCaps === 0) score -= 5;
+      if (isEye(board, x, y, 'O', size)) score -= 12;
 
       if (score > bestScore) { bestScore = score; bestBoard = sim; }
     }

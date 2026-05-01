@@ -51,3 +51,51 @@ Add an entry to `STRATEGIES` with all fields defined. Do not leave any field und
 - On `resetBoardState` failure: waits 5 s and retries.
 - Tracks win/loss/draw stats across the session.
 - Passes (`consecutivePasses`) ends the game after 2 consecutive passes by both sides.
+
+---
+
+## Illuminati — Tried Optimizations (do not repeat)
+
+Reference: ~370 games played, 6 wins total. Only 1 win in the first 311 games (game 291, 21 moves, won by 1.5). Current win rate ~1.6%.
+
+### What is known about Illuminati
+- Hard AI that punishes every tactical mistake immediately.
+- Favors encirclement — edge stones get surrounded fast.
+- The only consistent win (game 291) was a **connected line of stones**, NOT a cluster.
+- Games with ≤5 moves always end in catastrophic loss (score 0–49, full captures).
+- Games with 15–21 moves are competitive but still usually lost.
+
+### ❌ TRIED — opponentSkillW 0.5 (was 1.0)
+**Hypothesis:** At 1.0 the 2-ply territory delta collapses to ≈0 for all moves, making the engine quasi-random and causing early passes.  
+**Result:** Worse. The engine played more moves but built tight clusters that Illuminati surrounded and captured entirely (games 349, 352: score 0–49). Do NOT lower `opponentSkillW` below 1.0 for Illuminati.
+
+### ❌ TRIED — connW 3.0 + bridgeW 12 (was 1.5 / 6)
+**Hypothesis:** Connected groups survive; isolated stones get captured.  
+**Result:** These were set alongside `opponentSkillW 0.5`. The high connectivity weights caused clustering, which is exactly what Illuminati exploits. Cannot isolate effect from `opponentSkillW` change, but cluster-building is demonstrably bad. Do NOT raise `connW` above ~2.0 for Illuminati.
+
+### ❌ TRIED — passThresh -6 (was -2)
+**Hypothesis:** Keep playing longer; premature passes hand Illuminati free territory.  
+**Result:** Applied together with the above, outcome worse. The sole win (game 291) had a -0.5 second move, so some tolerance is needed, but -6 is too permissive. Marginal value: using -4 as compromise.
+
+### ❌ TRIED — saveAtariW 50, savePreAtariW 20, selfAtari1 60, selfAtari2 20 (aggressive rescue)
+**Hypothesis:** Escaping encirclement must dominate all other decisions.  
+**Result:** No measurable improvement over the conservative baseline values. Illuminati still wins by territory/encirclement even when we escape individual atari threats.
+
+### ⚠️ TRYING — Improved opponentBestResponse (encirclement modelling)
+**Hypothesis:** The old `opponentBestResponse` only scored `(oT - xT)*2 + xCaps*5`. This means the 2-ply assumed Illuminati plays pure territory, missing atari threats and cut moves. By adding local atari detection (+14 per adjacent X chain at 1 lib, +6 at 2 libs) and cut bonus (+10 per X group separated), the 2-ply should now anticipate Illuminati's real strategy and prefer moves that leave our chains harder to encircle.
+**Result:** TBD
+- **passThresh: -1.5** (trying since ~game 48): scores in recent games are all well above -1.5, so this is not causing early exits. Short games (3-5 moves) are Illuminati dominating, not premature passes.
+- **Board size stats** (current log, 20 Illuminati entries):
+  - 7x7: **0/7 wins**, avg score diff -15.4, avg 10.6 moves
+  - 9x9: **1/9 wins**, avg score diff -15.9, avg 17.1 moves ← only size with a win recently
+  - 13x13: **0/4 wins**, avg score diff -26.5, avg 37.2 moves
+  - Conclusion: 9x9 and 7x7 are similarly competitive. 13x13 is worse. Historical wins (291, 36) were on 7x7, so 7x7 is not hopeless.
+
+### File size
+`IPVGO_LOG_MAX = 20` × 5 opponents = 100 entries max = ~11.400 lines. The file does NOT grow further. No need to split into multiple files.
+
+### Improved eye detection
+The current `isEye()` only checks 4 cardinal neighbors are own stones (full eye). False eyes are not detected.
+
+### 3-ply or iterative deepening
+2-ply may not be deep enough to see Illuminati's multi-step encirclement setups.
