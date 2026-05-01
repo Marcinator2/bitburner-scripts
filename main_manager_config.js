@@ -72,6 +72,11 @@
       "enabled": false,
       "threads": 1,
       "args": []
+    },
+    "ipvgo": {
+      "enabled": false,
+      "threads": 1,
+      "args": ["Slum Snakes", 7]
     }
   },
   "gui": {
