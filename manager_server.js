@@ -21,7 +21,7 @@ export async function main(ns) {
     const guiState = config?.gui?.managerGui;
 
     if (guiState && ns.fileExists(BUY_SCRIPT, "home") && !ns.scriptRunning(BUY_SCRIPT, "home")) {
-      const purchased = ns.getPurchasedServers();
+      const purchased = ns.cloud.getServerNames();
       const money = ns.getPlayer().money;
 
       // Auto-Upgrade: step each server toward upgradeRam one power-of-2 at a time
@@ -31,7 +31,7 @@ export async function main(ns) {
         for (const s of purchased) {
           const nextRam = ns.getServerMaxRam(s) * 2;
           if (nextRam > targetRam) continue;
-          const cost = ns.getPurchasedServerUpgradeCost(s, nextRam);
+          const cost = ns.cloud.getServerUpgradeCost(s, nextRam);
           if (Number.isFinite(cost) && cost > 0) minCost = Math.min(minCost, cost);
         }
         if (minCost < Infinity && money >= minCost) {
@@ -42,8 +42,8 @@ export async function main(ns) {
       }
 
       // Auto-Buy: fill server slots with 8 GB servers
-      if (guiState.autoBuy && purchased.length < ns.getPurchasedServerLimit()) {
-        const cost = ns.getPurchasedServerCost(8);
+      if (guiState.autoBuy && purchased.length < ns.cloud.getServerLimit()) {
+        const cost = ns.cloud.getServerCost(8);
         if (cost > 0 && money >= cost) {
           ns.exec(BUY_SCRIPT, "home", 1, 8);
         }

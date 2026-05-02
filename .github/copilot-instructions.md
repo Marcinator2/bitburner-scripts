@@ -3,7 +3,12 @@
 This is a Bitburner automation project. All scripts run inside the Bitburner game engine (NS2/JS).
 Scripts use the `ns` (NetscriptJS) API. All files are deployed into the game via the Bitburner VS Code extension.
 
-**Bitburner version: 2.8.1** — Always use the API as defined for this version. Notable: use `ns.bladeburner.getActionEstimatedSuccessChance()` (not `getActionSuccessChance`, which no longer exists in 2.x).
+**Bitburner version: 3.0.0** — Always use the API as defined for this version.
+- Formatting: `ns.format.number()`, `ns.format.ram()`, `ns.format.percent()` (was `ns.formatNumber/formatRam/formatPercent`)
+- Purchased servers: `ns.cloud.purchaseServer()`, `ns.cloud.getServerNames()`, `ns.cloud.getServerCost()`, `ns.cloud.getServerLimit()`, `ns.cloud.getServerUpgradeCost()` (was `ns.purchaseServer/getPurchasedServers/...`)
+- Tail: `ns.ui.openTail()` (was `ns.tail()`)
+- Gang: `ns.gang.getAllGangInformation()` (was `getOtherGangInformation`)
+- Corporation: `corp.setJobAssignment()` (was `setAutoJobAssignment`), `division.industry` (was `division.type`)
 
 ## General Rules
 - All code comments, `ns.print`/`ns.tprint` messages, and **git commit messages** must be written in **English**.

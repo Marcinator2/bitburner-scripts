@@ -55,14 +55,14 @@ export async function main(ns) {
     ns.print("MONEY GRINDER");
     ns.print("");
     ns.print(`Crime:    ${best.type}`);
-    ns.print(`$/s:      ${ns.formatNumber(best.moneyPerSec)}$`);
+    ns.print(`$/s:      ${ns.format.number(best.moneyPerSec)}$`);
     ns.print(`Chance:   ${(best.chance * 100).toFixed(1)}%`);
-    ns.print(`Eff $/s:  ${ns.formatNumber(best.effectiveMoneyPerSec)}$ (chance-weighted)`);
+    ns.print(`Eff $/s:  ${ns.format.number(best.effectiveMoneyPerSec)}$ (chance-weighted)`);
     ns.print(`Time:     ${best.timeMs}ms`);
     ns.print("");
     ns.print("Top 5:");
     for (const c of best.top5) {
-      ns.print(`  ${c.type.padEnd(22)} ${ns.formatNumber(c.effectiveMoneyPerSec).padStart(8)}$/s  ${(c.chance * 100).toFixed(0).padStart(3)}%`);
+      ns.print(`  ${c.type.padEnd(22)} ${ns.format.number(c.effectiveMoneyPerSec).padStart(8)}$/s  ${(c.chance * 100).toFixed(0).padStart(3)}%`);
     }
 
     await ns.sleep(loopMs);

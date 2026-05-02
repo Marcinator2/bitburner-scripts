@@ -43,12 +43,21 @@ const STRATEGIES = {
     // Martial AI — encircles edge chains. Counter: play interior, spread out, escape fast.
     // cornerW NEGATIVE: stop clustering at edges/corners — Tetrads excels at edge encirclement.
     //   (2-edgeDist)*cornerW with cornerW=-1.5: corner=-3, edge=-1.5, 2-in=0, center=+1.5)
-    // connW 1.0 (was 2.0): early clustering moves score 0.4 and pull us into tight groups;
-    //   lower value lets territory and atari moves win the comparison on an open board.
-    // passThresh 0.0: logs show -1.3/-1.4 moves being played and losing territory; pass instead.
-    captureW: 12, connW: 1.0, atariW: 16, preAtariW: 8, cutW: 22, bridgeW: 14,
-    selfAtari1: 40, selfAtari2: 12, eyeFill: 32, cornerW: -1.5, passThresh: 0.0,
+    //   ❌ cornerW=-2.5 TRIED — on 7x7 only center (dist=3) gets +2.5; all other cells ≤0,
+    //   causing tight center clusters that Tetrads surrounds. Dropped from 2/8 to 1/18 wins.
+    //   Do NOT lower cornerW below -1.5 for Tetrads.
+    // connW 0.5 (was 1.0, was 2.0): on 7x7 with cornerW=-1.5 only (3,3) is positive;
+    //   adjacent cells score 0 from cornerW but get +connW per neighbor → engine clusters
+    //   around center. connW=0.5 reduces the clustering pull so spreading moves can compete.
+    // passThresh -1.5 (was 0.0): tolerates marginal negative moves needed for early 7x7
+    //   expansion without allowing clearly harmful plays. Fixed 4-move abort on 7x7.
+    // opponentSkillW 0.9: at 1.0 the 2-ply territory delta collapses to ≈0 on open boards,
+    //   causing 1-move games (games 12, 17, 18 all ended after 1 move).
+    captureW: 12, connW: 0.5, atariW: 16, preAtariW: 8, cutW: 22, bridgeW: 14,
+    selfAtari1: 40, selfAtari2: 12, eyeFill: 32, cornerW: -1.5, passThresh: -1.5,
     saveAtariW: 45, savePreAtariW: 24, opponentSkillW: 0.9,
+    // Tetrads-specific 2-ply opponent model: edge encirclement + aggressive cutting
+    oppAtariW: 8, oppPreAtariW: 3, oppCutW: 20, oppEdgeW: 10,
   },
   "Illuminati": {
     // Hard AI — defensive, prepares well, punishes tactical mistakes.
@@ -182,7 +191,7 @@ function pickMove(board, validMoves, liberties, size, strategy) {
 
       // 2nd ply: opponent's best response — score after they reply
       // opponentSkillW < 1 means we assume they won't always find the best reply
-      const sim2 = opponentBestResponse(sim1, size);
+      const sim2 = opponentBestResponse(sim1, size, strategy);
       const { xT: xT1, oT: oT1 } = countTerritory(sim1, size);
       const { xT: xT2, oT: oT2 } = countTerritory(sim2, size);
       const sw = strategy.opponentSkillW;
@@ -239,9 +248,14 @@ function pickMove(board, validMoves, liberties, size, strategy) {
 }
 
 // Find the opponent's best single reply on the given board (used for 2-ply).
-// Models Illuminati's actual playstyle: encirclement via atari/pre-atari threats
-// and cutting our groups — not just pure territory.
-function opponentBestResponse(board, size) {
+// Uses per-opponent weights from the strategy (oppAtariW, oppPreAtariW, oppCutW, oppEdgeW).
+// Falls back to Illuminati-style defaults when fields are not defined.
+function opponentBestResponse(board, size, strategy = {}) {
+  const oppAtariW    = strategy.oppAtariW    ?? 14;  // bonus: reduce X chain to 1 lib
+  const oppPreAtariW = strategy.oppPreAtariW ?? 6;   // bonus: reduce X chain to 2 libs
+  const oppCutW      = strategy.oppCutW      ?? 10;  // bonus per X group separated
+  const oppEdgeW     = strategy.oppEdgeW     ?? 0;   // bonus: threatening X chains near edge
+
   let bestScore = -Infinity;
   let bestBoard = board;
 
@@ -264,8 +278,7 @@ function opponentBestResponse(board, size) {
       const { xT, oT } = countTerritory(sim, size);
       let score = (oT - xT) * 2 + xCaps * 8;
 
-      // Encirclement: reward reducing liberties of adjacent X chains (local, fast)
-      // Illuminati's core tactic is to slowly reduce our chains' liberty counts.
+      // Encirclement: reward reducing liberties of adjacent X chains
       const seenChains = new Set();
       for (const [nx, ny] of neighbors(x, y, size)) {
         if (sim[nx]?.[ny] !== 'X') continue;
@@ -274,13 +287,19 @@ function opponentBestResponse(board, size) {
         const xChain = traceChain(sim, nx, ny, 'X', size);
         for (const [cx, cy] of xChain) seenChains.add(cx * size + cy);
         const xLibs = chainLiberties(sim, xChain, size);
-        if (xLibs === 1) score += 14;      // puts our chain in atari
-        else if (xLibs === 2) score += 6;  // pre-atari pressure
+        if (xLibs === 1) score += oppAtariW;
+        else if (xLibs === 2) score += oppPreAtariW;
+        // Edge encirclement bonus: extra reward for trapping chains near edges
+        if (oppEdgeW > 0) {
+          const isEdgeChain = xChain.some(([cx, cy]) =>
+            Math.min(cx, cy, size - 1 - cx, size - 1 - cy) <= 1);
+          if (isEdgeChain) score += oppEdgeW;
+        }
       }
 
       // Cut bonus: O stone separates two or more of our (X) groups
       const xGroups = countAdjacentGroups(board, x, y, 'X', size);
-      if (xGroups >= 2) score += 10 * (xGroups - 1);
+      if (xGroups >= 2) score += oppCutW * (xGroups - 1);
 
       // Opponent avoids self-atari and filling their own eyes
       if (libs === 1 && xCaps === 0) score -= 20;

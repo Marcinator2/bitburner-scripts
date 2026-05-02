@@ -144,7 +144,7 @@ export async function main(ns) {
 
         if (shouldBuy && ns.gang.purchaseEquipment(name, equip.name)) {
           const reason = isTraining ? "Training" : "ROI ok";
-          ns.print(`BUY [${reason}]: ${name} → ${equip.name} (${ns.formatNumber(equip.cost)})`);
+          ns.print(`BUY [${reason}]: ${name} → ${equip.name} (${ns.format.number(equip.cost)})`);
         }
       }
     }
@@ -163,7 +163,7 @@ export async function main(ns) {
       const currentRespect = Math.floor(ns.gang.getGangInformation().respect);
       minRespectForCyberterrorismMin = Math.max(minRespectForCyberterrorismMin, currentRespect);
       minRespectForCyberterrorism = Math.max(minRespectForCyberterrorismMin, currentRespect);
-      ns.print(`[RESPECT-TARGET] Respect Farm OFF → threshold set to ${ns.formatNumber(minRespectForCyberterrorism)}`);
+      ns.print(`[RESPECT-TARGET] Respect Farm OFF → threshold set to ${ns.format.number(minRespectForCyberterrorism)}`);
     }
     prevRespectFarmMode = gangConfig.respectFarmMode;
 
@@ -192,7 +192,7 @@ export async function main(ns) {
 
       if (minRespectForCyberterrorism !== oldTarget) {
         ns.print(
-          `[RESPECT-TARGET] ${ns.formatNumber(oldTarget)} -> ${ns.formatNumber(minRespectForCyberterrorism)} ` +
+          `[RESPECT-TARGET] ${ns.format.number(oldTarget)} -> ${ns.format.number(minRespectForCyberterrorism)} ` +
           `(penalty ${wantedPenalty.toFixed(3)}, wantedGain ${wantedLevelGain.toFixed(4)})`
         );
       }
@@ -255,7 +255,7 @@ export async function main(ns) {
     }
 
     // Average clash chance across active enemy gangs
-    const otherGangs = ns.gang.getOtherGangInformation();
+    const otherGangs = ns.gang.getAllGangInformation();
     const enemyNames = Object.keys(otherGangs).filter(g => g !== info.faction && otherGangs[g].territory > 0);
     let avgClashChance = 0;
     if (enemyNames.length > 0) {
@@ -429,7 +429,7 @@ export async function main(ns) {
       const metric = prepDexFocus ? "DEX" : "Combat";
       const dexFloorText = prepDexFocus ? ` | DEX-Floor: ${Math.floor(dexFloorRatio * 100)}%` : "";
       ns.print(
-        `[PREP ${metric}] Round ${prepRound} | Done: ${prepDoneMembers.size}/${memberStats.length} | Active: ${activeTrainees.length}${dexFloorText} | RespectTarget: ${ns.formatNumber(minRespectForCyberterrorism)} | Trainees: ${traineeText}`
+        `[PREP ${metric}] Round ${prepRound} | Done: ${prepDoneMembers.size}/${memberStats.length} | Active: ${activeTrainees.length}${dexFloorText} | RespectTarget: ${ns.format.number(minRespectForCyberterrorism)} | Trainees: ${traineeText}`
       );
     } else if (powerFarmMode && (loopCount % prepStatusEveryLoops === 0)) {
       const powerFarmers = memberStats
@@ -437,7 +437,7 @@ export async function main(ns) {
         .map(m => `${m.name} (Power ${Math.floor(combatScore(m.stats))})`);
       const powerFarmerText = powerFarmers.length > 0 ? powerFarmers.join(", ") : "none";
       ns.print(
-        `[POWER-FARM] Active: ${powerFarmers.length} | Clashes: OFF | RespectTarget: ${ns.formatNumber(minRespectForCyberterrorism)} | Fighters: ${powerFarmerText}`
+        `[POWER-FARM] Active: ${powerFarmers.length} | Clashes: OFF | RespectTarget: ${ns.format.number(minRespectForCyberterrorism)} | Fighters: ${powerFarmerText}`
       );
     }
 

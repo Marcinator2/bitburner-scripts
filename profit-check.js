@@ -44,9 +44,9 @@ export async function main(ns) {
     const root = s.hasRoot ? " " : "🔒";
     const num  = String(i + 1).padEnd(3);
     const name = s.name.length > 18 ? s.name.slice(0, 18) : s.name.padEnd(18);
-    const money = ns.nFormat(s.maxMoney, "$0.00a").padStart(11);
-    const cur   = ns.nFormat(s.curMoney, "$0.00a").padStart(11);
-    const rate  = ns.nFormat(s.rate,     "$0.00a").padStart(10);
+    const money = ("$" + ns.format.number(s.maxMoney, 2)).padStart(11);
+    const cur   = ("$" + ns.format.number(s.curMoney, 2)).padStart(11);
+    const rate  = ("$" + ns.format.number(s.rate,     2)).padStart(10);
     const lvl   = String(s.reqLevel).padStart(4);
     ns.tprint(`║ ${root} ${num} ${name} ${money} ${cur} ${rate} ${lvl}  ║`);
   }

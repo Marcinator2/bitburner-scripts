@@ -40,7 +40,7 @@ export async function main(ns) {
     ns.tprint(`Preferred faction '${preferredFaction}' does not have ${augName} or is not available. Using ${buyFaction} instead.`);
   }
 
-  ns.tprint(`Starting endless buy loop for ${augName} via faction '${buyFaction}' (reserve ${ns.formatNumber(reserveMoney)}$).`);
+  ns.tprint(`Starting endless buy loop for ${augName} via faction '${buyFaction}' (reserve ${ns.format.number(reserveMoney)}$).`);
 
   while (true) {
     try {
@@ -59,7 +59,7 @@ export async function main(ns) {
       if (canAfford && factionRep >= repReq) {
         const success = ns.singularity.purchaseAugmentation(buyFaction, augName);
         if (success) {
-          ns.tprint(`Purchase successful: ${augName} from ${buyFaction} for ${ns.formatNumber(price)}$. Balance now ${ns.formatNumber(ns.getPlayer().money)}$.`);
+          ns.tprint(`Purchase successful: ${augName} from ${buyFaction} for ${ns.format.number(price)}$. Balance now ${ns.format.number(ns.getPlayer().money)}$.`);
           await ns.sleep(1000);
           continue;
         }
@@ -68,17 +68,17 @@ export async function main(ns) {
       }
 
       if (!canAfford) {
-        ns.tprint(`Not enough money for ${augName} (price ${ns.formatNumber(price)}$, reserve ${ns.formatNumber(reserveMoney)}$). Balance ${ns.formatNumber(money)}$.`);
+        ns.tprint(`Not enough money for ${augName} (price ${ns.format.number(price)}$, reserve ${ns.format.number(reserveMoney)}$). Balance ${ns.format.number(money)}$.`);
       }
 
       if (factionRep < repReq) {
-        ns.tprint(`Not enough reputation at ${buyFaction} for ${augName} (${ns.formatNumber(factionRep)}/${ns.formatNumber(repReq)}).`);
+        ns.tprint(`Not enough reputation at ${buyFaction} for ${augName} (${ns.format.number(factionRep)}/${ns.format.number(repReq)}).`);
         if (canDonate && money > reserveMoney + 1e6) {
           const donateAmount = Math.max(0, Math.min(money - reserveMoney, price * 2));
           if (donateAmount > 0) {
             const donated = ns.singularity.donateToFaction(buyFaction, donateAmount);
             if (donated) {
-              ns.tprint(`Donated ${ns.formatNumber(donateAmount)}$ to ${buyFaction} for reputation gain. Balance ${ns.formatNumber(ns.getPlayer().money)}$.`);
+              ns.tprint(`Donated ${ns.format.number(donateAmount)}$ to ${buyFaction} for reputation gain. Balance ${ns.format.number(ns.getPlayer().money)}$.`);
               await ns.sleep(1000);
               continue;
             }

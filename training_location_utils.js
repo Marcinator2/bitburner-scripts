@@ -147,7 +147,7 @@ function selectBestLocation({
       ...choice,
       reason: choice.name === best.name
         ? `${bestLabel} (${formatRate(choice.xpPerSecond)} XP/s)`
-        : `${affordableLabel} (${formatRate(choice.xpPerSecond)} XP/s, ${ns.formatNumber(choice.startupCost)}$ startup cost)`,
+        : `${affordableLabel} (${formatRate(choice.xpPerSecond)} XP/s, ${ns.format.number(choice.startupCost)}$ startup cost)`,
     };
   }
 
@@ -165,7 +165,7 @@ function selectBestLocation({
 
   return {
     ...cheapest,
-    reason: `${cheapestLabel} (${ns.formatNumber(cheapest.startupCost || 0)}$)`,
+    reason: `${cheapestLabel} (${ns.format.number(cheapest.startupCost || 0)}$)`,
   };
 }
 

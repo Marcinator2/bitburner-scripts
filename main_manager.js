@@ -195,7 +195,7 @@ export async function main(ns) {
 
   const initialConfig = loadConfig(ns, configFile);
   if (initialConfig.tail) {
-    ns.tail();
+    ns.ui.openTail();
   }
 
   if (mode === "once") {
@@ -294,7 +294,7 @@ function printStatus(ns, serviceStates, config, configFile) {
   ns.print("");
   ns.print(`Config: ${configFile}`);
   ns.print(`Loop: ${Math.floor(config.loopMs / 1000)}s`);
-  ns.print(`Home RAM: ${ns.formatRam(ns.getServerUsedRam("home"))} / ${ns.formatRam(ns.getServerMaxRam("home"))}`);
+  ns.print(`Home RAM: ${ns.format.ram(ns.getServerUsedRam("home"))} / ${ns.format.ram(ns.getServerMaxRam("home"))}`);
   ns.print("");
 
   for (const state of serviceStates) {
@@ -310,8 +310,8 @@ function printStatus(ns, serviceStates, config, configFile) {
     ns.print("");
     ns.print("SERVER ADMIN");
     ns.print(`  AutoBuy:    ${guiState.autoBuy    ? "ON" : "OFF"} (8 GB)`);
-    ns.print(`  AutoUpgrade: ${guiState.autoUpgrade ? "ON" : "OFF"} (target: ${ns.formatRam(Number(guiState.upgradeRam) || 0)})`);
-    ns.print(`  BuyRam:     ${ns.formatRam(Number(guiState.buyRam) || 0)}`);
+    ns.print(`  AutoUpgrade: ${guiState.autoUpgrade ? "ON" : "OFF"} (target: ${ns.format.ram(Number(guiState.upgradeRam) || 0)})`);
+    ns.print(`  BuyRam:     ${ns.format.ram(Number(guiState.buyRam) || 0)}`);
   }
 }
 

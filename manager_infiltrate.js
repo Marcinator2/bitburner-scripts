@@ -67,8 +67,8 @@ export async function main(ns) {
     const name = loc.location.name.substring(0, COL_NAME - 2).padEnd(COL_NAME);
     const city = String(loc.location.city).padEnd(COL_CITY);
     const diff = loc.difficulty.toFixed(2).padEnd(6);
-    const cash = ("$" + ns.formatNumber(loc.reward.sellCash)).padEnd(12);
-    const rep  = ns.formatNumber(loc.reward.tradeRep);
+    const cash = ("$" + ns.format.number(loc.reward.sellCash)).padEnd(12);
+    const rep  = ns.format.number(loc.reward.tradeRep);
     ns.tprint(`${name}${city}${diff}${cash}${rep}`);
   }
 

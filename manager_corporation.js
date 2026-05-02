@@ -377,7 +377,7 @@ function hireAndAssign(ns, phase) {
         }
         for (const [job, target] of Object.entries(jobTargets)) {
           try {
-            corp.setAutoJobAssignment(div, city, job, target);
+            corp.setJobAssignment(div, city, job, target);
           } catch { /* */ }
         }
       } catch { /* */ }
@@ -470,14 +470,14 @@ function handleInvestment(ns, corpInfo, phase, configFile) {
     if (phase === "early" && offer.round === 1) {
       if (offer.funds >= INVEST_ROUND1_FUNDS_TARGET && config.corp.autoInvest) {
         corp.acceptInvestmentOffer();
-        ns.print(`Investment round 1 accepted: ${ns.formatNumber(offer.funds)}$`);
+        ns.print(`Investment round 1 accepted: ${ns.format.number(offer.funds)}$`);
       }
     }
 
     if (phase === "round2" && offer.round === 2) {
       if (offer.funds >= INVEST_ROUND2_FUNDS_TARGET && config.corp.autoInvest) {
         corp.acceptInvestmentOffer();
-        ns.print(`Investment round 2 accepted: ${ns.formatNumber(offer.funds)}$`);
+        ns.print(`Investment round 2 accepted: ${ns.format.number(offer.funds)}$`);
       }
     }
 
@@ -546,7 +546,7 @@ function manageProducts(ns, corpInfo, phase) {
         const productName = `${divName.split(" ")[0]}-v${Date.now() % 10000}`;
         try {
           corp.makeProduct(divName, CITIES[0], productName, budget, budget);
-          ns.print(`New product started: ${productName} | Investment: ${ns.formatNumber(budget)}$`);
+          ns.print(`New product started: ${productName} | Investment: ${ns.format.number(budget)}$`);
         } catch { /* */ }
       }
 
@@ -582,7 +582,7 @@ function setSellOrders(ns, phase) {
   for (const divName of corpInfo.divisions) {
     try {
       const divInfo = corp.getDivision(divName);
-      const industryData = corp.getIndustryData(divInfo.type);
+      const industryData = corp.getIndustryData(divInfo.industry);
 
       // Verkaufte Materialien
       for (const material of (industryData.producedMaterials ?? [])) {
@@ -615,7 +615,7 @@ function buyAdVerts(ns, phase) {
       // Max 5% der Mittel für AdVerts
       if (info.funds >= cost && cost <= info.funds * 0.05) {
         corp.hireAdVert(divName);
-        ns.print(`${divName}: AdVert purchased (Cost: ${ns.formatNumber(cost)}$)`);
+        ns.print(`${divName}: AdVert purchased (Cost: ${ns.format.number(cost)}$)`);
       }
     } catch { /* */ }
   }

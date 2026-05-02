@@ -3,7 +3,7 @@ export async function main(ns) {
   const ram = sanitizeRam(ns.args[0], 2 ** 12);
   const skipPrompt = ns.args[1] === true || String(ns.args[1] || "").toLowerCase() === "true";
 
-  const servers = ns.getPurchasedServers();
+  const servers = ns.cloud.getServerNames();
   if (servers.length === 0) {
     ns.tprint("No purchased servers found.");
     return;
@@ -12,24 +12,24 @@ export async function main(ns) {
   const plan = buildUpgradePlan(ns, servers, ram);
   if (plan.upgradable.length === 0) {
     if (plan.blockedDowngrades > 0) {
-      ns.tprint(`Target RAM ${ns.formatRam(ram)} is smaller than ${plan.blockedDowngrades} existing servers. Downgrade will not be performed.`);
+      ns.tprint(`Target RAM ${ns.format.ram(ram)} is smaller than ${plan.blockedDowngrades} existing servers. Downgrade will not be performed.`);
     }
-    ns.tprint(`No MyServer_ servers can be upgraded to ${ns.formatRam(ram)}.`);
+    ns.tprint(`No MyServer_ servers can be upgraded to ${ns.format.ram(ram)}.`);
     return;
   }
 
   if (plan.blockedDowngrades > 0) {
-    ns.tprint(`Note: ${plan.blockedDowngrades} servers already exceed ${ns.formatRam(ram)} and will not be downgraded.`);
+    ns.tprint(`Note: ${plan.blockedDowngrades} servers already exceed ${ns.format.ram(ram)} and will not be downgraded.`);
   }
 
   const totalCost = plan.totalCost;
   const playerMoney  = ns.getPlayer().money;
 
   ns.tprint(`Found servers: ${servers.join(", ")}`);
-  ns.tprint(`Total cost: ${ns.formatNumber(totalCost)}$  |  Your money: ${ns.formatNumber(playerMoney)}$`);
+  ns.tprint(`Total cost: ${ns.format.number(totalCost)}$  |  Your money: ${ns.format.number(playerMoney)}$`);
 
   if (!skipPrompt) {
-    const question = `Upgrade all ${plan.upgradable.length}/${servers.length} MyServer_ to ${ram} GB? Remaining money after: ${ns.formatNumber(playerMoney - totalCost)}$`;
+    const question = `Upgrade all ${plan.upgradable.length}/${servers.length} MyServer_ to ${ram} GB? Remaining money after: ${ns.format.number(playerMoney - totalCost)}$`;
     const answer = await ns.prompt(question, { type: "boolean" });
 
     if (!answer) {
@@ -43,7 +43,7 @@ export async function main(ns) {
     const serverName = entry.serverName;
     const cost = entry.cost;
     if (cost > ns.getPlayer().money) {
-      ns.tprint(`[✗] ${serverName}: Not enough money (${ns.formatNumber(cost)}$)`);
+      ns.tprint(`[✗] ${serverName}: Not enough money (${ns.format.number(cost)}$)`);
       continue;
     }
     ns.upgradePurchasedServer(serverName, ram);
@@ -68,7 +68,7 @@ function buildUpgradePlan(ns, servers, ram) {
       continue;
     }
 
-    const cost = ns.getPurchasedServerUpgradeCost(serverName, ram);
+    const cost = ns.cloud.getServerUpgradeCost(serverName, ram);
     if (!Number.isFinite(cost) || cost <= 0) {
       continue;
     }

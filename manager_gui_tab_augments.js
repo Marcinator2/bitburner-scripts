@@ -115,7 +115,7 @@ export function buildAugmentDetails(ns, enabled, running, override, scriptExists
     .join(", ");
 
   const bufferText = augConfig.minMoneyBuffer > 0
-    ? `Buffer: ${ns.formatNumber(augConfig.minMoneyBuffer)}$`
+    ? `Buffer: ${ns.format.number(augConfig.minMoneyBuffer)}$`
     : "No money buffer";
 
   return [

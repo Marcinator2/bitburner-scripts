@@ -135,7 +135,7 @@ export async function main(ns) {
 
     if (!initialSummary.hasTix && stockApi.purchaseTixApi && canAfford(Number(stockConstants.TixApiCost))) {
       if (stockApi.purchaseTixApi()) {
-        purchases.push(`TIX API (${ns.formatNumber(Number(stockConstants.TixApiCost))}$)`);
+        purchases.push(`TIX API (${ns.format.number(Number(stockConstants.TixApiCost))}$)`);
       }
     }
 
@@ -147,7 +147,7 @@ export async function main(ns) {
       canAfford(Number(stockConstants.MarketDataTixApi4SCost))
     ) {
       if (stockApi.purchase4SMarketDataTixApi()) {
-        purchases.push(`4S Market Data TIX API (${ns.formatNumber(Number(stockConstants.MarketDataTixApi4SCost))}$)`);
+        purchases.push(`4S Market Data TIX API (${ns.format.number(Number(stockConstants.MarketDataTixApi4SCost))}$)`);
       }
     }
 
@@ -273,11 +273,11 @@ export async function main(ns) {
 
       if (stopLossHit || forecastDropHit || forecastHit || trailingHit) {
         const grund = stopLossHit
-          ? `StopLoss (${ns.formatNumber(bid)} ≤ ${ns.formatNumber(stopLossPrice)})`
+          ? `StopLoss (${ns.format.number(bid)} ≤ ${ns.format.number(stopLossPrice)})`
           : forecastDropHit
             ? `ForecastDrop (${positionEntryForecast[sym].toFixed(3)} → ${forecast.toFixed(3)})`
             : trailingHit
-              ? `TrailingStop (peak=${ns.formatNumber(positionPeak[sym])} → now=${ns.formatNumber(bid)}, -${(((positionPeak[sym] - bid) / positionPeak[sym]) * 100).toFixed(1)}%)`
+              ? `TrailingStop (peak=${ns.format.number(positionPeak[sym])} → now=${ns.format.number(bid)}, -${(((positionPeak[sym] - bid) / positionPeak[sym]) * 100).toFixed(1)}%)`
               : `Forecast (${forecast.toFixed(3)} ≤ ${regime.sellF})`;
         const sellPrice = ns.stock.sellStock(sym, shares);
         if (sellPrice > 0) {
@@ -289,7 +289,7 @@ export async function main(ns) {
           if (stopLossHit) stoppedLoss++;
           if (forecastDropHit) droppedForecast++;
           const pnlPct = ((sellPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(1);
-          ns.print(`4S SELL ${sym}: ${shares} @ ${ns.formatNumber(sellPrice)} (${pnlPct}%) | ${grund}`);
+          ns.print(`4S SELL ${sym}: ${shares} @ ${ns.format.number(sellPrice)} (${pnlPct}%) | ${grund}`);
         }
         continue;
       }
@@ -409,7 +409,7 @@ export async function main(ns) {
         positionEntryForecast[c.sym] = c.forecast;
         positionEntryTime[c.sym] = now;
         positionPeak[c.sym] = ns.stock.getBidPrice(c.sym);
-        ns.print(`4S BUY ${c.sym}: ${qty} @ ${ns.formatNumber(buyPrice)} f=${c.forecast.toFixed(3)} v=${c.vol.toFixed(3)}`);
+        ns.print(`4S BUY ${c.sym}: ${qty} @ ${ns.format.number(buyPrice)} f=${c.forecast.toFixed(3)} v=${c.vol.toFixed(3)}`);
       }
     }
 
@@ -478,7 +478,7 @@ export async function main(ns) {
       const now = Date.now();
       if (status && now - lastStatusTs > 30_000) {
        /* ns.tprint(
-          `4S Status | regime=${status.regime} open=${status.openPositions} cash=${ns.formatNumber(status.tradableCash)} ` +
+          `4S Status | regime=${status.regime} open=${status.openPositions} cash=${ns.format.number(status.tradableCash)} ` +
           `buyF=${status.adaptiveBuyF.toFixed(3)} minVol=${status.adaptiveMinVol.toFixed(3)} ` +
           `buys=${status.buys} sells=${status.sells} rot=${status.rotations} stop=${status.stoppedLoss} drop=${status.droppedForecast} ` +
           `block(forecast=${status.blockedForecast},vol=${status.blockedVolatility},cd=${status.blockedCooldown},budget=${status.blockedBudget})`

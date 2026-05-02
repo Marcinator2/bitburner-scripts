@@ -62,18 +62,18 @@ export function buildCorpDetails(ns, enabled, running, override, scriptExists) {
   }
 
   const profit = status.profit;
-  const profitStr = profit >= 0 ? `+${ns.formatNumber(profit)}` : ns.formatNumber(profit);
+  const profitStr = profit >= 0 ? `+${ns.format.number(profit)}` : ns.format.number(profit);
 
   const lines = [
     `Config: ${enabled ? "ON" : "OFF"} | Runtime: ${running ? "RUNNING" : "STOPPED"} | ${scriptExists ? "Script: OK" : "Script: MISSING"}`,
     `${status.name} | Phase: ${status.phase} | ${status.public ? "PUBLIC" : "PRIVAT"}`,
-    `Funds: ${ns.formatNumber(status.funds)}$ | Wert: ${ns.formatNumber(status.valuation)}$`,
-    `Revenue: ${ns.formatNumber(status.revenue)}$/s | Profit: ${profitStr}$/s`,
+    `Funds: ${ns.format.number(status.funds)}$ | Wert: ${ns.format.number(status.valuation)}$`,
+    `Revenue: ${ns.format.number(status.revenue)}$/s | Profit: ${profitStr}$/s`,
     `Divisions: ${status.divisions}`,
   ];
 
   if (!status.public && status.investOffer > 0) {
-    lines.push(`Invest-Runde ${status.investRound}: ${ns.formatNumber(status.investOffer)}$ angeboten`);
+    lines.push(`Invest-Runde ${status.investRound}: ${ns.format.number(status.investOffer)}$ angeboten`);
   }
 
   return lines.join("\n");

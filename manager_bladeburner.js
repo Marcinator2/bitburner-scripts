@@ -138,7 +138,7 @@ export async function main(ns) {
     // Status output
     const bonusSec = Math.floor(ns.bladeburner.getBonusTime() / 1000);
     ns.print("=== BLADEBURNER MANAGER ===");
-    ns.print(`Rank: ${ns.formatNumber(rank, 2)}  |  SP: ${ns.bladeburner.getSkillPoints()}`);
+    ns.print(`Rank: ${ns.format.number(rank, 2)}  |  SP: ${ns.bladeburner.getSkillPoints()}`);
     ns.print(`Stamina: ${curStamina.toFixed(1)} / ${maxStamina.toFixed(1)}  (${(staminaRatio * 100).toFixed(0)}%)`);
     ns.print(`City: ${city}  |  Chaos: ${chaos.toFixed(2)}`);
     ns.print(`Bonus Time: ${bonusSec}s`);

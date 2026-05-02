@@ -56,7 +56,7 @@ export async function main(ns) {
 
     const allServers = scanAll();
     const hackLevel = ns.getHackingLevel();
-    const purchasedSet = new Set(ns.getPurchasedServers());
+    const purchasedSet = new Set(ns.cloud.getServerNames());
 
     // Candidates: root access, hack level ok, no backdoor yet, not a player server
     const candidates = allServers.filter(s =>

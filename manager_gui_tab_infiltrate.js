@@ -109,7 +109,7 @@ export function renderInfiltratePane(ns, panel) {
       nameLine.style.whiteSpace = "nowrap";
 
       const statsLine = doc.createElement("div");
-      statsLine.textContent = `${loc.location.city} | Diff: ${loc.difficulty.toFixed(2)} | $${ns.formatNumber(loc.reward.sellCash)} | Rep: ${ns.formatNumber(loc.reward.tradeRep)}`;
+      statsLine.textContent = `${loc.location.city} | Diff: ${loc.difficulty.toFixed(2)} | $${ns.format.number(loc.reward.sellCash)} | Rep: ${ns.format.number(loc.reward.tradeRep)}`;
       statsLine.style.fontSize = "10px";
       statsLine.style.color = "#8db3d9";
       statsLine.style.marginTop = "1px";

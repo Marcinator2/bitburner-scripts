@@ -6,10 +6,10 @@ export async function main(ns) {
   const RAM     = 16; // GB – enough for the manager + headroom
 
   // Reuse existing purchased server or buy a new one
-  let host = ns.getPurchasedServers().find(s => s === HOST);
+  let host = ns.cloud.getServerNames().find(s => s === HOST);
 
   if (!host) {
-    host = ns.purchaseServer(HOST, RAM);
+    host = ns.cloud.purchaseServer(HOST, RAM);
     if (!host) {
       ns.tprint(`❌ Purchase failed – not enough money for a ${RAM} GB server.`);
       ns.tprint(`   Required RAM: ${RAM} GB`);

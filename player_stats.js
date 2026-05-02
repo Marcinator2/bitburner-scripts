@@ -18,7 +18,7 @@ export async function main(ns) {
 
   ns.disableLog("sleep");
   ns.disableLog("read");
-  ns.tail();
+  ns.ui.openTail();
 
   ensureJsonFile(ns, file, {
     version: 1,
@@ -67,7 +67,7 @@ function renderDashboard(ns, file) {
   ns.print(`Intervall: ${formatDuration((history.sampleMs || 0) / 1000)}`);
   ns.print("");
 
-  ns.print(`Geld:        ${ns.formatNumber(last.money)}`);
+  ns.print(`Geld:        ${ns.format.number(last.money)}`);
   ns.print(`Geld / sec:  ${formatSigned(ns, moneyPerSec)}`);
   ns.print(`Hack Lvl:    ${last.skills.hacking} (${formatDelta(last.skills.hacking - first.skills.hacking)})`);
   ns.print(`Hack XP/sec: ${formatSigned(ns, hackingExpPerSec)}`);
@@ -89,8 +89,8 @@ function renderDashboard(ns, file) {
   printStatDelta(ns, "CHA", first.skills.charisma, last.skills.charisma);
   ns.print("");
 
-  printChartSection(ns, "Money trend", samples, sample => sample.money, value => ns.formatNumber(value));
-  printChartSection(ns, "Hack XP trend", samples, sample => sample.exp.hacking, value => ns.formatNumber(value));
+  printChartSection(ns, "Money trend", samples, sample => sample.money, value => ns.format.number(value));
+  printChartSection(ns, "Hack XP trend", samples, sample => sample.exp.hacking, value => ns.format.number(value));
   printChartSection(ns, "Combat Avg trend", samples, getAverageCombatLevel, value => value.toFixed(1));
   printChartSection(ns, "STR trend", samples, sample => sample.skills.strength, value => value.toFixed(0));
   printChartSection(ns, "DEX trend", samples, sample => sample.skills.dexterity, value => value.toFixed(0));
@@ -204,7 +204,7 @@ function formatDuration(seconds) {
 
 function formatSigned(ns, value) {
   const prefix = value >= 0 ? "+" : "-";
-  return `${prefix}${ns.formatNumber(Math.abs(value))}`;
+  return `${prefix}${ns.format.number(Math.abs(value))}`;
 }
 
 function formatDelta(value, decimals = 0) {

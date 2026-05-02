@@ -3,8 +3,8 @@ export async function main(ns) {
   const ram = sanitizeRam(ns.args[0], 2 ** 16);
   const autoUpgrade = ns.args[1] === true || String(ns.args[1] || "").toLowerCase() === "true";
   const prefix = "MyServer_";
-  const limit = ns.getPurchasedServerLimit();
-  const purchased = ns.getPurchasedServers();
+  const limit = ns.cloud.getServerLimit();
+  const purchased = ns.cloud.getServerNames();
 
   // Auto-upgrade: step each server up one power-of-2 at a time toward the target.
   // If a server can't afford its next step, skip it and try the next server.
@@ -14,22 +14,22 @@ export async function main(ns) {
       .map(s => {
         const currentRam = ns.getServerMaxRam(s);
         const nextRam = currentRam * 2;
-        const cost = nextRam <= ram ? ns.getPurchasedServerUpgradeCost(s, nextRam) : Infinity;
+        const cost = nextRam <= ram ? ns.cloud.getServerUpgradeCost(s, nextRam) : Infinity;
         return { server: s, currentRam, nextRam, cost };
       })
       .filter(e => e.nextRam <= ram && Number.isFinite(e.cost) && e.cost > 0)
       .sort((a, b) => a.cost - b.cost); // cheapest first
     if (upgradable.length === 0) {
-      ns.tprint(`Auto-upgrade: all ${purchased.length} servers already at or above ${ns.formatRam(ram)}.`);
+      ns.tprint(`Auto-upgrade: all ${purchased.length} servers already at or above ${ns.format.ram(ram)}.`);
     } else {
       let upgraded = 0;
       for (const { server, currentRam, nextRam, cost } of upgradable) {
         if (ns.getPlayer().money < cost) {
-          ns.tprint(`Auto-upgrade: skipping ${server} (${ns.formatRam(currentRam)} → ${ns.formatRam(nextRam)}) — need ${ns.formatNumber(cost)}$`);
+          ns.tprint(`Auto-upgrade: skipping ${server} (${ns.format.ram(currentRam)} → ${ns.format.ram(nextRam)}) — need ${ns.format.number(cost)}$`);
           continue;
         }
         ns.upgradePurchasedServer(server, nextRam);
-        ns.tprint(`✅ Upgraded: ${server} ${ns.formatRam(currentRam)} → ${ns.formatRam(nextRam)}`);
+        ns.tprint(`✅ Upgraded: ${server} ${ns.format.ram(currentRam)} → ${ns.format.ram(nextRam)}`);
         upgraded++;
       }
       if (upgraded === 0) ns.tprint("Auto-upgrade: no servers could be upgraded (insufficient funds).");
@@ -52,17 +52,17 @@ export async function main(ns) {
     return;
   }
 
-  const cost = ns.getPurchasedServerCost(ram);
+  const cost = ns.cloud.getServerCost(ram);
   const money = (typeof ns.getPlayer === "function") ? ns.getPlayer().money : ns.getServerMoneyAvailable("home");
 
-  ns.tprint(`Server RAM: ${ns.formatRam(ram)} | Server cost: ${cost}`);
+  ns.tprint(`Server RAM: ${ns.format.ram(ram)} | Server cost: ${cost}`);
   
   if (money < cost) {
     ns.tprint(`Not enough money for ${name}: requires ${Math.floor(cost).toLocaleString()}, available ${Math.floor(money).toLocaleString()}`);
     return;
   }
 
-  const purchasedName = ns.purchaseServer(name, ram);
+  const purchasedName = ns.cloud.purchaseServer(name, ram);
   if (purchasedName) {
     ns.tprint(`✅ Purchased: ${purchasedName}`);
     const pid = ns.exec("new_server_setup.js", "home", 1, purchasedName);

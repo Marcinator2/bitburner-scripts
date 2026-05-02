@@ -6,14 +6,14 @@ export async function main(ns) {
   const server = "MyServer_0";
   const files = ["money-hack.js", "profit-check.js", "share-ram.js"];
 
-  const upgradeCost = ns.getPurchasedServerUpgradeCost(server, ram);
+  const upgradeCost = ns.cloud.getServerUpgradeCost(server, ram);
   const player = ns.getPlayer();
 
   const upgradeServer = 0;
 
 
-  ns.tprint(ram + "Byte Ram Server cost: " + ns.getPurchasedServerCost(ram));
-  //ns.tprint(ns.getPurchasedServerCost(ram));//max 1048576  2**20
+  ns.tprint(ram + "Byte Ram Server cost: " + ns.cloud.getServerCost(ram));
+  //ns.tprint(ns.cloud.getServerCost(ram));//max 1048576  2**20
   //ns.scp(files, server);
  // ns.upgradePurchasedServer(server, ram);
   

@@ -59,8 +59,8 @@ export async function main(ns) {
   // Output
   const message = [
     `═══════════════════════════════`,
-    `Total income: $${ns.formatNumber(totalIncome)}/sec`,
-    `Money-Hack (all servers): $${ns.formatNumber(hackIncome)}/sec`,
+    `Total income: $${ns.format.number(totalIncome)}/sec`,
+    `Money-Hack (all servers): $${ns.format.number(hackIncome)}/sec`,
     `Money-Hack processes: ${moneyHackCount}`,
     `═══════════════════════════════`,
     ``,
@@ -86,8 +86,8 @@ export async function main(ns) {
       .map(([name, threads]) => `${name}:${threads}`)
       .join(", ") || "none";
     
-    const ramStr = `${ns.formatRam(info.usedRam)}/${ns.formatRam(info.maxRam)}`;
-    const moneyStr = `$${ns.formatNumber(info.currentMoney)}/$${ns.formatNumber(info.maxMoney)}`;
+    const ramStr = `${ns.format.ram(info.usedRam)}/${ns.format.ram(info.maxRam)}`;
+    const moneyStr = `$${ns.format.number(info.currentMoney)}/$${ns.format.number(info.maxMoney)}`;
     
     // Calculate server income for display
     let serverIncome = 0;
@@ -98,7 +98,7 @@ export async function main(ns) {
       serverIncome += running.onlineMoneyMade / runtime;
     }
     
-    message.push(`${server.padEnd(15)} | $/s: ${ns.formatNumber(serverIncome).padEnd(12)} | RAM: ${ramStr.padEnd(15)} | Money: ${moneyStr.padEnd(20)} | Procs: ${procList}`);
+    message.push(`${server.padEnd(15)} | $/s: ${ns.format.number(serverIncome).padEnd(12)} | RAM: ${ramStr.padEnd(15)} | Money: ${moneyStr.padEnd(20)} | Procs: ${procList}`);
   }
 
   await ns.prompt(message.join("\n"));

@@ -145,7 +145,7 @@ export async function main(ns) {
       if (ns.singularity.purchaseAugmentation(aug.faction, aug.name)) {
         owned.add(aug.name); // for subsequent prereq checks
         bought.push(aug.name);
-        ns.print(`BUY: ${aug.name} (${aug.faction}) – ${ns.formatNumber(currentPrice)}$`);
+        ns.print(`BUY: ${aug.name} (${aug.faction}) – ${ns.format.number(currentPrice)}$`);
       } else {
         pending.push({ ...aug, price: currentPrice, reason: "failed" });
       }
@@ -169,13 +169,13 @@ export async function main(ns) {
     if (moneyPending.length > 0) {
       // Cheapest pending = last in descending sorted list
       const next = moneyPending[moneyPending.length - 1];
-      ns.print(`[NEXT] ${next.name} – ${ns.formatNumber(next.price)}$ (${next.faction})`);
+      ns.print(`[NEXT] ${next.name} – ${ns.format.number(next.price)}$ (${next.faction})`);
     }
 
     if (repPending.length > 0) {
       const nearest = [...repPending].sort((a, b) => a.repReq - b.repReq)[0];
       const missing = Math.max(0, nearest.repReq - nearest.rep);
-      ns.print(`[REP] ${nearest.name} – still ${ns.formatNumber(missing)} Rep needed (${nearest.faction})`);
+      ns.print(`[REP] ${nearest.name} – still ${ns.format.number(missing)} Rep needed (${nearest.faction})`);
     }
 
     // Rep-Farming

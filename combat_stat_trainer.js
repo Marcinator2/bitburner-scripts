@@ -26,7 +26,7 @@ export async function main(ns) {
   const configFile = String(ns.args[0] || DEFAULT_CONFIG_FILE);
 
   ns.disableLog("sleep");
-  ns.tail();
+  ns.ui.openTail();
 
   let currentStat = "";
 

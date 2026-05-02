@@ -6,14 +6,14 @@ export async function main(ns) {
   const targetServerName = "the-hub";
   
   // 1. Calculate cost
-  const cost = ns.getPurchasedServerCost(ram);
+  const cost = ns.cloud.getServerCost(ram);
 
   // 2. Format values
-  // ns.formatRam turns 1048576 GB -> "1.00 PB" (Petabyte)
-  const ramFormatted = ns.formatRam(ram);
+  // ns.format.ram turns 1048576 GB -> "1.00 PB" (Petabyte)
+  const ramFormatted = ns.format.ram(ram);
   
-  // ns.formatNumber turns 1000000 -> "1.000m"
-  const costFormatted = "$" + ns.formatNumber(cost);
+  // ns.format.number turns 1000000 -> "1.000m"
+  const costFormatted = "$" + ns.format.number(cost);
 
   // 3. Output
   
@@ -26,8 +26,8 @@ Cost:   ${costFormatted}
 
 Target has the following values:
 Target:   ${targetServerName}
-Max Money: $${ns.formatNumber(ns.getServerMaxMoney(targetServerName))}
-Current:   $${ns.formatNumber(ns.getServerMoneyAvailable(targetServerName))}`);
+Max Money: $${ns.format.number(ns.getServerMaxMoney(targetServerName))}
+Current:   $${ns.format.number(ns.getServerMoneyAvailable(targetServerName))}`);
 
   ns.tprint(`Report for ${ramFormatted} created.`);
 }

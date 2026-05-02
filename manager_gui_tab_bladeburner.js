@@ -59,7 +59,7 @@ export function renderBladeburnerPane(ns, panel) {
   }
 
   infoList.appendChild(makeCard([
-    `Rank: ${ns.formatNumber(rank, 2)} | Skill Points: ${skillPoints}`,
+    `Rank: ${ns.format.number(rank, 2)} | Skill Points: ${skillPoints}`,
     `Stamina: ${curStamina.toFixed(2)} / ${maxStamina.toFixed(2)}`,
     `Bonus Time: ${bonusTimeStr}`,
   ].join("\n")));
@@ -81,7 +81,7 @@ export function renderBladeburnerPane(ns, panel) {
 
   const pop = ns.bladeburner.getCityEstimatedPopulation(city);
   const chaos = ns.bladeburner.getCityChaos(city);
-  infoList.appendChild(makeCard(`City: ${city}\nEst. Pop: ${ns.formatNumber(pop)} | Chaos: ${chaos.toFixed(2)}`));
+  infoList.appendChild(makeCard(`City: ${city}\nEst. Pop: ${ns.format.number(pop)} | Chaos: ${chaos.toFixed(2)}`));
 
   const citiesTitle = doc.createElement("div");
   citiesTitle.textContent = "City Overview";
@@ -109,7 +109,7 @@ export function renderBladeburnerPane(ns, panel) {
     statsEl.style.color = "#9fc0de";
     const cityPop = ns.bladeburner.getCityEstimatedPopulation(c);
     const cityChaos = ns.bladeburner.getCityChaos(c);
-    statsEl.textContent = `Pop: ${ns.formatNumber(cityPop)} | Chaos: ${cityChaos.toFixed(1)}`;
+    statsEl.textContent = `Pop: ${ns.format.number(cityPop)} | Chaos: ${cityChaos.toFixed(1)}`;
 
     row.append(nameEl, statsEl);
     infoList.appendChild(row);

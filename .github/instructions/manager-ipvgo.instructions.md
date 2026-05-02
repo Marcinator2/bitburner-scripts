@@ -35,6 +35,10 @@ Each strategy entry in `STRATEGIES` controls the scoring weights:
 | `cornerW` | Early-game multiplier for corner/edge preference |
 | `passThresh` | Pass the move if best score is below this value |
 | `opponentSkillW` | 0 = ignore opponent reply, 1 = assume perfect opponent response |
+| `oppAtariW` | (optional) 2-ply: bonus for reducing X chain to 1 lib (default 14) |
+| `oppPreAtariW` | (optional) 2-ply: bonus for reducing X chain to 2 libs (default 6) |
+| `oppCutW` | (optional) 2-ply: bonus per X group separated (default 10) |
+| `oppEdgeW` | (optional) 2-ply: extra bonus for threatening X chains near edge (default 0) |
 
 ## Opponent Profiles (rationale)
 - **Netburners**: weak, isolated stones — high atari weight, low `opponentSkillW`.
@@ -94,8 +98,53 @@ Reference: ~370 games played, 6 wins total. Only 1 win in the first 311 games (g
 ### File size
 `IPVGO_LOG_MAX = 20` × 5 opponents = 100 entries max = ~11.400 lines. The file does NOT grow further. No need to split into multiple files.
 
+---
+
+## Tetrads — Log Analysis & Tried Optimizations
+
+Reference: 20 games logged (3 wins all on 9x9, 0 wins on 7x7).
+
+### Board size stats (20 entries)
+- 9x9: **3/17 wins**, avg score diff −13.1, avg 30.2 moves
+- 7x7: **0/3 wins**, avg score diff −11.2, avg 13.0 moves ← dies after only 4 moves
+
+### What is known about Tetrads
+- Martial AI — excels at edge encirclement of chains that drift to corners.
+- 9x9 is competitive (3 wins); 7x7 breaks after 4 moves due to premature passing.
+- Winning games (12, 13, 14) had high avg move scores and full game length.
+
+### ❌ TRIED — passThresh 0.0 (was tried, caused 7x7 to abort after 4 moves)
+**Hypothesis:** Negative-scoring moves hurt territory; pass instead.  
+**Result:** On 7x7 with `opponentSkillW=0.9`, the 2-ply territory delta collapses near zero on an early open board, causing all expansion moves to score <0. Game 1 (7x7) ended at move 3 (score 0.4). Do NOT use passThresh≥0 for Tetrads.
+
+### ❌ TRIED — opponentSkillW 1.0 (was 0.9)
+**Hypothesis:** More accurate 2-ply prediction detects Tetrads traps earlier.  
+**Result:** 2-ply territory delta collapses to ≈0 on open 9x9 boards. Games 12, 17, 18 ended after only 1 move. Do NOT raise opponentSkillW above 0.9 for Tetrads.
+
+### ❌ TRIED — cornerW -1.5 (was tried, caused corner clustering)
+**Hypothesis:** -1.5 penalty is enough to keep us out of corners/edges.  
+**Result:** Game 19 (21-58.5, avg score 25.4): move 3 jumped to edge (6,7) scoring 8.5 despite -1.5 edge penalty, then moves 4-8 all stayed in that corner cluster → Tetrads surrounded the whole group. -1.5 is too weak for high-scoring corner salvage moves. Replaced with -2.5.
+
+### ❌ TRIED — cornerW -2.5 (was -1.5)
+**Hypothesis:** Stronger edge penalty prevents corner clustering (game 19 edge jump).  
+**Result:** Catastrophic. On 7x7, only dist=3 (center) gets +2.5; all other cells get 0 or negative. Forces all play into a tight center cluster. Tetrads surrounds it easily. Dropped from 2/8 to 1/18 wins on 7x7. Do NOT lower cornerW below -1.5 for Tetrads.
+
+### ⚠️ TRYING — connW 0.5 (was 1.0, since game 6 7x7)
+**Hypothesis:** On 7x7, `cornerW=-1.5` makes only center (3,3) positive. Adjacent cells score 0 from cornerW but get +1.0 from connW per neighbor → engine clusters around center. Lowering to 0.5 reduces the clustering pull.  
+**Result:** TBD
+
+### ⚠️ TRYING — opponent-specific 2-ply response profile (since game 9 9x9)
+**Hypothesis:** The shared `opponentBestResponse` was tuned for Illuminati (slow atari-chain reduction). Tetrads plays differently: aggressive edge encirclement + cutting. New `opp*` fields in the Tetrads strategy override the response model: `oppAtariW=8`, `oppPreAtariW=3`, `oppCutW=20`, `oppEdgeW=10`. The edge bonus rewards Tetrads for threatening our chains near edges (dist≤1), so our 2-ply now anticipates and avoids placing stones on the edge where Tetrads can trap them.  
+**Result:** TBD
+**Hypothesis:** cornerW=-2.5 gives: corner=-5, edge=-2.5, 2-in=0, center=+5. Stronger deterrent against early corner jumps. opponentSkillW reverted to 0.9 to prevent 1-move collapse. passThresh=-1.5 stays (fixed 7x7).  
+**Result:** TBD
+
 ### Improved eye detection
 The current `isEye()` only checks 4 cardinal neighbors are own stones (full eye). False eyes are not detected.
 
 ### 3-ply or iterative deepening
-2-ply may not be deep enough to see Illuminati's multi-step encirclement setups.
+2-ply may not be deep enough to see Tetrads' multi-step encirclement setups.
+
+---
+
+## Illuminati — Tried Optimizations (do not repeat)

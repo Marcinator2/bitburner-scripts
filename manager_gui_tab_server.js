@@ -131,8 +131,8 @@ export function buildServerAdminSection(doc) {
 // --- Render ---
 
 export function renderServerTab(ns, panel) {
-  const purchasedServers = ns.getPurchasedServers();
-  const purchasedLimit = ns.getPurchasedServerLimit();
+  const purchasedServers = ns.cloud.getServerNames();
+  const purchasedLimit = ns.cloud.getServerLimit();
   const buyScriptExists = ns.fileExists(NEW_SERVER_BUY_SCRIPT, "home");
   const upgradeScriptExists = ns.fileExists(UPGRADE_SERVER_SCRIPT, "home");
   const buyRunning = ns.scriptRunning(NEW_SERVER_BUY_SCRIPT, "home");
@@ -153,7 +153,7 @@ export function renderServerTab(ns, panel) {
 
   const autoBuyEnabled = panel.admin.autoBuyCheckbox.checked;
   const autoBuyRam = RAM_OPTIONS[0];
-  const autoBuyCost = ns.getPurchasedServerCost(autoBuyRam);
+  const autoBuyCost = ns.cloud.getServerCost(autoBuyRam);
   const autoBuyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, autoBuyRam);
   if (autoBuyEnabled && buyScriptExists && !buyRunning && !autoBuyPlan.blocked
       && autoBuyCost > 0 && playerMoney >= autoBuyCost) {
@@ -172,11 +172,11 @@ export function renderServerTab(ns, panel) {
   styleActionButton(panel.admin.confirmUpgradeButton, panel.admin.confirmUpgradeButton.disabled ? "disabled" : "stop");
   styleActionButton(panel.admin.cancelUpgradeButton, panel.admin.cancelUpgradeButton.disabled ? "disabled" : "neutral");
   panel.admin.confirmWrap.style.display = panel.admin.upgradePending ? "block" : "none";
-  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} servers to ${ns.formatRam(upgradeRam)} for a total of ${ns.formatNumber(upgradePlan.totalCost)}$. ${upgradePlan.blockedDowngrades > 0 ? `${upgradePlan.blockedDowngrades} larger servers remain unchanged.` : ""}`.trim();
+  panel.admin.confirmText.textContent = `Upgrade ${upgradePlan.upgradableCount}/${purchasedServers.length} servers to ${ns.format.ram(upgradeRam)} for a total of ${ns.format.number(upgradePlan.totalCost)}$. ${upgradePlan.blockedDowngrades > 0 ? `${upgradePlan.blockedDowngrades} larger servers remain unchanged.` : ""}`.trim();
   panel.admin.details.textContent = [
-    `MyServer: ${purchasedServers.length}/${purchasedLimit} | Money: ${ns.formatNumber(playerMoney)}$`,
-    `Buy ${ns.formatRam(buyRam)} -> ${buyPlan.targetName} | Cost: ${ns.formatNumber(buyPlan.cost)}$ | ${buyPlan.status}`,
-    `Upgrade ${ns.formatRam(upgradeRam)} -> ${upgradePlan.upgradableCount}/${purchasedServers.length} servers | Cost: ${ns.formatNumber(upgradePlan.totalCost)}$ | ${upgradePlan.status}`,
+    `MyServer: ${purchasedServers.length}/${purchasedLimit} | Money: ${ns.format.number(playerMoney)}$`,
+    `Buy ${ns.format.ram(buyRam)} -> ${buyPlan.targetName} | Cost: ${ns.format.number(buyPlan.cost)}$ | ${buyPlan.status}`,
+    `Upgrade ${ns.format.ram(upgradeRam)} -> ${upgradePlan.upgradableCount}/${purchasedServers.length} servers | Cost: ${ns.format.number(upgradePlan.totalCost)}$ | ${upgradePlan.status}`,
     `Buy Script: ${buyScriptExists ? (buyRunning ? "RUNNING" : "READY") : "MISSING"} | Upgrade Script: ${upgradeScriptExists ? (upgradeRunning ? "RUNNING" : "READY") : "MISSING"}`,
   ].join("\n");
 }
@@ -247,7 +247,7 @@ function formatRamOption(ram) {
 function getBuyPlan(ns, purchasedServers, purchasedLimit, ram) {
   const index = purchasedServers.length;
   const targetName = `MyServer_${index}`;
-  const cost = ns.getPurchasedServerCost(ram);
+  const cost = ns.cloud.getServerCost(ram);
   const atLimit = purchasedServers.length >= purchasedLimit;
   const nameExists = ns.serverExists(targetName);
 
@@ -271,7 +271,7 @@ function getStepUpgradePlan(ns, purchasedServers, targetRam) {
     if (currentRam >= targetRam) continue;
     const nextRam = currentRam * 2;
     if (nextRam > targetRam) continue;
-    const cost = ns.getPurchasedServerUpgradeCost(server, nextRam);
+    const cost = ns.cloud.getServerUpgradeCost(server, nextRam);
     if (!Number.isFinite(cost) || cost <= 0) continue;
     upgradableCount++;
     if (cost < minStepCost) minStepCost = cost;
@@ -297,7 +297,7 @@ function getUpgradePlan(ns, purchasedServers, targetRam) {
       continue;
     }
 
-    const cost = ns.getPurchasedServerUpgradeCost(server, targetRam);
+    const cost = ns.cloud.getServerUpgradeCost(server, targetRam);
     if (!Number.isFinite(cost) || cost <= 0) {
       continue;
     }
