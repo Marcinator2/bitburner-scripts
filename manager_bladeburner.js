@@ -112,6 +112,25 @@ export async function main(ns) {
     }
 
     const current = ns.bladeburner.getCurrentAction();
+
+    // Sticky contract/operation: don't re-start mid-execution if the current action is still
+    // valid. Only switch for higher-priority overrides (resting, diplomacy, black ops) or if
+    // an Operation becomes available while running a Contract.
+    if (
+      current &&
+      (current.type === "Contracts" || current.type === "Operations") &&
+      nextAction.type !== "General" &&
+      nextAction.type !== "Black Operations" &&
+      !(nextAction.type === "Operations" && current.type === "Contracts")
+    ) {
+      const remaining = ns.bladeburner.getActionCountRemaining(current.type, current.name);
+      const threshold = current.type === "Contracts" ? MIN_CONTRACT_CHANCE : MIN_OP_CHANCE;
+      const chance = getChanceMin(ns, current.type, current.name);
+      if (remaining > 0 && chance >= threshold) {
+        nextAction = { type: current.type, name: current.name };
+      }
+    }
+
     if (!current || current.type !== nextAction.type || current.name !== nextAction.name) {
       ns.bladeburner.startAction(nextAction.type, nextAction.name);
     }
@@ -210,11 +229,11 @@ function getBestBlackOp(ns, rank, minChance) {
   for (const name of blackOps) {
     const requiredRank = ns.bladeburner.getBlackOpRank(name);
     if (rank < requiredRank) continue;
-    const remaining = ns.bladeburner.getActionCountRemaining("BlackOp", name);
+    const remaining = ns.bladeburner.getActionCountRemaining("Black Operations", name);
     if (remaining <= 0) continue;
-    const chance = getChanceMin(ns, "BlackOp", name);
+    const chance = getChanceMin(ns, "Black Operations", name);
     if (chance < minChance) continue;
-    return { type: "BlackOp", name };
+    return { type: "Black Operations", name };
   }
   return null;
 }
@@ -223,39 +242,39 @@ function getBestOperation(ns, minChance) {
   const ops = ns.bladeburner.getOperationNames();
   const candidates = ops
     .map(name => {
-      const remaining = ns.bladeburner.getActionCountRemaining("Operation", name);
+      const remaining = ns.bladeburner.getActionCountRemaining("Operations", name);
       if (remaining <= 0) return null;
-      const chance = getChanceMin(ns, "Operation", name);
+      const chance = getChanceMin(ns, "Operations", name);
       if (chance < minChance) return null;
       return { name, chance };
     })
     .filter(Boolean)
     .sort((a, b) => b.chance - a.chance);
 
-  return candidates.length > 0 ? { type: "Operation", name: candidates[0].name } : null;
+  return candidates.length > 0 ? { type: "Operations", name: candidates[0].name } : null;
 }
 
 function getBestContract(ns, minChance) {
   const contracts = ns.bladeburner.getContractNames();
   const candidates = contracts
     .map(name => {
-      const remaining = ns.bladeburner.getActionCountRemaining("Contract", name);
+      const remaining = ns.bladeburner.getActionCountRemaining("Contracts", name);
       if (remaining <= 0) return null;
-      const chance = getChanceMin(ns, "Contract", name);
+      const chance = getChanceMin(ns, "Contracts", name);
       if (chance < minChance) return null;
       return { name, chance };
     })
     .filter(Boolean)
     .sort((a, b) => b.chance - a.chance);
 
-  return candidates.length > 0 ? { type: "Contract", name: candidates[0].name } : null;
+  return candidates.length > 0 ? { type: "Contracts", name: candidates[0].name } : null;
 }
 
 function anyActionAvailable(ns) {
   const ops = ns.bladeburner.getOperationNames();
   const contracts = ns.bladeburner.getContractNames();
   return [...ops, ...contracts].some(name => {
-    const type = ops.includes(name) ? "Operation" : "Contract";
+    const type = ops.includes(name) ? "Operations" : "Contracts";
     return ns.bladeburner.getActionCountRemaining(type, name) > 0;
   });
 }
