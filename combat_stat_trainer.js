@@ -150,7 +150,9 @@ function startTraining(ns, trainerConfig, stat, gymChoice, universityChoice) {
     return false;
   }
 
-  return ns.singularity.gymWorkout(chosenGym.name, stat, trainerConfig.focus);
+  const GYM_STAT_ENUM = { strength: "str", defense: "def", dexterity: "dex", agility: "agi" };
+  const gymType = GYM_STAT_ENUM[stat] ?? stat;
+  return ns.singularity.gymWorkout(chosenGym.name, gymType, trainerConfig.focus);
 }
 
 function pickNextStat(skills, selectedStats) {

@@ -1,0 +1,5 @@
+{
+  "allowedFiletypes": [".js", ".txt"],
+  "port": 12525,
+  "scriptsFolder": "."
+}
