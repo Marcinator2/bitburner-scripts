@@ -218,7 +218,8 @@ export function getBestKarmaCrime(ns) {
     .map(type => {
       const stats = ns.singularity.getCrimeStats(type);
       const timeMs = Number(stats?.time || 0);
-      const karma = Number(stats?.karma || 0);
+      const rawKarma = Number(stats?.karma ?? 0);
+      const karma = Math.abs(rawKarma);
       const chance = Number(ns.singularity.getCrimeChance(type) || 0);
       const trainingStats = getCrimeTrainingStats(stats);
 
@@ -227,6 +228,7 @@ export function getBestKarmaCrime(ns) {
         chance,
         timeMs,
         karma,
+        rawKarma,
         trainingStats,
         karmaPerSecond: timeMs > 0 ? karma / (timeMs / 1000) : 0,
       };
