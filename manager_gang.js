@@ -108,9 +108,9 @@ export async function main(ns) {
 
     for (const { name, stats: mStats } of memberStats) {
       const memberInfo = ns.gang.getMemberInformation(name);
-      const isTraining = memberInfo.task === "Train Hacking";
+      const isTraining = memberInfo.task === trainTask;
       const isWarrior = combatRoleSet.has(name);
-      const equipList = isWarrior ? combatEquipments : hackEquipments;
+      const equipList = (isWarrior || !isHackingGang) ? combatEquipments : hackEquipments;
 
       for (const equip of equipList) {
         const money = ns.getPlayer().money;
@@ -149,6 +149,13 @@ export async function main(ns) {
       }
     }
   }
+
+  // Gang type is fixed for the entire run — compute task names once
+  const isHackingGang = ns.gang.getGangInformation().isHacking;
+  const trainTask     = isHackingGang ? "Train Hacking"   : "Train Combat";
+  const wantedRedTask = isHackingGang ? "Ethical Hacking"  : "Vigilante Justice";
+  const moneyTask     = isHackingGang ? "Money Laundering" : "Human Trafficking";
+  const respectTask   = isHackingGang ? "Cyberterrorism"   : "Terrorism";
 
   while (true) {
     loopCount++;
@@ -279,7 +286,7 @@ export async function main(ns) {
 
     // Only use trained members for Crime/Wanted logic
     const trainedMembers = memberStats
-      .filter(m => m.stats.hack >= minHackForCrime);
+      .filter(m => isHackingGang ? m.stats.hack >= minHackForCrime : combatScore(m.stats) >= minHackForCrime);
 
     // Combat role assignment:
     // - Prep mode: rotating training group, until each member gained +100 Combat
@@ -368,7 +375,9 @@ export async function main(ns) {
       // Ascension: Hackers by hack mult, War team by combat mults
       const res = ns.gang.getAscensionResult(name);
       if (gangConfig.autoAscend && res) {
-        const shouldAscendHack = res.hack >= ascensionFactor;
+        const shouldAscendHack = isHackingGang
+          ? res.hack >= ascensionFactor
+          : (res.str >= combatAscendFactor || res.def >= combatAscendFactor || res.dex >= combatAscendFactor || res.agi >= combatAscendFactor);
         const shouldAscendCombat = isWarrior && (
           res.str >= combatAscendFactor ||
           res.def >= combatAscendFactor ||
@@ -379,7 +388,7 @@ export async function main(ns) {
         if (shouldAscendHack || shouldAscendCombat) {
           ns.gang.ascendMember(name);
           // After ascension: stats were reset → train immediately
-          ns.gang.setMemberTask(name, "Train Hacking");
+          ns.gang.setMemberTask(name, trainTask);
           continue;
         }
       }
@@ -391,9 +400,10 @@ export async function main(ns) {
       }
 
       // PRIORITY 0: Too weak for Crime → train
-      // (also applies to freshly-ascended members since their hack stat was reset)
-      if (stats.hack < minHackForCrime) {
-        ns.gang.setMemberTask(name, "Train Hacking");
+      // (also applies to freshly-ascended members since their stat was reset)
+      const isUntrained = isHackingGang ? stats.hack < minHackForCrime : combatScore(stats) < minHackForCrime;
+      if (isUntrained) {
+        ns.gang.setMemberTask(name, trainTask);
         continue;
       }
 
@@ -403,15 +413,15 @@ export async function main(ns) {
         const threshold = wantedLevelGain > 0 ? 1.0 : (wantedLevel > 10000 ? 0.7 : 0.5);
         const idx = trainedMemberNames.indexOf(name);
         const cleanerCount = Math.ceil(trainedMemberNames.length * threshold);
-        ns.gang.setMemberTask(name, idx < cleanerCount ? "Ethical Hacking" : "Money Laundering");
+        ns.gang.setMemberTask(name, idx < cleanerCount ? wantedRedTask : moneyTask);
       }
       // PRIORITY 3: Farm respect (always if respectFarmMode, otherwise until threshold)
       else if (gangConfig.respectFarmMode || info.respect < minRespectForCyberterrorism) {
-        ns.gang.setMemberTask(name, "Cyberterrorism");
+        ns.gang.setMemberTask(name, respectTask);
       }
       // PRIORITY 4: Make money
       else {
-        ns.gang.setMemberTask(name, "Money Laundering");
+        ns.gang.setMemberTask(name, moneyTask);
       }
     }
 
