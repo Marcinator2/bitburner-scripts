@@ -44,7 +44,49 @@ export async function main(ns) {
 
     ns.print(`[bootstrap] RAM: ${homeRamUsed.toFixed(1)}/${homeRam} GB free | Money: ${ns.format.number(money)} | Hack: ${hackLevel} | SF4: ${hasSF4}`);
 
-    // --- Phase 1a: Start a simple hack loop on n00dles if nothing else is hacking ---
+    // --- Phase 1a: Study Computer Science whenever idle (SF4 only) ---
+    if (hasSF4) {
+      // Hack courses at Rothman University (Sector-12), sorted best to cheapest.
+      // Base costs from source (money/s) × Rothman costMult 3.
+      const HACK_COURSES = [
+        { name: "Algorithms",             classType: "Algorithms",        costPerSec: 960 },
+        { name: "Networks",               classType: "Networks",          costPerSec: 240 },
+        { name: "Data Structures",        classType: "Data Structures",   costPerSec: 120 },
+        { name: "Study Computer Science", classType: "Computer Science",  costPerSec: 0   },
+      ];
+
+      // Sum up hacknet production ($/s)
+      let hacknetIncome = 0;
+      const numNodes = ns.hacknet.numNodes?.() ?? 0;
+      for (let i = 0; i < numNodes; i++) {
+        try { hacknetIncome += ns.hacknet.getNodeStats(i).production; } catch (_) {}
+      }
+
+      const bestCourse = HACK_COURSES.find(c => hacknetIncome >= c.costPerSec)
+        ?? HACK_COURSES[HACK_COURSES.length - 1];
+
+      let currentWork = null;
+      try { currentWork = ns.singularity.getCurrentWork(); } catch (_) {}
+
+      const HACK_CLASS_TYPES = new Set(HACK_COURSES.map(c => c.classType));
+      const currentClassType = currentWork?.classType ?? "";
+      const isStudyingHack   = currentWork?.type === "CLASS" && HACK_CLASS_TYPES.has(currentClassType);
+      const isOnBestCourse   = isStudyingHack && currentClassType === bestCourse.classType;
+      const isIdle           = currentWork === null;
+
+      if (isIdle || (isStudyingHack && !isOnBestCourse)) {
+        try {
+          ns.singularity.universityCourse("Rothman University", bestCourse.name, false);
+          ns.print(`[Phase 1] Study: ${bestCourse.name} (hacknet: ${ns.format.number(hacknetIncome)}/s, hack ${hackLevel}).`);
+        } catch (_) {}
+      } else if (isOnBestCourse) {
+        ns.print(`[Phase 1] Studying ${bestCourse.name} (hack ${hackLevel}, hacknet: ${ns.format.number(hacknetIncome)}/s).`);
+      } else {
+        ns.print(`[Phase 1] Working: ${currentWork?.type} – not interrupting for study.`);
+      }
+    }
+
+    // --- Phase 1c: Start a simple hack loop on n00dles if nothing else is hacking ---
     const hackRunning = ns.scriptRunning(HACK_SCRIPT, HOME)
       || ns.scriptRunning(HACK_MANAGER, HOME);
     if (!hackRunning && ns.fileExists(HACK_SCRIPT, HOME)) {
@@ -59,7 +101,7 @@ export async function main(ns) {
       }
     }
 
-    // --- Phase 1b: Buy first hacknet node if affordable and none exist ---
+    // --- Phase 1d: Buy first hacknet node if affordable and none exist ---
     if (ns.hacknet && ns.hacknet.numNodes() === 0) {
       const nodeCost = ns.hacknet.getPurchaseNodeCost();
       if (money >= nodeCost) {
