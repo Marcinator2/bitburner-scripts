@@ -1,7 +1,12 @@
 # Bitburner Project – Copilot Instructions
 
 This is a Bitburner automation project. All scripts run inside the Bitburner game engine (NS2/JS).
-Scripts use the `ns` (NetscriptJS) API. All files are deployed into the game via the Bitburner VS Code extension.
+Scripts use the `ns` (NetscriptJS) API. All files are deployed into the game via `bitburner-filesync`.
+
+## Dev Setup (Bitburner 3)
+Files werden über `npx bitburner-filesync` synchronisiert (Port 12525, konfiguriert in `filesync.json`).
+In Bitburner 3 verbindet sich das **Spiel** zum Server: **Options → Remote API → Port 12525**.
+Der VS Code Task `bitburner-filesync` startet automatisch beim Öffnen des Ordners.
 
 **Bitburner version: 3.0.0** — Always use the API as defined for this version.
 - Formatting: `ns.format.number()`, `ns.format.ram()`, `ns.format.percent()` (was `ns.formatNumber/formatRam/formatPercent`)
