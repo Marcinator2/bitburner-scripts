@@ -27,7 +27,9 @@ export async function main(ns) {
         ns.print(`[hacknet-boot] Waiting for ${ns.format.number(cost)} to buy first node.`);
       }
     } else {
-      ns.print(`[hacknet-boot] ${ns.hacknet.numNodes()} node(s) active. Waiting for manager_hacknet.js.`);
+      // First node exists — mission accomplished. Free RAM for other scripts.
+      ns.print(`[hacknet-boot] ${ns.hacknet.numNodes()} node(s) active. Terminating to free RAM.`);
+      return;
     }
 
     await ns.sleep(LOOP_MS);
