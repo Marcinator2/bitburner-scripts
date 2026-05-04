@@ -1,5 +1,5 @@
 # Ignore the stable source folder (local copy)
-bitburner-src-stable/
+Bitburner_Source/
 .vscode/settings.json
 
 # Personal/working lists
