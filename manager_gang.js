@@ -12,7 +12,9 @@ export async function main(ns) {
   const dexFloorRatio = 0.6;       // With DEX focus: dex must be at least X% of the highest other combat stat
   const swapMinAbs = 120;          // Absolute minimum progress for swap
   const swapPct = 0.2;             // Relative progress for swap (0.2 = 20% of base value)
-  const respectFarmCleanerShare = 0.15; // Fraction of trained members kept on wanted reduction in respect farm mode
+  const respectFarmCleanerShare = 0.15;    // Fraction of trained members kept on wanted reduction when cleaning is active
+  const farmCleanerActivatePenalty = 0.95;  // Activate cleaners when wanted penalty drops below -5%
+  const farmCleanerDeactivatePenalty = 0.99; // Deactivate cleaners once penalty is back to -1%
   const territoryPrepTarget = 0.98; // Actively prepare territory up to this value
   const startWarChance = 0.60;     // Enable Territory Warfare at this average chance
   const stopWarChance = 0.52;      // Disable Territory Warfare below this average chance
@@ -69,6 +71,7 @@ export async function main(ns) {
   let loopCount = 0;
   let minRespectForCyberterrorism = 2_000_000;
   let prevRespectFarmMode = false;
+  let farmCleaningActive = false; // Hysteresis state for respect farm mode cleaner activation
 
   // Pre-calculate equipment lists sorted by price
   const hackEquipments = ns.gang.getEquipmentNames()
@@ -186,6 +189,14 @@ export async function main(ns) {
     const wantedPenalty = typeof info.wantedPenalty === "number" ? info.wantedPenalty : 1;
     const wantedLevelGain = typeof info.wantedLevelGainRate === "number" ? info.wantedLevelGainRate : 0;
     const wantedLevel = typeof info.wantedLevel === "number" ? info.wantedLevel : 0;
+
+    // Respect farm cleaner hysteresis: activate below -5% penalty, deactivate above -1%
+    if (gangConfig.respectFarmMode) {
+      if (wantedPenalty < farmCleanerActivatePenalty) farmCleaningActive = true;
+      else if (wantedPenalty >= farmCleanerDeactivatePenalty) farmCleaningActive = false;
+    } else {
+      farmCleaningActive = false;
+    }
 
     // Dynamic respect threshold for Cyberterrorism: slowly adjust
     if (loopCount % respectAdjustEveryLoops === 0) {
@@ -418,9 +429,11 @@ export async function main(ns) {
       }
       // PRIORITY 3: Farm respect (always if respectFarmMode, otherwise until threshold)
       else if (gangConfig.respectFarmMode || info.respect < minRespectForCyberterrorism) {
-        // In respect farm mode: keep a small fraction on wanted reduction to prevent oscillation
+        // In respect farm mode: assign cleaners only when wanted penalty has dropped below threshold
         const idx = trainedMemberNames.indexOf(name);
-        const cleanerCount = gangConfig.respectFarmMode ? Math.max(1, Math.ceil(trainedMemberNames.length * respectFarmCleanerShare)) : 0;
+        const cleanerCount = (gangConfig.respectFarmMode && farmCleaningActive)
+          ? Math.max(1, Math.ceil(trainedMemberNames.length * respectFarmCleanerShare))
+          : 0;
         ns.gang.setMemberTask(name, idx < cleanerCount ? wantedRedTask : respectTask);
       }
       // PRIORITY 4: Make money
