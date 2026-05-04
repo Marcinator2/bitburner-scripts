@@ -22,9 +22,11 @@ export async function main(ns) {
   const HACKNET_BOOT       = "bootstrap_hacknet.js";
   const LEVELER_SCRIPT     = "auto-leveler.js";
   const STUDY_SCRIPT       = "bootstrap_study.js";
+  const HACKWORM_SCRIPT    = "1st-hackworm.js";
   const HACK_MANAGER       = "auto-hack-manager.js";
   const SERVER_MANAGER     = "manager_server.js";
   const MAIN_MANAGER       = "main_manager.js";
+  const HACKWORM_WORKERS   = ["v_hack.js", "v_grow.js", "v_weaken.js"];
   const HACK_MANAGER_RAM   = 8;   // GB required on home to start auto-hack-manager
   const SERVER_MANAGER_RAM = 4;   // GB required on home to start manager_server
   const HOME               = "home";
@@ -40,7 +42,9 @@ export async function main(ns) {
     const hasSF4      = !!ns.singularity;
 
     // RAM reserve: keep enough free for money-hack.js unless hacking is already running
-    const hackingActive = ns.scriptRunning(HACK_SCRIPT, HOME) || ns.scriptRunning(HACK_MANAGER, HOME);
+    const hackingActive = ns.scriptRunning(HACK_SCRIPT, HOME)
+      || ns.scriptRunning(HACKWORM_SCRIPT, HOME)
+      || ns.scriptRunning(HACK_MANAGER, HOME);
     const hackReserve   = hackingActive ? 0 : ns.getScriptRam(HACK_SCRIPT, HOME);
     const canLaunch     = (script) => homeFreeRam - ns.getScriptRam(script, HOME) >= hackReserve;
 
@@ -98,6 +102,20 @@ export async function main(ns) {
           ns.exec(HACKNET_SCRIPT, HOME, 1);
           ns.print(`[Phase 2] Started ${HACKNET_SCRIPT}`);
         }
+      }
+    }
+
+    // --- Phase 2.5: Launch 1st-hackworm.js if workers exist and RAM allows ---
+    // Replaces money-hack.js; itself gets replaced by auto-hack-manager.js in Phase 3.
+    const hackwormRunning   = ns.scriptRunning(HACKWORM_SCRIPT, HOME);
+    const hackwormWorkersOk = HACKWORM_WORKERS.every(w => ns.fileExists(w, HOME));
+    if (!hackwormRunning && !ns.scriptRunning(HACK_MANAGER, HOME)
+        && hackwormWorkersOk && ns.fileExists(HACKWORM_SCRIPT, HOME)) {
+      if (canLaunch(HACKWORM_SCRIPT)) {
+        ns.scriptKill(HACK_SCRIPT, HOME);
+        await ns.sleep(200);
+        const pid = ns.exec(HACKWORM_SCRIPT, HOME, 1);
+        if (pid > 0) ns.print(`[Phase 2.5] Started ${HACKWORM_SCRIPT} (replaced ${HACK_SCRIPT})`);
       }
     }
 
