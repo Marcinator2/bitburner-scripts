@@ -1,15 +1,16 @@
 /** @param {NS} ns */
 // bootstrap.js — Phase-based launcher for a fresh start on 8 GB home.
 //
-// Phase 1: Hack n00dles (inline, minimal RAM)
-// Phase 1e: Launch bootstrap_hacknet.js (buys first node, ~3.6 GB, when RAM allows)
-// Phase 2: SF4 available → launch bootstrap_study.js + auto-leveler.js + manager_hacknet.js
-// Phase 3: Enough RAM on home → launch auto-hack-manager.js + manager_server.js
-// Phase 4: main_manager.js is running → self-terminate
+// Phase 1:   Hack n00dles (inline, minimal RAM)
+// Phase 1e:  Launch bootstrap_hacknet.js (buys first node, when RAM allows)
+// Phase 1f:  Buy cloud servers inline (cloud API, ~4 GB extra)
+// Phase 2:   SF4 → bootstrap_study.js + auto-leveler.js + manager_hacknet.js + bootstrap_home_upgrade.js
+// Phase 2.5: Launch 1st-hackworm.js when workers exist
+// Phase 3:   Launch auto-hack-manager.js; manager_server.js if RAM allows
+// Phase 4:   main_manager.js running → self-terminate
 //
-// RAM budget: ~5.35 GB (no hacknet API, no singularity API calls)
-// Sub-scripts are only launched when homeFreeRam >= scriptRam + hackReserve.
-// hackReserve = money-hack.js RAM, unless hacking is already running (then 0).
+// Server buying is done inline (Phase 1f) so it works even when RAM is tight.
+// bootstrap_home_upgrade.js only launches when it actually fits in RAM (SF4 L3+).
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -22,6 +23,7 @@ export async function main(ns) {
   const HACKNET_BOOT       = "bootstrap_hacknet.js";
   const LEVELER_SCRIPT     = "auto-leveler.js";
   const STUDY_SCRIPT       = "bootstrap_study.js";
+  const HOME_UPGRADE_SCRIPT= "bootstrap_home_upgrade.js";
   const HACKWORM_SCRIPT    = "1st-hackworm.js";
   const HACK_MANAGER       = "auto-hack-manager.js";
   const SERVER_MANAGER     = "manager_server.js";
@@ -81,6 +83,25 @@ export async function main(ns) {
 
     // --- Phase 1d: (moved to bootstrap_hacknet.js) ---
 
+    // --- Phase 1f: Buy cloud servers inline (no sub-script needed) ---
+    if (!ns.scriptRunning(SERVER_MANAGER, HOME)) {
+      const purchased  = ns.cloud.getServerNames();
+      const limit      = ns.cloud.getServerLimit();
+      const money      = ns.getPlayer().money;
+      if (purchased.length < limit) {
+        const cost = ns.cloud.getServerCost(8);
+        if (cost > 0 && money >= cost * 1.1) {
+          const name = `MyServer_${purchased.length}`;
+          const result = ns.cloud.purchaseServer(name, 8);
+          if (result) ns.print(`[Phase 1f] Bought ${result} (8 GB) for ${ns.format.number(cost)}`);
+        } else if (cost > 0) {
+          ns.print(`[Phase 1f] Servers: ${purchased.length}/${limit} | Next 8 GB: ${ns.format.number(cost)}`);
+        }
+      } else {
+        ns.print(`[Phase 1f] Server slots full (${purchased.length}/${limit}).`);
+      }
+    }
+
     // --- Phase 2: SF4 available → launch study helper, auto-leveler and hacknet manager ---
     if (hasSF4) {
       if (ns.fileExists(STUDY_SCRIPT, HOME) && !ns.scriptRunning(STUDY_SCRIPT, HOME)) {
@@ -101,6 +122,13 @@ export async function main(ns) {
         if (canLaunch(HACKNET_SCRIPT)) {
           ns.exec(HACKNET_SCRIPT, HOME, 1);
           ns.print(`[Phase 2] Started ${HACKNET_SCRIPT}`);
+        }
+      }
+
+      if (ns.fileExists(HOME_UPGRADE_SCRIPT, HOME) && !ns.scriptRunning(HOME_UPGRADE_SCRIPT, HOME)) {
+        if (canLaunch(HOME_UPGRADE_SCRIPT)) {
+          ns.exec(HOME_UPGRADE_SCRIPT, HOME, 1);
+          ns.print(`[Phase 2] Started ${HOME_UPGRADE_SCRIPT}`);
         }
       }
     }
