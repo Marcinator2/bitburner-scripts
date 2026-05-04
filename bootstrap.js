@@ -52,8 +52,10 @@ export async function main(ns) {
 
     ns.print(`[bootstrap] RAM: ${homeRamUsed.toFixed(1)}/${homeRam} GB used | Hack: ${hackLevel} | SF4: ${hasSF4} | Reserve: ${hackReserve.toFixed(1)} GB`);
 
-    // --- Phase 1e: Launch hacknet bootstrap helper when RAM allows ---
-    if (ns.fileExists(HACKNET_BOOT, HOME) && !ns.scriptRunning(HACKNET_BOOT, HOME) && !ns.scriptRunning(HACKNET_SCRIPT, HOME)) {
+    // --- Phase 1e: Launch hacknet bootstrap helper when RAM allows and no nodes exist yet ---
+    if (ns.hacknet.numNodes() === 0
+        && ns.fileExists(HACKNET_BOOT, HOME) && !ns.scriptRunning(HACKNET_BOOT, HOME)
+        && !ns.scriptRunning(HACKNET_SCRIPT, HOME)) {
       if (canLaunch(HACKNET_BOOT)) {
         ns.exec(HACKNET_BOOT, HOME, 1);
         ns.print(`[Phase 1e] Started ${HACKNET_BOOT}`);
@@ -106,16 +108,16 @@ export async function main(ns) {
       if (homeRam >= HACK_MANAGER_RAM && homeFreeRam >= ram) {
         ns.scriptKill(HACK_SCRIPT, HOME);
         await ns.sleep(500);
-        ns.exec(HACK_MANAGER, HOME, 1);
-        ns.print(`[Phase 3] Started ${HACK_MANAGER} (replaced ${HACK_SCRIPT})`);
+        const pid = ns.exec(HACK_MANAGER, HOME, 1);
+        ns.print(pid > 0 ? `[Phase 3] Started ${HACK_MANAGER}` : `[Phase 3] FAILED to start ${HACK_MANAGER} (not enough RAM?)`);
       }
     }
 
     if (ns.fileExists(SERVER_MANAGER, HOME) && !ns.scriptRunning(SERVER_MANAGER, HOME)) {
       const ram = ns.getScriptRam(SERVER_MANAGER, HOME);
       if (homeRam >= SERVER_MANAGER_RAM && homeFreeRam >= ram) {
-        ns.exec(SERVER_MANAGER, HOME, 1);
-        ns.print(`[Phase 3] Started ${SERVER_MANAGER}`);
+        const pid = ns.exec(SERVER_MANAGER, HOME, 1);
+        ns.print(pid > 0 ? `[Phase 3] Started ${SERVER_MANAGER}` : `[Phase 3] FAILED to start ${SERVER_MANAGER} (not enough RAM?)`);
       }
     }
 
