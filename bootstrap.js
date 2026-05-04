@@ -1,13 +1,15 @@
 /** @param {NS} ns */
 // bootstrap.js — Phase-based launcher for a fresh start on 8 GB home.
 //
-// Phase 1: Hack n00dles (inline, minimal RAM) + hacknet node buying (inline)
-// Phase 2: SF4 available → launch auto-leveler.js + manager_hacknet.js
+// Phase 1: Hack n00dles (inline, minimal RAM)
+// Phase 1e: Launch bootstrap_hacknet.js (buys first node, ~3.6 GB, when RAM allows)
+// Phase 2: SF4 available → launch bootstrap_study.js + auto-leveler.js + manager_hacknet.js
 // Phase 3: Enough RAM on home → launch auto-hack-manager.js + manager_server.js
 // Phase 4: main_manager.js is running → self-terminate
 //
-// The script kills itself once main_manager.js takes over (Phase 4).
-// Re-run it manually if you want to restart the bootstrap chain.
+// RAM budget: ~5.35 GB (no hacknet API, no singularity API calls)
+// Sub-scripts are only launched when homeFreeRam >= scriptRam + hackReserve.
+// hackReserve = money-hack.js RAM, unless hacking is already running (then 0).
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -17,7 +19,9 @@ export async function main(ns) {
   const HACK_TARGET        = "n00dles";
   const HACK_SCRIPT        = "money-hack.js";
   const HACKNET_SCRIPT     = "manager_hacknet.js";
+  const HACKNET_BOOT       = "bootstrap_hacknet.js";
   const LEVELER_SCRIPT     = "auto-leveler.js";
+  const STUDY_SCRIPT       = "bootstrap_study.js";
   const HACK_MANAGER       = "auto-hack-manager.js";
   const SERVER_MANAGER     = "manager_server.js";
   const MAIN_MANAGER       = "main_manager.js";
@@ -32,9 +36,13 @@ export async function main(ns) {
     const homeRam     = ns.getServerMaxRam(HOME);
     const homeRamUsed = ns.getServerUsedRam(HOME);
     const homeFreeRam = homeRam - homeRamUsed;
-    const money       = ns.getPlayer().money;
     const hackLevel   = ns.getHackingLevel();
     const hasSF4      = !!ns.singularity;
+
+    // RAM reserve: keep enough free for money-hack.js unless hacking is already running
+    const hackingActive = ns.scriptRunning(HACK_SCRIPT, HOME) || ns.scriptRunning(HACK_MANAGER, HOME);
+    const hackReserve   = hackingActive ? 0 : ns.getScriptRam(HACK_SCRIPT, HOME);
+    const canLaunch     = (script) => homeFreeRam - ns.getScriptRam(script, HOME) >= hackReserve;
 
     // --- Phase 4: main_manager is running → hand off and exit ---
     if (ns.scriptRunning(MAIN_MANAGER, HOME)) {
@@ -42,54 +50,18 @@ export async function main(ns) {
       return;
     }
 
-    ns.print(`[bootstrap] RAM: ${homeRamUsed.toFixed(1)}/${homeRam} GB free | Money: ${ns.format.number(money)} | Hack: ${hackLevel} | SF4: ${hasSF4}`);
+    ns.print(`[bootstrap] RAM: ${homeRamUsed.toFixed(1)}/${homeRam} GB used | Hack: ${hackLevel} | SF4: ${hasSF4} | Reserve: ${hackReserve.toFixed(1)} GB`);
 
-    // --- Phase 1a: Study Computer Science whenever idle (SF4 only) ---
-    if (hasSF4) {
-      // Hack courses at Rothman University (Sector-12), sorted best to cheapest.
-      // Base costs from source (money/s) × Rothman costMult 3.
-      const HACK_COURSES = [
-        { name: "Algorithms",             classType: "Algorithms",        costPerSec: 960 },
-        { name: "Networks",               classType: "Networks",          costPerSec: 240 },
-        { name: "Data Structures",        classType: "Data Structures",   costPerSec: 120 },
-        { name: "Study Computer Science", classType: "Computer Science",  costPerSec: 0   },
-      ];
-
-      // Sum up hacknet production ($/s)
-      let hacknetIncome = 0;
-      const numNodes = ns.hacknet.numNodes?.() ?? 0;
-      for (let i = 0; i < numNodes; i++) {
-        try { hacknetIncome += ns.hacknet.getNodeStats(i).production; } catch (_) {}
-      }
-
-      const bestCourse = HACK_COURSES.find(c => hacknetIncome >= c.costPerSec)
-        ?? HACK_COURSES[HACK_COURSES.length - 1];
-
-      let currentWork = null;
-      try { currentWork = ns.singularity.getCurrentWork(); } catch (_) {}
-
-      const HACK_CLASS_TYPES = new Set(HACK_COURSES.map(c => c.classType));
-      const currentClassType = currentWork?.classType ?? "";
-      const isStudyingHack   = currentWork?.type === "CLASS" && HACK_CLASS_TYPES.has(currentClassType);
-      const isOnBestCourse   = isStudyingHack && currentClassType === bestCourse.classType;
-      const isIdle           = currentWork === null;
-
-      if (isIdle || (isStudyingHack && !isOnBestCourse)) {
-        try {
-          ns.singularity.universityCourse("Rothman University", bestCourse.name, false);
-          ns.print(`[Phase 1] Study: ${bestCourse.name} (hacknet: ${ns.format.number(hacknetIncome)}/s, hack ${hackLevel}).`);
-        } catch (_) {}
-      } else if (isOnBestCourse) {
-        ns.print(`[Phase 1] Studying ${bestCourse.name} (hack ${hackLevel}, hacknet: ${ns.format.number(hacknetIncome)}/s).`);
-      } else {
-        ns.print(`[Phase 1] Working: ${currentWork?.type} – not interrupting for study.`);
+    // --- Phase 1e: Launch hacknet bootstrap helper when RAM allows ---
+    if (ns.fileExists(HACKNET_BOOT, HOME) && !ns.scriptRunning(HACKNET_BOOT, HOME) && !ns.scriptRunning(HACKNET_SCRIPT, HOME)) {
+      if (canLaunch(HACKNET_BOOT)) {
+        ns.exec(HACKNET_BOOT, HOME, 1);
+        ns.print(`[Phase 1e] Started ${HACKNET_BOOT}`);
       }
     }
 
     // --- Phase 1c: Start a simple hack loop on n00dles if nothing else is hacking ---
-    const hackRunning = ns.scriptRunning(HACK_SCRIPT, HOME)
-      || ns.scriptRunning(HACK_MANAGER, HOME);
-    if (!hackRunning && ns.fileExists(HACK_SCRIPT, HOME)) {
+    if (!hackingActive && ns.fileExists(HACK_SCRIPT, HOME)) {
       const targetHackLevel = ns.getServerRequiredHackingLevel(HACK_TARGET);
       if (hackLevel >= targetHackLevel) {
         // Estimate RAM needed for money-hack.js (Bitburner charges at exec time)
@@ -101,28 +73,26 @@ export async function main(ns) {
       }
     }
 
-    // --- Phase 1d: Buy first hacknet node if affordable and none exist ---
-    if (ns.hacknet && ns.hacknet.numNodes() === 0) {
-      const nodeCost = ns.hacknet.getPurchaseNodeCost();
-      if (money >= nodeCost) {
-        ns.hacknet.purchaseNode();
-        ns.print("[Phase 1] Bought first hacknet node.");
-      }
-    }
+    // --- Phase 1d: (moved to bootstrap_hacknet.js) ---
 
-    // --- Phase 2: SF4 available → launch auto-leveler and hacknet manager ---
+    // --- Phase 2: SF4 available → launch study helper, auto-leveler and hacknet manager ---
     if (hasSF4) {
+      if (ns.fileExists(STUDY_SCRIPT, HOME) && !ns.scriptRunning(STUDY_SCRIPT, HOME)) {
+        if (canLaunch(STUDY_SCRIPT)) {
+          ns.exec(STUDY_SCRIPT, HOME, 1);
+          ns.print(`[Phase 2] Started ${STUDY_SCRIPT}`);
+        }
+      }
+
       if (ns.fileExists(LEVELER_SCRIPT, HOME) && !ns.scriptRunning(LEVELER_SCRIPT, HOME)) {
-        const ram = ns.getScriptRam(LEVELER_SCRIPT, HOME);
-        if (homeFreeRam >= ram) {
+        if (canLaunch(LEVELER_SCRIPT)) {
           ns.exec(LEVELER_SCRIPT, HOME, 1);
           ns.print(`[Phase 2] Started ${LEVELER_SCRIPT}`);
         }
       }
 
       if (ns.fileExists(HACKNET_SCRIPT, HOME) && !ns.scriptRunning(HACKNET_SCRIPT, HOME)) {
-        const ram = ns.getScriptRam(HACKNET_SCRIPT, HOME);
-        if (homeFreeRam >= ram) {
+        if (canLaunch(HACKNET_SCRIPT)) {
           ns.exec(HACKNET_SCRIPT, HOME, 1);
           ns.print(`[Phase 2] Started ${HACKNET_SCRIPT}`);
         }
