@@ -198,10 +198,17 @@ function manageRepFarming(ns, augConfig) {
   // Factions where workForFaction is not applicable (rep only via in-game mechanics)
   const WORK_EXEMPT_FACTIONS = new Set(["Bladeburners", "Church of the Machine God"]);
 
+  // Can't work for the faction where the player's gang is based
+  let gangFaction = null;
+  try {
+    if (ns.gang.inGang()) gangFaction = ns.gang.getGangInformation().faction;
+  } catch (_) {}
+
   // Build map: faction → count of rep-blocked wanted augments
   const factionCount = new Map();
   for (const faction of ns.getPlayer().factions) {
     if (WORK_EXEMPT_FACTIONS.has(faction)) continue;
+    if (gangFaction && faction === gangFaction) continue;
     let factionRep;
     try { factionRep = ns.singularity.getFactionRep(faction); } catch { continue; }
 
