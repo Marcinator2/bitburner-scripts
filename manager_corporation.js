@@ -111,12 +111,26 @@ export async function main(ns) {
     return;
   }
 
+  // --restart: guide user to restart the corp via the in-game UI
+  // The NS API createCorporation() cannot replace an existing corporation —
+  // restart is only available through the game UI.
+  if (ns.args.includes("--restart")) {
+    ns.tprint("INFO: The NS API cannot restart an existing corporation.");
+    ns.tprint("INFO: To restart with self-fund ($150b from your wallet):");
+    ns.tprint("INFO:   1. Open the Corporation tab in the game.");
+    ns.tprint("INFO:   2. Click 'Overview' → find the 'Sell CEO position' or restart option.");
+    ns.tprint("INFO:   3. Re-create the corporation and choose 'Use your own money' ($150b).");
+    ns.tprint("INFO: You have enough money — $150b is negligible compared to your wallet.");
+    return;
+  }
+
   if (!ns.corporation.hasCorporation()) {
     ns.tprint("ERROR: Keine Corporation vorhanden. Bitte zuerst eine Corporation gründen.");
     return;
   }
 
   ns.print("Corporation Manager gestartet.");
+  ns.ui.openTail(); // open own tail so WARN messages are visible
 
   let loopCount = 0;
 
@@ -137,11 +151,35 @@ async function runCorpLoop(ns, config, configFile, loopCount) {
   const corp = ns.corporation;
   const corpInfo = corp.getCorporation();
 
-  // 1. Unlocks sicherstellen
-  ensureUnlocks(ns);
-
-  // 2. Divisions anlegen falls fehlen
+  // 1. Divisions first — must exist before spending funds on unlocks
+  //    (Unlocks cost $135b total, which would exhaust the $150b starting capital
+  //    before Agriculture ($40b) could ever be created.)
   ensureDivisions(ns);
+
+  // 1b. Bootstrap deadlock detection: warn when corp has insufficient funds for any division.
+  //     This can happen if a previous run drained money on upgrades/unlocks before divisions
+  //     were created. With only $2b (BN3 seed money), investment round offers (~$640m) are
+  //     far too small to ever reach $20b for Tobacco. The only fix is a corp restart.
+  {
+    const freshInfo = corp.getCorporation();
+    if (freshInfo.divisions.length === 0 && freshInfo.funds < 20e9) {
+      if (loopCount % 12 === 0) {
+        ns.print(`WARN: Corp is in a bootstrap deadlock: ${ns.format.number(freshInfo.funds)}$ — need $20b+ for the cheapest division.`);
+        const offer = (() => { try { return corp.getInvestmentOffer(); } catch { return null; } })();
+        if (offer && offer.round <= 4) {
+          const tooSmall = offer.funds < 20e9;
+          if (tooSmall) {
+            ns.print(`WARN: Investment round ${offer.round} offer (${ns.format.number(offer.funds)}$) is too small to help — accepting won't reach $20b.`);
+          }
+        }
+        ns.print(`ACTION: Go to the Corporation tab → Overview → sell/restart the corp → choose "Use your own money" ($150b from wallet).`);
+      }
+      return; // Nothing useful can be done — skip rest of loop
+    }
+  }
+
+  // 2. Unlocks sicherstellen (with budget reserve so divisions/warehouses stay affordable)
+  ensureUnlocks(ns);
 
   // 3. Warehouses + Offices sicherstellen
   const phase = determinePhase(ns, corpInfo);
@@ -149,6 +187,10 @@ async function runCorpLoop(ns, config, configFile, loopCount) {
 
   // 4. Smart Supply aktivieren
   enableSmartSupply(ns);
+
+  // 4b. Required input materials kaufen wenn Smart Supply noch nicht verfügbar
+  //     (sonst produziert Agriculture 0, da Water/Chemicals fehlen)
+  ensureRequiredMaterials(ns);
 
   // 5. Mitarbeiter einstellen und Jobs zuweisen
   hireAndAssign(ns, phase);
@@ -194,23 +236,74 @@ function determinePhase(ns, corpInfo) {
   return "early";
 }
 
+// ─── Required Input Materials (Smart Supply Fallback) ─────────────────────────
+
+// When Smart Supply is not yet unlocked, manually set a continuous purchase
+// rate for each division's required input materials so production is non-zero.
+// Once Smart Supply is enabled it overrides these rates automatically.
+function ensureRequiredMaterials(ns) {
+  const corp = ns.corporation;
+  if (corp.hasUnlock("Smart Supply")) return;
+  if (!corp.hasUnlock("Warehouse API")) return;
+
+  const corpInfo = corp.getCorporation();
+  for (const divName of corpInfo.divisions) {
+    try {
+      const divInfo = corp.getDivision(divName);
+      const industryData = corp.getIndustryData(divInfo.industry);
+      const required = industryData.requiredMaterials ?? {};
+      for (const city of divInfo.cities) {
+        try {
+          if (!corp.hasWarehouse(divName, city)) continue;
+          for (const [material, rate] of Object.entries(required)) {
+            try {
+              corp.buyMaterial(divName, city, material, rate);
+            } catch { /* */ }
+          }
+        } catch { /* */ }
+      }
+    } catch { /* */ }
+  }
+}
+
 // ─── Unlocks ──────────────────────────────────────────────────────────────────
 
 function ensureUnlocks(ns) {
   const corp = ns.corporation;
+
+  // Warehouse API and Office API are hard prerequisites for hiring and warehouses.
+  // Never buy one without being able to afford BOTH — otherwise the remaining $40b
+  // gets spent on other unlocks/infrastructure and the second API can never be bought.
+  const hasWarehouseAPI = corp.hasUnlock("Warehouse API");
+  const hasOfficeAPI = corp.hasUnlock("Office API");
+
+  if (!hasWarehouseAPI || !hasOfficeAPI) {
+    const costNeeded = (!hasWarehouseAPI ? 50e9 : 0) + (!hasOfficeAPI ? 50e9 : 0);
+    const info = corp.getCorporation();
+    if (info.funds < costNeeded + 10e9) {
+      // Not enough to buy all missing APIs + buffer — don't buy any yet
+      ns.print(`INFO: Need ${ns.format.number(costNeeded + 10e9)}$ for APIs, have ${ns.format.number(info.funds)}$`);
+      return;
+    }
+    if (!hasWarehouseAPI) { corp.purchaseUnlock("Warehouse API"); ns.print("Unlock purchased: Warehouse API"); }
+    if (!hasOfficeAPI)    { corp.purchaseUnlock("Office API");    ns.print("Unlock purchased: Office API");    }
+    return; // buy remaining unlocks next loop
+  }
+
+  // Both APIs owned — buy remaining unlocks with a small reserve
+  const minReserve = 10e9;
   for (const unlock of REQUIRED_UNLOCKS) {
+    if (unlock === "Warehouse API" || unlock === "Office API") continue;
     try {
       if (!corp.hasUnlock(unlock)) {
         const cost = corp.getUnlockCost(unlock);
         const info = corp.getCorporation();
-        if (info.funds >= cost) {
+        if (info.funds >= cost + minReserve) {
           corp.purchaseUnlock(unlock);
           ns.print(`Unlock purchased: ${unlock}`);
         }
       }
-    } catch {
-      // Unlock nicht verfügbar (z.B. Office/Warehouse API fehlt)
-    }
+    } catch { }
   }
 }
 
@@ -224,20 +317,25 @@ function ensureDivisions(ns) {
   if (!divNames.includes(AGRI_DIV)) {
     try {
       const info = corp.getCorporation();
-      const cost = 40e9; // Agriculture kostet 40b
-      if (info.funds >= cost) {
+      // Must be able to afford Agriculture ($40b) AND both APIs ($100b) + buffer ($10b)
+      // = $150b total. Creating Agriculture with less means we can never buy both APIs.
+      if (info.funds >= 150e9) {
         corp.expandIndustry("Agriculture", AGRI_DIV);
         ns.print(`Division created: ${AGRI_DIV}`);
+      } else {
+        ns.print(`INFO: Need $150b to create Agriculture (have ${ns.format.number(info.funds)}$)`);
       }
     } catch (e) {
       ns.print(`WARN: Could not create ${AGRI_DIV}: ${e}`);
     }
   }
 
+  // Only create Tobacco after both APIs are unlocked — it would otherwise consume
+  // funds needed for Office API / Warehouse API.
   if (!divNames.includes(TOBACCO_DIV)) {
+    if (!corp.hasUnlock("Office API") || !corp.hasUnlock("Warehouse API")) return;
     try {
       const info = corp.getCorporation();
-      // Tobacco kostet 20b
       if (info.funds >= 20e9) {
         corp.expandIndustry("Tobacco", TOBACCO_DIV);
         ns.print(`Division created: ${TOBACCO_DIV}`);
@@ -336,11 +434,21 @@ function hireAndAssign(ns, phase) {
   const corp = ns.corporation;
   const corpInfo = corp.getCorporation();
 
-  const targetSize = OFFICE_SIZES[phase] ?? OFFICE_SIZES.early;
+  const hasOfficeAPI = (() => { try { return corp.hasUnlock("Office API"); } catch { return false; } })();
+  // Diagnostic: print state every loop to terminal so it's always visible
+  const divSummary = corpInfo.divisions.map(d => {
+    try {
+      const o = corp.getOffice(d, "Sector-12");
+      return `${d}:${o.numEmployees}/${o.size}`;
+    } catch { return `${d}:?`; }
+  }).join(", ");
+  ns.tprint(`[corp] phase=${phase} officeAPI=${hasOfficeAPI} ${divSummary}`);
 
-  // Job distribution by phase.
-  // Late ratio {6,8,8,4,10} sums to 36 — chosen so that with only 3 employees
-  // the Largest Remainder Method yields Engineer=1, Business=1, R&D=1 (not all Operations).
+  if (!hasOfficeAPI) {
+    ns.tprint(`[corp] BLOCKED: Office API not unlocked — cannot hire.`);
+    return;
+  }
+
   const jobRatio = phase === "early"
     ? { "Operations": 1, "Engineer": 2, "Business": 1, "Management": 1, "Research & Development": 4 }
     : phase === "round1"
@@ -349,38 +457,53 @@ function hireAndAssign(ns, phase) {
 
   for (const div of corpInfo.divisions) {
     for (const city of CITIES) {
-      try {
-        const office = corp.getOffice(div, city);
-        // Fill open positions (one per tick to save RAM)
-        while (office.numEmployees < office.size) {
-          const result = corp.hireEmployee(div, city);
-          if (!result) break;
-          break;
-        }
+      let office;
+      try { office = corp.getOffice(div, city); } catch { continue; }
 
-        // Largest Remainder Method: most accurate proportional assignment at any office size
-        const totalRatio = Object.values(jobRatio).reduce((a, b) => a + b, 0);
-        const n = office.numEmployees;
-        const jobTargets = {};
-        let assigned = 0;
-        for (const [job, ratio] of Object.entries(jobRatio)) {
-          jobTargets[job] = Math.floor(n * ratio / totalRatio);
-          assigned += jobTargets[job];
-        }
-        // Distribute remainder slots to the roles with the largest fractional parts
-        const remainder = n - assigned;
-        const byFraction = Object.entries(jobRatio)
-          .map(([job, ratio]) => ({ job, frac: (n * ratio / totalRatio) % 1 }))
-          .sort((a, b) => b.frac - a.frac);
-        for (let i = 0; i < remainder; i++) {
-          jobTargets[byFraction[i].job]++;
-        }
-        for (const [job, target] of Object.entries(jobTargets)) {
+      // Hire all open slots
+      const slotsToFill = office.size - office.numEmployees;
+      if (slotsToFill > 0) {
+        let hired = 0;
+        for (let i = 0; i < slotsToFill; i++) {
           try {
-            corp.setJobAssignment(div, city, job, target);
-          } catch { /* */ }
+            const ok = corp.hireEmployee(div, city);
+            if (ok) { hired++; } else { break; }
+          } catch (e) {
+            ns.tprint(`WARN [corp/hire]: ${div}/${city}: ${e}`);
+            break;
+          }
         }
-      } catch { /* */ }
+        if (hired > 0) {
+          ns.print(`Hired ${hired} employees in ${div}/${city}`);
+        } else {
+          ns.tprint(`WARN [corp/hire]: 0 hired in ${div}/${city} (slots: ${slotsToFill}, size: ${office.size}, emp: ${office.numEmployees})`);
+        }
+        try { office = corp.getOffice(div, city); } catch { continue; }
+      }
+
+      // Assign jobs: Largest Remainder Method
+      const n = office.numEmployees;
+      if (n === 0) continue;
+      const totalRatio = Object.values(jobRatio).reduce((a, b) => a + b, 0);
+      const jobTargets = {};
+      let assigned = 0;
+      for (const [job, ratio] of Object.entries(jobRatio)) {
+        jobTargets[job] = Math.floor(n * ratio / totalRatio);
+        assigned += jobTargets[job];
+      }
+      const remainder = n - assigned;
+      const byFraction = Object.entries(jobRatio)
+        .map(([job, ratio]) => ({ job, frac: (n * ratio / totalRatio) % 1 }))
+        .sort((a, b) => b.frac - a.frac);
+      for (let i = 0; i < remainder; i++) jobTargets[byFraction[i].job]++;
+
+      for (const [job, target] of Object.entries(jobTargets)) {
+        try {
+          corp.setJobAssignment(div, city, job, target);
+        } catch (e) {
+          ns.tprint(`WARN [corp/assign]: ${div}/${city} ${job}=${target}: ${e}`);
+        }
+      }
     }
   }
 }
@@ -388,6 +511,9 @@ function hireAndAssign(ns, phase) {
 // ─── Corp-Upgrades ────────────────────────────────────────────────────────────
 
 function buyCorpUpgrades(ns, corpInfo, phase) {
+  // Don't buy upgrades when there are no divisions — nothing benefits from them,
+  // and buying upgrades would drain the startup capital needed to create divisions.
+  if (corpInfo.divisions.length === 0) return;
   // Don't buy upgrades when funds are negative
   if (corpInfo.funds < 0) return;
   // Budget: spend no more than 10% of funds per round on upgrades

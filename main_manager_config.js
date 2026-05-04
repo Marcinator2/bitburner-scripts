@@ -77,6 +77,10 @@
       "enabled": false,
       "threads": 1,
       "args": ["Slum Snakes", 7]
+    },
+    "corporation": {
+      "autoInvest": false,
+      "autoGoPublic": false
     }
   },
   "gui": {
