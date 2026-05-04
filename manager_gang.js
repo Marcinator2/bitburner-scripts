@@ -13,7 +13,8 @@ export async function main(ns) {
   const swapMinAbs = 120;          // Absolute minimum progress for swap
   const swapPct = 0.2;             // Relative progress for swap (0.2 = 20% of base value)
   const respectFarmCleanerShare = 0.15;    // Fraction of trained members kept on wanted reduction when cleaning is active
-  const farmCleanerActivatePenalty = 0.95;  // Activate cleaners when wanted penalty drops below -5%
+  const moneyShare = 0.30;                  // Fraction of trained members always kept on money task while respect farming
+  const farmCleanerActivatePenalty = 0.97;  // Activate respectFarm cleaners when wanted penalty drops below -3%
   const farmCleanerDeactivatePenalty = 0.99; // Deactivate cleaners once penalty is back to -1%
   const territoryPrepTarget = 0.98; // Actively prepare territory up to this value
   const startWarChance = 0.60;     // Enable Territory Warfare at this average chance
@@ -190,7 +191,8 @@ export async function main(ns) {
     const wantedLevelGain = typeof info.wantedLevelGainRate === "number" ? info.wantedLevelGainRate : 0;
     const wantedLevel = typeof info.wantedLevel === "number" ? info.wantedLevel : 0;
 
-    // Respect farm cleaner hysteresis: activate below -5% penalty, deactivate above -1%
+    // Respect farm cleaner hysteresis: activate below -3% penalty, deactivate above -1%
+    // (PRIORITY 2 handles severe cases ≥ -10% independently)
     if (gangConfig.respectFarmMode) {
       if (wantedPenalty < farmCleanerActivatePenalty) farmCleaningActive = true;
       else if (wantedPenalty >= farmCleanerDeactivatePenalty) farmCleaningActive = false;
@@ -419,25 +421,35 @@ export async function main(ns) {
         continue;
       }
 
-      // PRIORITY 2: Lower Wanted Level
-      if (wantedLevel > 5000 || wantedLevelGain > 0) {
-        // If Wanted is actively growing → everyone cleans; otherwise only a portion
-        const threshold = wantedLevelGain > 0 ? 1.0 : (wantedLevel > 10000 ? 0.7 : 0.5);
+      // PRIORITY 2: Lower Wanted Level (penalty-based, avoids false triggers from task's natural wantedGain)
+      // Trigger at penalty < -10%, escalate at < -20%, full cleanup at < -30%
+      const cleanupShare = wantedPenalty < 0.70 ? 1.0
+                         : wantedPenalty < 0.80 ? 0.7
+                         : wantedPenalty < 0.90 ? 0.5
+                         : 0;
+      if (cleanupShare > 0) {
         const idx = trainedMemberNames.indexOf(name);
-        const cleanerCount = Math.ceil(trainedMemberNames.length * threshold);
+        const cleanerCount = Math.ceil(trainedMemberNames.length * cleanupShare);
         ns.gang.setMemberTask(name, idx < cleanerCount ? wantedRedTask : moneyTask);
       }
-      // PRIORITY 3: Farm respect (always if respectFarmMode, otherwise until threshold)
+      // PRIORITY 3+4: Respect farming vs Money
+      // While respect farming: cleaners (front) | respect (middle) | money (back, fixed 30%)
+      // When respect is sufficient: everyone on money
       else if (gangConfig.respectFarmMode || info.respect < minRespectForCyberterrorism) {
-        // In respect farm mode: assign cleaners only when wanted penalty has dropped below threshold
-        const idx = trainedMemberNames.indexOf(name);
+        const total = trainedMemberNames.length;
+        const moneyCount = Math.ceil(total * moneyShare);
         const cleanerCount = (gangConfig.respectFarmMode && farmCleaningActive)
-          ? Math.max(1, Math.ceil(trainedMemberNames.length * respectFarmCleanerShare))
+          ? Math.max(1, Math.ceil(total * respectFarmCleanerShare))
           : 0;
-        ns.gang.setMemberTask(name, idx < cleanerCount ? wantedRedTask : respectTask);
-      }
-      // PRIORITY 4: Make money
-      else {
+        const idx = trainedMemberNames.indexOf(name);
+        if (idx < cleanerCount) {
+          ns.gang.setMemberTask(name, wantedRedTask);
+        } else if (idx >= total - moneyCount) {
+          ns.gang.setMemberTask(name, moneyTask);
+        } else {
+          ns.gang.setMemberTask(name, respectTask);
+        }
+      } else {
         ns.gang.setMemberTask(name, moneyTask);
       }
     }
