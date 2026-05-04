@@ -42,7 +42,7 @@ Each entry:
 
 ## Loop
 - `loopMs` from config, fallback `DEFAULT_LOOP_MS = 5000`.
-- Opens `ns.tail()` if `config.tail === true`.
+- Opens `ns.ui.openTail()` if `config.tail === true`.
 
 ## Server Admin (headless)
 - `handleServerAdmin(ns, config)` is called every loop after `supervise()`.
