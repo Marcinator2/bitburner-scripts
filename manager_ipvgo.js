@@ -474,21 +474,26 @@ function analyzeThreats(b, size) {
   return { oppAtari, oppPreAtari, ownAtari, ownPreAtari };
 }
 
-// ── Game log (last 10 games per opponent) ────────────────────────────────────
+// ── Game log (last 100 games per opponent, one file each) ───────────────────
 
-const IPVGO_LOG_FILE = "ipvgo_gamelog.js";
-const IPVGO_LOG_MAX  = 20;
+const IPVGO_LOG_MAX = 100;
+
+function opponentLogFile(opponent) {
+  const safe = opponent.replace(/[^a-zA-Z0-9]/g, "_");
+  return `ipvgo_gamelog_${safe}.js`;
+}
 
 function saveGameLog(ns, opponent, entry) {
-  let log = {};
+  const file = opponentLogFile(opponent);
+  let log = [];
   try {
-    const raw = ns.read(IPVGO_LOG_FILE);
+    const raw = ns.read(file);
     if (raw) log = JSON.parse(raw);
   } catch { /* start fresh */ }
-  if (!Array.isArray(log[opponent])) log[opponent] = [];
-  log[opponent].push(entry);
-  if (log[opponent].length > IPVGO_LOG_MAX)
-    log[opponent] = log[opponent].slice(-IPVGO_LOG_MAX);
-  ns.write(IPVGO_LOG_FILE, JSON.stringify(log, null, 2), "w");
+  if (!Array.isArray(log)) log = [];
+  log.push(entry);
+  if (log.length > IPVGO_LOG_MAX)
+    log = log.slice(-IPVGO_LOG_MAX);
+  ns.write(file, JSON.stringify(log, null, 2), "w");
 }
 

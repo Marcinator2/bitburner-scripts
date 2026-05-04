@@ -95,8 +95,8 @@ Reference: ~370 games played, 6 wins total. Only 1 win in the first 311 games (g
   - 13x13: **0/4 wins**, avg score diff -26.5, avg 37.2 moves
   - Conclusion: 9x9 and 7x7 are similarly competitive. 13x13 is worse. Historical wins (291, 36) were on 7x7, so 7x7 is not hopeless.
 
-### File size
-`IPVGO_LOG_MAX = 20` × 5 opponents = 100 entries max = ~11.400 lines. The file does NOT grow further. No need to split into multiple files.
+### Log files
+One file per opponent: `ipvgo_gamelog_<safe_name>.js` (spaces → `_`). Each file stores a JSON array of up to `IPVGO_LOG_MAX = 100` game entries. Files do NOT grow further once full.
 
 ---
 
