@@ -51,8 +51,12 @@ export async function main(ns) {
     if (isIdle || (isStudyingHack && !isOnBestCourse)) {
       try {
         ns.singularity.universityCourse("Rothman University", bestCourse.name, false);
-        ns.print(`[study] Started: ${bestCourse.name} (hacknet: ${ns.format.number(hacknetIncome)}/s, hack ${hackLevel}).`);
-      } catch (_) {}
+      } catch (e) {
+        ns.print(`[study] ERROR: universityCourse failed: ${e}`);
+        await ns.sleep(LOOP_MS);
+        continue;
+      }
+      ns.print(`[study] Started: ${bestCourse.name} (hacknet: ${ns.format.number(hacknetIncome)}/s, hack ${hackLevel}).`);
     } else if (isOnBestCourse) {
       ns.print(`[study] Studying ${bestCourse.name} (hack ${hackLevel}, hacknet: ${ns.format.number(hacknetIncome)}/s).`);
     } else {
