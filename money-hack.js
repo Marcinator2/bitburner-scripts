@@ -15,6 +15,21 @@ export async function main(ns) {
     return;
   }
 
+  // Ensure root access — nuke if needed (works for servers with 0 required ports)
+  if (!ns.hasRootAccess(target)) {
+    try {
+      if (ns.fileExists("BruteSSH.exe", "home"))  ns.brutessh(target);
+      if (ns.fileExists("FTPCrack.exe", "home"))  ns.ftpcrack(target);
+      if (ns.fileExists("relaySMTP.exe", "home")) ns.relaysmtp(target);
+      if (ns.fileExists("HTTPWorm.exe", "home"))  ns.httpworm(target);
+      if (ns.fileExists("SQLInject.exe", "home")) ns.sqlinject(target);
+      ns.nuke(target);
+    } catch (e) {
+      ns.tprint(`ERROR: Cannot get root access on ${target}: ${e}`);
+      return;
+    }
+  }
+
   // Determine maxMoney correctly and stop script if 0
   const targetMaxMoney = ns.getServerMaxMoney(target);
   const targetMaxRam = ns.getServerMaxRam(target);
