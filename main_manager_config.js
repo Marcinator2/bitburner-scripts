@@ -3,10 +3,10 @@
   "tail": true,
   "services": {
     "hack": {
-      "enabled": true,
+      "enabled": false,
       "threads": 1,
       "args": [],
-      "shareRam": false
+      "shareRam": true
     },
     "hacknet": {
       "enabled": false,
@@ -14,9 +14,12 @@
       "args": []
     },
     "stocks": {
-      "enabled": false,
+      "enabled": true,
       "threads": 1,
-      "args": []
+      "args": [],
+      "useOwnedServers": true,
+      "maxManipTargets": 2,
+      "minCashReserveFraction": 0.05
     },
     "gang": {
       "enabled": false,
@@ -32,7 +35,7 @@
 
     },
     "programs": {
-      "enabled": false,
+      "enabled": true,
       "threads": 1,
       "args": []
     },
@@ -64,6 +67,11 @@
       "args": []
     },
     "serverAdmin": {
+      "enabled": false,
+      "threads": 1,
+      "args": []
+    },
+    "root": {
       "enabled": true,
       "threads": 1,
       "args": []
@@ -87,7 +95,7 @@
     "managerGui": {
       "autoBuy": true,
       "autoUpgrade": true,
-      "upgradeRam": 65536
+      "upgradeRam": 1048576
     }
   }
 }

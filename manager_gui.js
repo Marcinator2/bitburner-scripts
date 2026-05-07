@@ -3,7 +3,7 @@ import { makeButton, styleActionButton, loadConfig, saveConfig, CONFIG_FILE, RAM
 import { buildCombatStatControls, getCombatTrainerConfig, getNegativeKarmaConfig, buildCombatTrainerDetails, buildNegativeKarmaDetails, syncCombatTrainerControls, handleTrainingAction } from "./manager_gui_tab_training.js";
 import { buildGangControls, getGangConfig, buildGangDetails, syncGangControls, handleGangAction } from "./manager_gui_tab_gang.js";
 import { buildAugmentControls, getAugmentConfig, buildAugmentDetails, syncAugmentControls, handleAugmentAction } from "./manager_gui_tab_augments.js";
-import { buildHackControls, buildHacknetControls, buildProgramsControls, syncHackControls, syncHacknetControls, syncProgramsControls, handleServicesAction } from "./manager_gui_tab_services.js";
+import { buildHackControls, buildHacknetControls, buildProgramsControls, buildStocksControls, syncHackControls, syncHacknetControls, syncProgramsControls, syncStocksControls, handleServicesAction } from "./manager_gui_tab_services.js";
 import { buildServerAdminSection, renderServerTab, handleServerAction, getSelectedRam } from "./manager_gui_tab_server.js";
 import { buildCorpControls, buildCorpDetails, syncCorpControls, handleCorpAction } from "./manager_gui_tab_corp.js";
 import { buildIpvgoControls, getIpvgoConfig, buildIpvgoDetails, syncIpvgoControls, handleIpvgoAction } from "./manager_gui_tab_ipvgo.js";
@@ -40,6 +40,7 @@ const SERVICES = [
   { key: "backdoor", script: "manager_backdoor.js", host: "home", label: "Backdoor" },
   { key: "ipvgo", script: "manager_ipvgo.js", host: "home", label: "IPvGO" },
   { key: "corporation", script: "manager_corporation.js", host: "home", label: "Corporation" },
+  { key: "root", script: "manager_root.js", host: "home", label: "Auto Root" },
   { key: "serverAdmin", script: "manager_server.js", host: "home", label: "Server Admin" },
   { key: "bladeburner", script: "manager_bladeburner.js", host: "home", label: "Bladeburner" },
 ];
@@ -323,6 +324,7 @@ function buildPanel(doc) {
       let programsControls = null;
       let hacknetControls = null;
       let hackControls = null;
+      let stocksControls = null;
       if (service.key === "hack") {
         hackControls = buildHackControls(doc);
         row.append(top, details, hackControls.wrap);
@@ -332,10 +334,13 @@ function buildPanel(doc) {
       } else if (service.key === "hacknet") {
         hacknetControls = buildHacknetControls(doc);
         row.append(top, details, hacknetControls.wrap);
+      } else if (service.key === "stocks") {
+        stocksControls = buildStocksControls(doc);
+        row.append(top, details, stocksControls.wrap);
       } else {
         row.append(top, details);
       }
-      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls, hacknetControls, hackControls });
+      rows.set(service.key, { toggle, details, row, statControls: null, gangControls: null, programsControls, hacknetControls, hackControls, stocksControls });
     } else {
       row.style.padding = "10px 12px";
 
@@ -690,6 +695,7 @@ function renderPanel(ns, panel) {
     if (service.key === "programs") syncProgramsControls(row, config.services.programs || {});
     if (service.key === "hacknet") syncHacknetControls(row, config.services.hacknet || {});
     if (service.key === "hack") syncHackControls(row, config.services.hack || {});
+    if (service.key === "stocks") syncStocksControls(row, config.services.stocks || {});
     if (service.key === "ipvgo") syncIpvgoControls(row, ipvgoConfig);
     if (service.key === "corporation") syncCorpControls(row, override);
   }

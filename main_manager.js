@@ -163,6 +163,16 @@ const SERVICE_DEFINITIONS = [
     shouldRun: ns => Boolean(ns.corporation && typeof ns.corporation.hasCorporation === "function" && ns.corporation.hasCorporation()),
   },
   {
+    key: "root",
+    script: "manager_root.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [],
+    description: "Gains root access on all reachable servers automatically",
+    shouldRun: () => true,
+  },
+  {
     key: "serverAdmin",
     script: "manager_server.js",
     host: "home",

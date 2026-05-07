@@ -1,4 +1,42 @@
 /** @param {NS} ns */
+
+// All server→stock pairs ranked by manipulation efficiency: mv_max / shareTxForMovement_min
+// (higher score = easier to move the forecast with fewer threads)
+const MANIP_TARGETS = [
+  { server: "netlink",          symbol: "NTLK",  score: 22.2 },
+  { server: "joesguns",         symbol: "JGN",   score: 18.3 },
+  { server: "sigma-cosmetics",  symbol: "SGC",   score: 13.8 },
+  { server: "syscore",          symbol: "SYSC",  score: 11.3 },
+  { server: "catalyst",         symbol: "CTYS",  score: 7.3  },
+  { server: "alpha-ent",        symbol: "APHE",  score: 6.8  },
+  { server: "clarkinc",         symbol: "CLRK",  score: 2.4  },
+  { server: "blade",            symbol: "BLD",   score: 2.0  },
+  { server: "vitalife",         symbol: "VITA",  score: 2.2  },
+  { server: "lexo-corp",        symbol: "LXO",   score: 3.75 },
+  { server: "omega-net",        symbol: "OMGA",  score: 3.7  },
+  { server: "icarus",           symbol: "ICRS",  score: 1.94 },
+  { server: "solaris",          symbol: "SLRS",  score: 1.9  },
+  { server: "nova-med",         symbol: "NVMD",  score: 1.9  },
+  { server: "omnia",            symbol: "OMN",   score: 1.79 },
+  { server: "computek",         symbol: "CTK",   score: 1.67 },
+  { server: "univ-energy",      symbol: "UNV",   score: 1.67 },
+  { server: "ecorp",            symbol: "ECP",   score: 1.67 },
+  { server: "megacorp",         symbol: "MGCP",  score: 1.67 },
+  { server: "aerocorp",         symbol: "AERO",  score: 1.55 },
+  { server: "global-pharm",     symbol: "GPH",   score: 1.55 },
+  { server: "omnitek",          symbol: "OMTK",  score: 1.5  },
+  { server: "4sigma",           symbol: "FSIG",  score: 1.5  },
+  { server: "kuai-gong",        symbol: "KGI",   score: 1.5  },
+  { server: "fulcrumtech",      symbol: "FLCM",  score: 1.5  },
+  { server: "stormtech",        symbol: "STM",   score: 1.5  },
+  { server: "defcomm",          symbol: "DCOMM", score: 1.5  },
+  { server: "helios",           symbol: "HLS",   score: 1.5  },
+  { server: "foodnstuff",       symbol: "FNS",   score: 1.33 },
+  { server: "rho-construction",  symbol: "RHOC",  score: 1.17 },
+  { server: "microdyne",        symbol: "MDYN",  score: 0.89 },
+  { server: "titan-labs",       symbol: "TITN",  score: 0.78 },
+];
+
 export async function main(ns) {
   ns.disableLog("sleep");
 
@@ -35,8 +73,6 @@ export async function main(ns) {
     }
   })();
 
-  const company = ns.args[0] || "joesguns";
-  const firmSymbol = ns.args[1] || "JGN";
   const host = "home";
 
   const v_hack = "v_hack.js";
@@ -44,10 +80,6 @@ export async function main(ns) {
   const v_weaken = "v_weaken.js";
   const weakenRam = ns.getScriptRam(v_weaken);
 
-  if (!ns.serverExists(company)) {
-    ns.tprint(`Server ${company} does not exist.`);
-    return;
-  }
   if (weakenRam <= 0) {
     ns.tprint(`Script ${v_weaken} is missing or has invalid RAM cost.`);
     return;
@@ -56,8 +88,6 @@ export async function main(ns) {
   const pct_MinMoney = 0.2;
   const pct_MaxMoney = 0.8;
   const ramBuffer = 32;
-  const maxBuyQuantity = 10_000_000_000;
-  const minCashReserve = 10_000_000;
   const txFee = 100_000;
   const buyForecast = 0.56;
   const sellForecast = 0.52;
@@ -75,9 +105,18 @@ export async function main(ns) {
   const trailingStopPct = 0.10;  // Trailing Stop: sell if price drops X% below peak
   const DEFAULT_LOOP_MS = 2000;
   let loopMs = DEFAULT_LOOP_MS;
+  let useOwnedServers = false;
+  let maxManipTargets = 2;
+  let minCashReserveFraction = 0.05;
   try {
     const cfgRaw = ns.read("main_manager_config.js");
-    if (cfgRaw) loopMs = Number(JSON.parse(cfgRaw)?.services?.stocks?.loopMs) || DEFAULT_LOOP_MS;
+    if (cfgRaw) {
+      const cfg = JSON.parse(cfgRaw);
+      loopMs = Number(cfg?.services?.stocks?.loopMs) || DEFAULT_LOOP_MS;
+      useOwnedServers = !!(cfg?.services?.stocks?.useOwnedServers);
+      maxManipTargets = Number(cfg?.services?.stocks?.maxManipTargets) || 2;
+      minCashReserveFraction = Number(cfg?.services?.stocks?.minCashReserveFraction) || 0.05;
+    }
   } catch { /* use fallback */ }
   const rebuyBlockedUntil = {};
   const positionPeak = {};       // Highest bid price since purchase per symbol
@@ -97,6 +136,80 @@ export async function main(ns) {
     if (threads <= 0) return false;
     const pid = ns.exec(script, host, threads, company);
     return pid > 0;
+  }
+
+  function scanRootedHosts() {
+    const visited = new Set([host]);
+    const queue = [host];
+    const rooted = [];
+    const owned = new Set(ns.cloud.getServerNames());
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (const neighbor of ns.scan(current)) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        queue.push(neighbor);
+        if (neighbor !== host && !owned.has(neighbor) && ns.hasRootAccess(neighbor)) {
+          rooted.push(neighbor);
+        }
+      }
+    }
+    return rooted;
+  }
+
+  function calcAllManipHosts() {
+    const hosts = [host];
+    if (useOwnedServers) {
+      hosts.push(...ns.cloud.getServerNames());
+      hosts.push(...scanRootedHosts());
+    }
+    return hosts;
+  }
+
+  function calcThreadsOnHost(h) {
+    const buffer = h === host ? ramBuffer : 0;
+    const freeRam = ns.getServerMaxRam(h) - ns.getServerUsedRam(h) - buffer;
+    return Math.max(0, Math.floor(freeRam / weakenRam));
+  }
+
+  const WORKER_SCRIPTS = [v_hack, v_grow, v_weaken];
+
+  function ensureScriptsOnHost(h) {
+    if (h === host) return;
+    for (const s of WORKER_SCRIPTS) {
+      if (!ns.fileExists(s, h)) {
+        ns.scp(s, h, host);
+      }
+    }
+  }
+
+  function execWorkerOnHosts(script, server, hosts) {
+    let total = 0;
+    for (const h of hosts) {
+      ensureScriptsOnHost(h);
+      if (!ns.fileExists(script, h)) continue;
+      const t = calcThreadsOnHost(h);
+      if (t <= 0) continue;
+      const pid = ns.exec(script, h, t, server);
+      if (pid > 0) total += t;
+    }
+    return total;
+  }
+
+  function totalAvailableThreads() {
+    return calcAllManipHosts().reduce((sum, h) => sum + calcThreadsOnHost(h), 0);
+  }
+
+  function selectManipTargets() {
+    const hackLevel = ns.getHackingLevel();
+    return MANIP_TARGETS
+      .filter(t =>
+        ns.serverExists(t.server) &&
+        ns.hasRootAccess(t.server) &&
+        ns.getServerRequiredHackingLevel(t.server) <= hackLevel &&
+        ns.getServerMaxMoney(t.server) > 0
+      )
+      .slice(0, maxManipTargets);
   }
 
   function has4S() {
@@ -224,6 +337,7 @@ export async function main(ns) {
     const adaptiveBuyF = Math.max(0.53, regime.buyF - idleFactor * 0.02);
     const adaptiveMinVol = Math.max(0.015, regime.minVol - idleFactor * 0.006);
     const playerMoney = ns.getPlayer().money;
+    const minCashReserve = playerMoney * minCashReserveFraction;
     const tradableCash = Math.max(0, playerMoney - minCashReserve);
     const maxPerSymbolCash = tradableCash * regime.allocPerSymbol;
     let sells = 0;
@@ -392,7 +506,8 @@ export async function main(ns) {
       const [shares] = ns.stock.getPosition(c.sym);
       const maxShares = ns.stock.getMaxShares(c.sym);
       const ask = ns.stock.getAskPrice(c.sym);
-      const cashNow = Math.max(0, ns.getPlayer().money - minCashReserve - txFee);
+      const moneyNow = ns.getPlayer().money;
+      const cashNow = Math.max(0, moneyNow - moneyNow * minCashReserveFraction - txFee);
       const budget = Math.min(maxPerSymbolCash, cashNow);
       const byBudget = Math.floor(budget / Math.max(1, ask));
       const qty = Math.min(maxShares - shares, byBudget);
@@ -440,6 +555,11 @@ export async function main(ns) {
   let modeLogged = "";
   let lastRegime = "";
   let lastStatusTs = 0;
+
+  // MANIP mode state: per-target phase tracking
+  let manipTargets = [];        // [{ server, symbol, score, phase, nextLaunchAt }]
+  let manipTargetRefreshAt = 0;
+  const MANIP_REFRESH_MS = 60_000;
 
   if (!singularityStatusLogged) {
     ns.tprint(
@@ -490,99 +610,93 @@ export async function main(ns) {
       continue;
     }
 
+    // --- MANIP mode: auto-select best rooted targets and run non-blocking scheduler ---
+    const now = Date.now();
+    if (now >= manipTargetRefreshAt) {
+      const fresh = selectManipTargets();
+      // Keep existing state for already-active targets; init new ones
+      manipTargets = fresh.map(f => {
+        const existing = manipTargets.find(e => e.server === f.server);
+        return existing ?? { server: f.server, symbol: f.symbol, phase: "hack", nextLaunchAt: 0 };
+      });
+      manipTargetRefreshAt = now + MANIP_REFRESH_MS;
+    }
+
+    if (manipTargets.length === 0) {
+      if (modeLogged !== "MANIP_WAIT") {
+        ns.tprint("MANIP: No rooted targets available yet. Waiting...");
+        modeLogged = "MANIP_WAIT";
+      }
+      await ns.sleep(5000);
+      continue;
+    }
+
     if (modeLogged !== "MANIP") {
-      ns.tprint(`Stock Manager mode: Manipulation/Fallback (${firmSymbol} on ${company})`);
+      ns.tprint(`Stock Manager mode: Auto-Manipulation (${manipTargets.length} target(s): ${manipTargets.map(t => t.symbol).join(", ")})`);
       modeLogged = "MANIP";
     }
 
-    const curMoney = ns.getServerMoneyAvailable(company);
-    const maxMoney = ns.getServerMaxMoney(company);
-    const curSec = ns.getServerSecurityLevel(company);
-    const minSec = ns.getServerMinSecurityLevel(company);
-    const [longShares] = ns.stock.getPosition(firmSymbol);
+    const allHosts = calcAllManipHosts();
 
-    // Calculate threads inside the loop to always have up-to-date values
-    let threads = calcThreads();
+    for (let i = 0; i < manipTargets.length; i++) {
+      const t = manipTargets[i];
+      // Partition hosts: each target gets hosts at positions i, i+N, i+2N, ...
+      const hosts = allHosts.filter((_, idx) => idx % manipTargets.length === i);
+      if (hosts.length === 0) continue;
 
-    if (threads <= 0) { await ns.sleep(1000); continue; }
+      const curMoney = ns.getServerMoneyAvailable(t.server);
+      const maxMoney = ns.getServerMaxMoney(t.server);
+      const curSec = ns.getServerSecurityLevel(t.server);
+      const minSec = ns.getServerMinSecurityLevel(t.server);
+      const [shares] = ns.stock.getPosition(t.symbol);
 
-    // PRIORITY 1: SECURITY
-    if (curSec > minSec + 2) {
-      ns.print("Security too high...");
-      execWorker(v_weaken, threads);
-      await ns.sleep(ns.getWeakenTime(company) + 100);
-    } 
-    
-    // PRIORITY 2: LONG MANEUVER
-    else if (curMoney < maxMoney * pct_MinMoney && longShares <= 0) {
-      if ((rebuyBlockedUntil[firmSymbol] || 0) > Date.now()) {
-        await ns.sleep(500);
-        continue;
-      }
-
-      const maxAvailable = ns.stock.getMaxShares(firmSymbol);
-      const askPrice = ns.stock.getAskPrice(firmSymbol);
-      const cash = ns.getPlayer().money;
-      const budget = Math.max(0, cash - minCashReserve - txFee);
-      const byBudget = Math.floor(budget / Math.max(1, askPrice));
-      const buyQuantity = Math.min(maxBuyQuantity, Math.max(0, maxAvailable - longShares), byBudget);
-      
-      if (buyQuantity <= 0) {
-        await ns.sleep(1000);
-        continue;
-      }
-
-      const buyPrice = ns.stock.buyStock(firmSymbol, buyQuantity);
-      
-      if (buyPrice > 0) {
-        ns.tprint(`--- LONG START: ${buyQuantity} shares ---`);
-        while (ns.getServerMoneyAvailable(company) < maxMoney * pct_MaxMoney) {
-          // Recalculate threads inside the loop!
-          let loopThreads = calcThreads();
-          if (loopThreads <= 0) { await ns.sleep(1000); continue; }
-
-          if (ns.getServerSecurityLevel(company) > minSec + 2) {
-            execWorker(v_weaken, loopThreads);
-            await ns.sleep(ns.getWeakenTime(company) + 100);
-          } else {
-            execWorker(v_grow, loopThreads);
-            await ns.sleep(ns.getGrowTime(company) + 100);
+      // State transitions: sell when money is high enough, buy when low enough
+      if (curMoney >= maxMoney * pct_MaxMoney && shares > 0) {
+        const sellPrice = ns.stock.sellStock(t.symbol, shares);
+        if (sellPrice > 0) {
+          rebuyBlockedUntil[t.symbol] = now + rebuyCooldownMs;
+          ns.tprint(`MANIP SELL ${t.symbol}: ${shares} @ ${ns.format.number(sellPrice)}`);
+          t.phase = "hack";
+          t.nextLaunchAt = 0;
+        }
+      } else if (t.phase === "hack" && curMoney <= maxMoney * pct_MinMoney && shares <= 0 && (rebuyBlockedUntil[t.symbol] || 0) <= now) {
+        const maxAvailable = ns.stock.getMaxShares(t.symbol);
+        const askPrice = ns.stock.getAskPrice(t.symbol);
+        const cash = ns.getPlayer().money;
+        const budget = Math.max(0, cash - cash * minCashReserveFraction - txFee);
+        const qty = Math.min(maxAvailable, Math.floor(budget / Math.max(1, askPrice)));
+        if (qty > 0) {
+          const buyPrice = ns.stock.buyStock(t.symbol, qty);
+          if (buyPrice > 0) {
+            ns.tprint(`MANIP BUY ${t.symbol}: ${qty} @ ${ns.format.number(buyPrice)}`);
+            t.phase = "grow";
+            t.nextLaunchAt = 0;
           }
         }
-        const [heldShares] = ns.stock.getPosition(firmSymbol);
-        if (heldShares > 0) {
-          ns.stock.sellStock(firmSymbol, heldShares);
-          rebuyBlockedUntil[firmSymbol] = Date.now() + rebuyCooldownMs;
-          ns.tprint(`--- LONG SOLD (${heldShares}) ---`);
-        }
+      }
+
+      // Don't re-launch workers until previous batch should be done
+      if (now < t.nextLaunchAt) continue;
+
+      let script, opTime;
+      if (curSec > minSec + 2) {
+        script = v_weaken;
+        opTime = ns.getWeakenTime(t.server);
+      } else if (t.phase === "grow" || shares > 0) {
+        script = v_grow;
+        opTime = ns.getGrowTime(t.server);
       } else {
-        ns.print("Purchase failed (money or limit).");
+        script = v_hack;
+        opTime = ns.getHackTime(t.server);
+      }
+
+      const launched = execWorkerOnHosts(script, t.server, hosts);
+      if (launched > 0) {
+        t.nextLaunchAt = now + opTime + 200;
+        ns.print(`MANIP ${t.symbol} [${t.phase}]: ${launched} threads on ${hosts.length} host(s)`);
       }
     }
 
-// PRIORITY 3: PREP FOR NEXT BUY (hack without short)
-    else if (curMoney > maxMoney * pct_MaxMoney) {
-      ns.print("Price is high. Hacking server to empty for the next cycle...");
-      
-      while (ns.getServerMoneyAvailable(company) > maxMoney * pct_MinMoney) {
-        let loopThreads = calcThreads();
-        if (loopThreads <= 0) { await ns.sleep(1000); continue; }
-
-        if (ns.getServerSecurityLevel(company) > minSec + 2) {
-          execWorker(v_weaken, loopThreads);
-          await ns.sleep(ns.getWeakenTime(company) + 100);
-        } else {
-          execWorker(v_hack, loopThreads);
-          await ns.sleep(ns.getHackTime(company) + 100);
-        }
-      }
-      ns.tprint("--- BOTTOM REACHED: READY FOR NEXT LONG BUY ---");
-    }
-    
-    else {
-      execWorker(v_grow, threads);
-      await ns.sleep(ns.getGrowTime(company) + 100);
-    }
-    await ns.sleep(200);
+    await ns.sleep(loopMs);
   }
 }

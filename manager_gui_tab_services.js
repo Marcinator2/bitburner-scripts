@@ -80,6 +80,32 @@ export function buildProgramsControls(doc) {
   return { wrap, studyCheckbox };
 }
 
+export function buildStocksControls(doc) {
+  const wrap = doc.createElement("div");
+  wrap.style.marginTop = "8px";
+  wrap.style.fontSize = "11px";
+  wrap.style.color = "#c6d8eb";
+
+  const ownedLabel = doc.createElement("label");
+  ownedLabel.style.display = "flex";
+  ownedLabel.style.alignItems = "center";
+  ownedLabel.style.gap = "6px";
+  ownedLabel.style.cursor = "pointer";
+
+  const ownedCheckbox = doc.createElement("input");
+  ownedCheckbox.type = "checkbox";
+  ownedCheckbox.dataset.action = "toggle-stocks-owned-servers";
+  ownedCheckbox.style.cursor = "pointer";
+
+  const ownedText = doc.createElement("span");
+  ownedText.textContent = "Use all servers for manipulation";
+
+  ownedLabel.append(ownedCheckbox, ownedText);
+  wrap.appendChild(ownedLabel);
+
+  return { wrap, ownedCheckbox };
+}
+
 // --- Config getter ---
 
 export function getProgramsConfig(service) {
@@ -106,12 +132,18 @@ export function syncProgramsControls(row, programsService) {
   row.programsControls.studyCheckbox.checked = cfg.build;
 }
 
+export function syncStocksControls(row, stocksService) {
+  if (!row.stocksControls?.ownedCheckbox) return;
+  row.stocksControls.ownedCheckbox.checked = !!(stocksService.useOwnedServers ?? false);
+}
+
 // --- Action handler ---
 
 export function handleServicesAction(ns, action) {
   if (action === "toggle-hack-share-ram") { toggleHackShareRam(ns); return true; }
   if (action === "toggle-hacknet-roi") { toggleHacknetRoi(ns); return true; }
   if (action === "toggle-programs-build") { toggleProgramsBuild(ns); return true; }
+  if (action === "toggle-stocks-owned-servers") { toggleStocksOwnedServers(ns); return true; }
   return false;
 }
 
@@ -143,6 +175,16 @@ function toggleProgramsBuild(ns) {
   config.services.programs = {
     ...current,
     build: !(current.build ?? false),
+  };
+  saveConfig(ns, CONFIG_FILE, config);
+}
+
+function toggleStocksOwnedServers(ns) {
+  const config = loadConfig(ns, CONFIG_FILE);
+  const current = config.services.stocks || {};
+  config.services.stocks = {
+    ...current,
+    useOwnedServers: !(current.useOwnedServers ?? false),
   };
   saveConfig(ns, CONFIG_FILE, config);
 }
