@@ -173,6 +173,16 @@ const SERVICE_DEFINITIONS = [
     shouldRun: () => true,
   },
   {
+    key: "shareRam",
+    script: "manager_share-ram.js",
+    host: "home",
+    threads: 1,
+    enabled: false,
+    args: [],
+    description: "Shares unused RAM with factions (configurable quota)",
+    shouldRun: () => true,
+  },
+  {
     key: "serverAdmin",
     script: "manager_server.js",
     host: "home",

@@ -41,6 +41,7 @@ const SERVICES = [
   { key: "ipvgo", script: "manager_ipvgo.js", host: "home", label: "IPvGO" },
   { key: "corporation", script: "manager_corporation.js", host: "home", label: "Corporation" },
   { key: "root", script: "manager_root.js", host: "home", label: "Auto Root" },
+  { key: "shareRam", script: "manager_share-ram.js", host: "home", label: "Share RAM" },
   { key: "serverAdmin", script: "manager_server.js", host: "home", label: "Server Admin" },
   { key: "bladeburner", script: "manager_bladeburner.js", host: "home", label: "Bladeburner" },
 ];

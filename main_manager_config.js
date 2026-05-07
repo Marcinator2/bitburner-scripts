@@ -19,7 +19,8 @@
       "args": [],
       "useOwnedServers": true,
       "maxManipTargets": 2,
-      "minCashReserveFraction": 0.05
+      "minCashReserveFraction": 0.05,
+      "loopMs": 500
     },
     "gang": {
       "enabled": false,
@@ -52,7 +53,7 @@
       }
     },
     "playerStatsWorker": {
-      "enabled": true,
+      "enabled": false,
       "threads": 1,
       "args": ["player_stats_data.txt", 10000, 360]
     },
@@ -71,10 +72,22 @@
       "threads": 1,
       "args": []
     },
+    "backdoor": {
+      "enabled": true,
+      "threads": 1,
+      "args": []
+    },
     "root": {
       "enabled": true,
       "threads": 1,
       "args": []
+    },
+    "shareRam": {
+      "enabled": true,
+      "threads": 1,
+      "args": [],
+      "shareQuota": 0.1,
+      "loopMs": 30000
     },
     "bladeburner": {
       "enabled": false,
@@ -82,7 +95,7 @@
       "args": []
     },
     "ipvgo": {
-      "enabled": false,
+      "enabled": true,
       "threads": 1,
       "args": ["Slum Snakes", 7]
     },
