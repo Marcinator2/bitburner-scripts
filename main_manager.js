@@ -231,6 +231,17 @@ export async function main(ns) {
     return;
   }
 
+  // Kill all managed services when the manager itself is stopped.
+  ns.atExit(() => {
+    const config = loadConfig(ns, configFile);
+    const serviceStates = inspectServices(ns, config);
+    for (const state of serviceStates) {
+      if (state.running) {
+        ns.scriptKill(state.script, state.host);
+      }
+    }
+  });
+
   while (true) {
     ns.clearLog();
     const config = supervise(ns, configFile, false);

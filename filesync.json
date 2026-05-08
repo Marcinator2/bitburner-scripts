@@ -1,5 +1,6 @@
 {
   "allowedFiletypes": [".js", ".txt"],
   "port": 12525,
-  "scriptsFolder": "."
+  "scriptsFolder": ".",
+  "exclude": ["Bitburner_Source"]
 }

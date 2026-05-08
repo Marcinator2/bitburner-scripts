@@ -64,6 +64,15 @@ export async function main(ns) {
     purchaseTixApi: getStockMethod("purchaseTixApi"),
     has4SDataTixApi: getStockMethod("has4SDataTixApi", "has4SDataTIXAPI"),
     purchase4SMarketDataTixApi: getStockMethod("purchase4SMarketDataTixApi", "purchase4SMarketDataTIXAPI"),
+    shortStock: getStockMethod("shortStock"),
+    sellShort: getStockMethod("sellShort"),
+  };
+  let canShort = !!(stockApi.shortStock && stockApi.sellShort);
+  const tryShort = (sym, qty) => {
+    try { return ns.stock.shortStock(sym, qty); } catch { canShort = false; return 0; }
+  };
+  const tryCover = (sym, qty) => {
+    try { return ns.stock.sellShort(sym, qty); } catch { canShort = false; return 0; }
   };
   const stockConstants = (() => {
     try {
@@ -122,6 +131,9 @@ export async function main(ns) {
   const positionPeak = {};       // Highest bid price since purchase per symbol
   const positionEntryForecast = {};
   const positionEntryTime = {};
+  const shortPeakLow = {};       // Lowest bid price since short opened per symbol
+  const shortEntryForecast = {};
+  const shortEntryTime = {};
   let noTradeCycles = 0;
   let lastAccessSummary = "";
   let lastAccessCheckTs = 0;
@@ -353,77 +365,109 @@ export async function main(ns) {
 
     // Execute exit rules first to free up capital.
     for (const sym of symbols) {
-      const [shares, , avgBuyPrice] = ns.stock.getPosition(sym);
-      if (shares <= 0) {
-        delete positionPeak[sym]; // Position closed, reset peak
-        delete positionEntryForecast[sym];
-        delete positionEntryTime[sym];
-        continue;
-      }
-
+      const [shares, avgBuyPrice, shortShares, shortAvgBuyPrice] = ns.stock.getPosition(sym);
       const bid = ns.stock.getBidPrice(sym);
       const forecast = ns.stock.getForecast(sym);
       const volatility = ns.stock.getVolatility(sym);
 
-      if (positionEntryForecast[sym] === undefined) {
-        positionEntryForecast[sym] = forecast;
-      }
-      if (positionEntryTime[sym] === undefined) {
-        positionEntryTime[sym] = now;
-      }
+      // --- Long position exit ---
+      if (shares <= 0) {
+        delete positionPeak[sym];
+        delete positionEntryForecast[sym];
+        delete positionEntryTime[sym];
+      } else {
+        if (positionEntryForecast[sym] === undefined) positionEntryForecast[sym] = forecast;
+        if (positionEntryTime[sym] === undefined) positionEntryTime[sym] = now;
+        if (!positionPeak[sym] || bid > positionPeak[sym]) positionPeak[sym] = bid;
 
-      // Peak aktualisieren
-      if (!positionPeak[sym] || bid > positionPeak[sym]) {
-        positionPeak[sym] = bid;
-      }
+        const heldMs = now - positionEntryTime[sym];
+        const trailingStopPrice = positionPeak[sym] * (1 - trailingStopPct);
+        const stopLossPrice = avgBuyPrice * (1 - hardStopLossPct);
+        const trailingHit = bid <= trailingStopPrice;
+        const forecastHit = forecast <= regime.sellF;
+        const stopLossHit = bid <= stopLossPrice;
+        const forecastDropHit = heldMs >= minHoldMs && (positionEntryForecast[sym] - forecast) >= forecastDropExit;
 
-      const heldMs = now - positionEntryTime[sym];
-      const trailingStopPrice = positionPeak[sym] * (1 - trailingStopPct);
-      const stopLossPrice = avgBuyPrice * (1 - hardStopLossPct);
-      const trailingHit = bid <= trailingStopPrice;
-      const forecastHit = forecast <= regime.sellF;
-      const stopLossHit = bid <= stopLossPrice;
-      const forecastDropHit = heldMs >= minHoldMs && (positionEntryForecast[sym] - forecast) >= forecastDropExit;
-
-      if (stopLossHit || forecastDropHit || forecastHit || trailingHit) {
-        const grund = stopLossHit
-          ? `StopLoss (${ns.format.number(bid)} ≤ ${ns.format.number(stopLossPrice)})`
-          : forecastDropHit
-            ? `ForecastDrop (${positionEntryForecast[sym].toFixed(3)} → ${forecast.toFixed(3)})`
-            : trailingHit
-              ? `TrailingStop (peak=${ns.format.number(positionPeak[sym])} → now=${ns.format.number(bid)}, -${(((positionPeak[sym] - bid) / positionPeak[sym]) * 100).toFixed(1)}%)`
-              : `Forecast (${forecast.toFixed(3)} ≤ ${regime.sellF})`;
-        const sellPrice = ns.stock.sellStock(sym, shares);
-        if (sellPrice > 0) {
-          delete positionPeak[sym];
-          delete positionEntryForecast[sym];
-          delete positionEntryTime[sym];
-          rebuyBlockedUntil[sym] = now + rebuyCooldownMs;
-          sells++;
-          if (stopLossHit) stoppedLoss++;
-          if (forecastDropHit) droppedForecast++;
-          const pnlPct = ((sellPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(1);
-          ns.print(`4S SELL ${sym}: ${shares} @ ${ns.format.number(sellPrice)} (${pnlPct}%) | ${grund}`);
+        if (stopLossHit || forecastDropHit || forecastHit || trailingHit) {
+          const grund = stopLossHit
+            ? `StopLoss (${ns.format.number(bid)} ≤ ${ns.format.number(stopLossPrice)})`
+            : forecastDropHit
+              ? `ForecastDrop (${positionEntryForecast[sym].toFixed(3)} → ${forecast.toFixed(3)})`
+              : trailingHit
+                ? `TrailingStop (peak=${ns.format.number(positionPeak[sym])} → now=${ns.format.number(bid)}, -${(((positionPeak[sym] - bid) / positionPeak[sym]) * 100).toFixed(1)}%)`
+                : `Forecast (${forecast.toFixed(3)} ≤ ${regime.sellF})`;
+          const sellPrice = ns.stock.sellStock(sym, shares);
+          if (sellPrice > 0) {
+            delete positionPeak[sym];
+            delete positionEntryForecast[sym];
+            delete positionEntryTime[sym];
+            rebuyBlockedUntil[sym] = now + rebuyCooldownMs;
+            sells++;
+            if (stopLossHit) stoppedLoss++;
+            if (forecastDropHit) droppedForecast++;
+            const pnlPct = ((sellPrice - avgBuyPrice) / avgBuyPrice * 100).toFixed(1);
+            ns.print(`4S SELL ${sym}: ${shares} @ ${ns.format.number(sellPrice)} (${pnlPct}%) | ${grund}`);
+          }
+        } else {
+          heldPositions.push({
+            sym,
+            shares,
+            forecast,
+            volatility,
+            score: getSignalScore(forecast, volatility),
+            avgBuyPrice,
+            heldMs,
+          });
         }
-        continue;
       }
 
-      heldPositions.push({
-        sym,
-        shares,
-        forecast,
-        volatility,
-        score: getSignalScore(forecast, volatility),
-        avgBuyPrice,
-        heldMs,
-      });
+      // --- Short position exit ---
+      if (canShort) {
+        if (shortShares <= 0) {
+          delete shortPeakLow[sym];
+          delete shortEntryForecast[sym];
+          delete shortEntryTime[sym];
+        } else {
+          if (shortEntryForecast[sym] === undefined) shortEntryForecast[sym] = forecast;
+          if (shortEntryTime[sym] === undefined) shortEntryTime[sym] = now;
+          if (!shortPeakLow[sym] || bid < shortPeakLow[sym]) shortPeakLow[sym] = bid;
+
+          const heldMs = now - shortEntryTime[sym];
+          const shortStopLossPrice = shortAvgBuyPrice * (1 + hardStopLossPct);
+          const shortTrailingStopPrice = shortPeakLow[sym] * (1 + trailingStopPct);
+          const shortForecastHit = forecast >= (1 - regime.sellF);
+          const shortStopLossHit = bid >= shortStopLossPrice;
+          const shortTrailingHit = bid >= shortTrailingStopPrice;
+          const shortForecastRiseHit = heldMs >= minHoldMs && (forecast - shortEntryForecast[sym]) >= forecastDropExit;
+
+          if (shortStopLossHit || shortForecastRiseHit || shortForecastHit || shortTrailingHit) {
+            const grund = shortStopLossHit
+              ? `StopLoss (${ns.format.number(bid)} ≥ ${ns.format.number(shortStopLossPrice)})`
+              : shortForecastRiseHit
+                ? `ForecastRise (${shortEntryForecast[sym].toFixed(3)} → ${forecast.toFixed(3)})`
+                : shortTrailingHit
+                  ? `TrailingStop (low=${ns.format.number(shortPeakLow[sym])} → now=${ns.format.number(bid)}, +${(((bid - shortPeakLow[sym]) / shortPeakLow[sym]) * 100).toFixed(1)}%)`
+                  : `Forecast (${forecast.toFixed(3)} ≥ ${(1 - regime.sellF).toFixed(3)})`;
+            const coverPrice = tryCover(sym, shortShares);
+            if (coverPrice > 0) {
+              delete shortPeakLow[sym];
+              delete shortEntryForecast[sym];
+              delete shortEntryTime[sym];
+              rebuyBlockedUntil[sym] = now + rebuyCooldownMs;
+              sells++;
+              const pnlPct = ((shortAvgBuyPrice - coverPrice) / shortAvgBuyPrice * 100).toFixed(1);
+              ns.print(`4S COVER ${sym}: ${shortShares} @ ${ns.format.number(coverPrice)} (${pnlPct}%) | ${grund}`);
+            }
+          }
+        }
+      }
     }
 
     // Kandidaten aufbauen und nach erwarteter Kante sortieren.
     const candidates = [];
     for (const sym of symbols) {
-      const [shares] = ns.stock.getPosition(sym);
-      if (shares > 0) continue;
+      const [shares, , shortS] = ns.stock.getPosition(sym);
+      if (shares > 0 || shortS > 0) continue;
       if ((rebuyBlockedUntil[sym] || 0) > now) {
         blockedCooldown++;
         continue;
@@ -528,6 +572,44 @@ export async function main(ns) {
       }
     }
 
+    // Short entry — bearish signals (independent of long slots)
+    if (canShort) {
+      const shortCandidates = [];
+      for (const sym of symbols) {
+        const [longS, , shortS] = ns.stock.getPosition(sym);
+        if (longS > 0 || shortS > 0) continue;
+        if ((rebuyBlockedUntil[sym] || 0) > now) continue;
+        const forecast = ns.stock.getForecast(sym);
+        const vol = ns.stock.getVolatility(sym);
+        const bearF = 1 - forecast;
+        if (bearF < adaptiveBuyF) continue;
+        if (vol < adaptiveMinVol) continue;
+        shortCandidates.push({ sym, score: getSignalScore(bearF, vol), forecast, vol });
+      }
+      shortCandidates.sort((a, b) => b.score - a.score);
+      const currentShortPositions = symbols.filter(s => ns.stock.getPosition(s)[2] > 0).length;
+      let shortSlots = Math.max(0, regime.maxPos - currentShortPositions);
+      for (const c of shortCandidates) {
+        if (shortSlots <= 0) break;
+        const maxShares = ns.stock.getMaxShares(c.sym);
+        const bid = ns.stock.getBidPrice(c.sym);
+        const moneyNow = ns.getPlayer().money;
+        const cashNow = Math.max(0, moneyNow - moneyNow * minCashReserveFraction - txFee);
+        const budget = Math.min(maxPerSymbolCash, cashNow);
+        const qty = Math.min(maxShares, Math.floor(budget / Math.max(1, bid)));
+        if (qty <= 0) { blockedBudget++; continue; }
+        const shortPrice = tryShort(c.sym, qty);
+        if (shortPrice > 0) {
+          shortSlots--;
+          buys++;
+          shortEntryForecast[c.sym] = c.forecast;
+          shortEntryTime[c.sym] = now;
+          shortPeakLow[c.sym] = ns.stock.getBidPrice(c.sym);
+          ns.print(`4S SHORT ${c.sym}: ${qty} @ ${ns.format.number(shortPrice)} f=${c.forecast.toFixed(3)} v=${c.vol.toFixed(3)}`);
+        }
+      }
+    }
+
     if (buys === 0 && sells === 0) {
       noTradeCycles++;
     } else {
@@ -547,7 +629,7 @@ export async function main(ns) {
       blockedBudget,
       adaptiveBuyF,
       adaptiveMinVol,
-      openPositions: symbols.filter(s => ns.stock.getPosition(s)[0] > 0).length,
+      openPositions: symbols.filter(s => { const [l, , sh] = ns.stock.getPosition(s); return l > 0 || sh > 0; }).length,
       tradableCash,
     };
   }
@@ -658,8 +740,31 @@ export async function main(ns) {
           ns.tprint(`MANIP SELL ${t.symbol}: ${shares} @ ${ns.format.number(sellPrice)}`);
           t.phase = "hack";
           t.nextLaunchAt = 0;
+          // Open short — server will be hacked down next, forecast will drop
+          if (canShort) {
+            const [, , curShortShares] = ns.stock.getPosition(t.symbol);
+            if (curShortShares <= 0) {
+              const maxShares = ns.stock.getMaxShares(t.symbol);
+              const bidPrice = ns.stock.getBidPrice(t.symbol);
+              const cash = ns.getPlayer().money;
+              const shortBudget = Math.max(0, cash - cash * minCashReserveFraction - txFee);
+              const shortQty = Math.min(maxShares, Math.floor(shortBudget / Math.max(1, bidPrice)));
+              if (shortQty > 0) {
+                const shortP = tryShort(t.symbol, shortQty);
+                if (shortP > 0) ns.tprint(`MANIP SHORT ${t.symbol}: ${shortQty} @ ${ns.format.number(shortP)}`);
+              }
+            }
+          }
         }
       } else if (t.phase === "hack" && curMoney <= maxMoney * pct_MinMoney && shares <= 0 && (rebuyBlockedUntil[t.symbol] || 0) <= now) {
+        // Cover short first — server will be grown up next, forecast will rise
+        if (canShort) {
+          const [, , curShortShares] = ns.stock.getPosition(t.symbol);
+          if (curShortShares > 0) {
+            const coverPrice = tryCover(t.symbol, curShortShares);
+            if (coverPrice > 0) ns.tprint(`MANIP COVER ${t.symbol}: ${curShortShares} @ ${ns.format.number(coverPrice)}`);
+          }
+        }
         const maxAvailable = ns.stock.getMaxShares(t.symbol);
         const askPrice = ns.stock.getAskPrice(t.symbol);
         const cash = ns.getPlayer().money;

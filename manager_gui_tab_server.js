@@ -142,23 +142,6 @@ export function renderServerTab(ns, panel) {
   const playerMoney = ns.getPlayer().money;
   const buyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, buyRam);
   const upgradePlan = getUpgradePlan(ns, purchasedServers, upgradeRam);
-  const stepUpgradePlan = getStepUpgradePlan(ns, purchasedServers, upgradeRam);
-
-  const autoUpgradeEnabled = panel.admin.autoUpgradeCheckbox.checked;
-  if (autoUpgradeEnabled && buyScriptExists && !buyRunning
-      && stepUpgradePlan.upgradableCount > 0 && stepUpgradePlan.minStepCost > 0
-      && playerMoney >= stepUpgradePlan.minStepCost) {
-    startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, upgradeRam, true);
-  }
-
-  const autoBuyEnabled = panel.admin.autoBuyCheckbox.checked;
-  const autoBuyRam = RAM_OPTIONS[0];
-  const autoBuyCost = ns.cloud.getServerCost(autoBuyRam);
-  const autoBuyPlan = getBuyPlan(ns, purchasedServers, purchasedLimit, autoBuyRam);
-  if (autoBuyEnabled && buyScriptExists && !buyRunning && !autoBuyPlan.blocked
-      && autoBuyCost > 0 && playerMoney >= autoBuyCost) {
-    startScriptIfIdle(ns, NEW_SERVER_BUY_SCRIPT, autoBuyRam);
-  }
 
   panel.admin.buyButton.disabled = !buyScriptExists || buyRunning || buyPlan.blocked;
   panel.admin.upgradeButton.disabled = !upgradeScriptExists || upgradeRunning || upgradePlan.upgradableCount === 0;

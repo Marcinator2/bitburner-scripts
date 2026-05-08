@@ -62,16 +62,17 @@ const STRATEGIES = {
   "Illuminati": {
     // Hard AI — defensive, prepares well, punishes tactical mistakes.
     // opponentSkillW 1.0: always simulate their best reply.
-    // cornerW -4.0 (was -1.0): with -1.0 the center-vs-corner spread was only 2 pts,
-    //   causing corner opens (1,1) even with cornerW negative (games 33, 35). At -4.0
-    //   the spread is 12 pts: center +4, 1-in -4, corner -8. Reliably forces interior play.
-    // passThresh -1.5 (was -4): -4 allowed moves scoring -3.3, -3.8 which destroy own
-    //   groups (games 30, 43, 44). The winning game 36's second move scored -1.0 — that
-    //   must still be playable. -1.5 blocks clearly harmful moves (≤-2) but tolerates
-    //   marginal negative moves that may be necessary to keep the group alive.
-    captureW: 8,  connW: 1.5, atariW: 14, preAtariW: 5, cutW: 10, bridgeW: 6,
-    selfAtari1: 50, selfAtari2: 14, eyeFill: 32, cornerW: -4.0, passThresh: -1.5,
-    saveAtariW: 45, savePreAtariW: 16, opponentSkillW: 1.0,
+    // cornerW 0.5: was -4.0 (tuned for 7x7 center preference), but on 5x5 only
+    //   center gets edgeDist=2; all other cells score -4 to -8 → engine passes after
+    //   1st move on 5x5, causing 41% of games to end in ≤2 moves. Positive cornerW
+    //   allows expansion without mass-passes.
+    // passThresh -8: was -1.5, which caused premature passing as above.
+    //   Illuminati exploits passive play → keep filling board.
+    // Higher captureW/atariW/saveAtariW: Illuminati has strong territory control,
+    //   so tactical captures are disproportionately valuable.
+    captureW: 14, connW: 2.0, atariW: 20, preAtariW: 8, cutW: 14, bridgeW: 10,
+    selfAtari1: 55, selfAtari2: 16, eyeFill: 35, cornerW: 0.5, passThresh: -8,
+    saveAtariW: 55, savePreAtariW: 22, opponentSkillW: 1.0,
   },
 };
 
